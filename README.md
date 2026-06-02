@@ -1,13 +1,13 @@
 디렉터리 구조
 
-my-project/
+my-project
 ├── docker-compose.yml
-├── nginx/
+├── nginx
 │   └── default.conf
-├── frontend/
+├── frontend
 │   ├── Dockerfile
 │   └── ... (Vue.js 프로젝트 파일)
-└── backend/
+└── backend
     ├── Dockerfile
     └── ... (Node.js + TypeScript 프로젝트 파일)
 
