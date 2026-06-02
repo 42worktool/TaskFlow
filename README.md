@@ -1,15 +1,15 @@
 디렉터리 구조
-
-my-project
-├── docker-compose.yml
-├── nginx
-│   └── default.conf
-├── frontend
-│   ├── Dockerfile
-│   └── ... (Vue.js 프로젝트 파일)
-└── backend
-    ├── Dockerfile
-    └── ... (Node.js + TypeScript 프로젝트 파일)
+<br><br>
+my-project<br>
+├── docker-compose.yml<br>
+├── nginx<br>
+│   └── default.conf<br>
+├── frontend<br>
+│   ├── Dockerfile<br>
+│   └── ... (Vue.js 프로젝트 파일)<br>
+└── backend<br>
+    ├── Dockerfile<br>
+    └── ... (Node.js + TypeScript 프로젝트 파일)<br>
 
 
 
