@@ -1,5 +1,5 @@
 # 프로젝트 이름 설정
-NAME = workspace_system
+NAME = korello
 
 # 사용할 도커 컴포즈 파일 지정
 COMPOSE = docker compose
