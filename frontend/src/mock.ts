@@ -41,6 +41,11 @@ export const mockBoards: Board[] = [
     workspaceId: 'workspace-1',
     title: 'Collaboration tool development',
   },
+  {
+    id: 'board-2',
+    workspaceId: 'workspace-1',
+    title: 'Test',
+  },
 ]
 
 export const mockBoardLists: BoardList[] = [
@@ -58,6 +63,11 @@ export const mockBoardLists: BoardList[] = [
     id: 'list-done',
     boardId: 'board-1',
     title: 'Done',
+  },
+  {
+    id: 'list-empty',
+    boardId: 'board-2',
+    title: 'Empty',
   },
 ]
 

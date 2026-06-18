@@ -26,7 +26,6 @@ export type BoardList = {
   id: string
   boardId: string
   title: string
-  order: number
 }
 
 export type CardLocation = { type: 'list'; listId: string } | { type: 'inbox'; userId: string }
@@ -36,7 +35,4 @@ export type Card = {
   location: CardLocation
   title: string
   description: string
-  order: number
-  assigneeIds: string[]
-  dueDate?: string
 }
