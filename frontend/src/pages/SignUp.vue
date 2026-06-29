@@ -1,5 +1,9 @@
+<script setup lang="ts">
+import AuthLayout from '../layouts/AuthLayout.vue'
+</script>
+
 <template>
-  <main>
+  <AuthLayout>
     <h1>Sign Up Page</h1>
-  </main>
+  </AuthLayout>
 </template>
