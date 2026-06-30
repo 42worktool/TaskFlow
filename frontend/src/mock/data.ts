@@ -1,0 +1,62 @@
+import type { Workspace, WorkspaceMember, List, Card, Notification } from '../types'
+
+export const currentUser = {
+  id: 'user-1',
+  name: '김연준',
+  email: 'yeonjunky@gmail.com',
+  avatar: '김',
+  avatar_color: '#2563EB',
+}
+
+export const myWorkspaces: Workspace[] = [
+  { id: 'ws-1', name: 'MiliDeal 앱 개발', is_public: false, member_count: 4, color: '#2563EB', created_at: '2025-05-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z' },
+  { id: 'ws-2', name: '마케팅 캠페인 Q2', is_public: false, member_count: 6, color: '#EF4444', created_at: '2025-04-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z' },
+  { id: 'ws-3', name: '인프라 마이그레이션', is_public: false, member_count: 3, color: '#F59E0B', created_at: '2025-03-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z' },
+]
+
+export const openWorkspaces: Workspace[] = [
+  { id: 'ws-4', name: 'Open Source Tracker', is_public: true, member_count: 12, color: '#10B981', created_at: '2025-01-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z' },
+  { id: 'ws-5', name: 'Design System Hub', is_public: true, member_count: 8, color: '#7C3AED', created_at: '2025-02-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z' },
+  { id: 'ws-6', name: 'Community Blog', is_public: true, member_count: 5, color: '#0EA5E9', created_at: '2025-02-15T00:00:00Z', updated_at: '2025-05-20T00:00:00Z' },
+  { id: 'ws-7', name: 'Dev Roadmap 2025', is_public: true, member_count: 20, color: '#F59E0B', created_at: '2025-01-15T00:00:00Z', updated_at: '2025-05-20T00:00:00Z' },
+]
+
+export const workspaceMembers: WorkspaceMember[] = [
+  { user_id: 'user-1', name: '김연준', email: 'yeonjunky@gmail.com', profile_image_url: null, role: 'OWNER' },
+  { user_id: 'user-2', name: '이지우', email: 'jiwoo@example.com', profile_image_url: null, role: 'EDITOR' },
+  { user_id: 'user-3', name: '박서준', email: 'seojun@example.com', profile_image_url: null, role: 'VIEWER' },
+]
+
+export const lists: List[] = [
+  { id: 'list-1', workspace_id: 'ws-1', name: '할 일', sequence: 1 },
+  { id: 'list-2', workspace_id: 'ws-1', name: '진행 중', sequence: 2 },
+  { id: 'list-3', workspace_id: 'ws-1', name: '검토 중', sequence: 3 },
+  { id: 'list-4', workspace_id: 'ws-1', name: '완료', sequence: 4 },
+]
+
+export const cards: Card[] = [
+  { id: 'card-1', list_id: 'list-1', title: '로그인 API 연동', description: null, start_at: null, deadline: '2025-05-20T00:00:00Z', sequence: 1, created_at: '2025-05-01T00:00:00Z', label: '개발', label_color: '#2563EB' },
+  { id: 'card-2', list_id: 'list-1', title: 'UI 컴포넌트 설계', description: null, start_at: null, deadline: '2025-05-21T00:00:00Z', sequence: 2, created_at: '2025-05-01T00:00:00Z', label: '디자인', label_color: '#7C3AED' },
+  { id: 'card-3', list_id: 'list-1', title: '배포 파이프라인 설정', description: null, start_at: null, deadline: '2025-05-22T00:00:00Z', sequence: 3, created_at: '2025-05-01T00:00:00Z', label: '인프라', label_color: '#6B7280' },
+  { id: 'card-4', list_id: 'list-2', title: 'OAuth 구현', description: null, start_at: null, deadline: '2025-05-20T00:00:00Z', sequence: 1, created_at: '2025-05-01T00:00:00Z', label: '개발', label_color: '#2563EB' },
+  { id: 'card-5', list_id: 'list-2', title: '메인 대시보드 개발', description: null, start_at: null, deadline: '2025-05-21T00:00:00Z', sequence: 2, created_at: '2025-05-01T00:00:00Z', label: '개발', label_color: '#2563EB' },
+  { id: 'card-6', list_id: 'list-3', title: 'API 문서화', description: null, start_at: null, deadline: '2025-05-20T00:00:00Z', sequence: 1, created_at: '2025-05-01T00:00:00Z', label: '문서', label_color: '#F59E0B' },
+  { id: 'card-7', list_id: 'list-4', title: 'DB 스키마 설계', description: null, start_at: null, deadline: '2025-05-20T00:00:00Z', sequence: 1, created_at: '2025-05-01T00:00:00Z', label: '완료', label_color: '#10B981' },
+  { id: 'card-8', list_id: 'list-4', title: '팀 온보딩 완료', description: null, start_at: null, deadline: '2025-05-21T00:00:00Z', sequence: 2, created_at: '2025-05-01T00:00:00Z', label: '완료', label_color: '#10B981' },
+  { id: 'card-9', list_id: 'list-4', title: 'CI/CD 설정', description: null, start_at: null, deadline: '2025-05-22T00:00:00Z', sequence: 3, created_at: '2025-05-01T00:00:00Z', label: '완료', label_color: '#10B981' },
+  { id: 'card-10', list_id: 'list-4', title: '기획 확정', description: null, start_at: null, deadline: '2025-05-23T00:00:00Z', sequence: 4, created_at: '2025-05-01T00:00:00Z', label: '완료', label_color: '#10B981' },
+]
+
+export const calendarCards = [
+  { date: 15, month: 5, year: 2025, title: 'OAuth 구현', color: '#7C3AED' },
+  { date: 20, month: 5, year: 2025, title: '메인 대시보드', color: '#2563EB' },
+  { date: 23, month: 5, year: 2025, title: 'API 문서화', color: '#10B981' },
+  { date: 27, month: 5, year: 2025, title: 'UI 컴포넌트', color: '#F59E0B' },
+]
+
+export const notifications: Notification[] = [
+  { id: 'n-1', text: '이지우님이 카드를 할당했습니다', time: '5분 전', read: false, avatar: '이', avatar_color: '#10B981' },
+  { id: 'n-2', text: '박서준님이 댓글을 남겼습니다', time: '1시간 전', read: false, avatar: '박', avatar_color: '#7C3AED' },
+  { id: 'n-3', text: 'OAuth 구현 카드 완료됨', time: '2시간 전', read: true, avatar: '', avatar_color: '#6B7280' },
+  { id: 'n-4', text: '새 팀원이 프로젝트에 참여', time: '어제', read: true, avatar: '', avatar_color: '#6B7280' },
+]
