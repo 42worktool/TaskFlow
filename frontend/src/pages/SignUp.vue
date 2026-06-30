@@ -29,7 +29,12 @@ function signup() {
       <input v-model="name" type="text" placeholder="이름" class="form-input" />
       <input v-model="email" type="email" placeholder="이메일 주소" class="form-input" />
       <input v-model="password" type="password" placeholder="비밀번호" class="form-input" />
-      <input v-model="passwordConfirm" type="password" placeholder="비밀번호 확인" class="form-input" />
+      <input
+        v-model="passwordConfirm"
+        type="password"
+        placeholder="비밀번호 확인"
+        class="form-input"
+      />
       <p v-if="passwordError" class="error-msg">{{ passwordError }}</p>
       <button type="submit" class="submit-btn">회원가입</button>
     </form>
@@ -63,14 +68,14 @@ function signup() {
 }
 
 .form-input:focus {
-  border-color: #2563EB;
+  border-color: #2563eb;
   background: #fff;
   outline: none;
 }
 
 .submit-btn {
   padding: 13px;
-  background: #2563EB;
+  background: #2563eb;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -91,7 +96,7 @@ function signup() {
 }
 
 .login-link a {
-  color: #2563EB;
+  color: #2563eb;
   font-weight: 500;
 }
 

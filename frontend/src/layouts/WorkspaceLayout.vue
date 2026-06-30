@@ -8,7 +8,9 @@ import { myWorkspaces, openWorkspaces, workspaceMembers, currentUser } from '../
 const route = useRoute()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
 const allWorkspaces = [...myWorkspaces, ...openWorkspaces]
-const workspace = computed(() => allWorkspaces.find(w => w.id === workspaceId.value) ?? myWorkspaces[0])
+const workspace = computed(
+  () => allWorkspaces.find((w) => w.id === workspaceId.value) ?? myWorkspaces[0],
+)
 
 const showShareModal = ref(false)
 
@@ -36,12 +38,20 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
         <p class="sidebar-workspace-name">{{ workspace.name }}</p>
         <ul class="sidebar-nav">
           <li>
-            <RouterLink :to="`/workspaces/${workspaceId}/board`" class="nav-item" active-class="nav-item--active">
+            <RouterLink
+              :to="`/workspaces/${workspaceId}/board`"
+              class="nav-item"
+              active-class="nav-item--active"
+            >
               <span class="nav-icon">⊞</span> 보드
             </RouterLink>
           </li>
           <li>
-            <RouterLink :to="`/workspaces/${workspaceId}/calendar`" class="nav-item" active-class="nav-item--active">
+            <RouterLink
+              :to="`/workspaces/${workspaceId}/calendar`"
+              class="nav-item"
+              active-class="nav-item--active"
+            >
               <span class="nav-icon">▦</span> 달력
             </RouterLink>
           </li>
@@ -60,7 +70,10 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
           <p class="team-label">팀원</p>
           <ul class="team-list">
             <li v-for="(m, i) in workspaceMembers" :key="m.user_id" class="team-member">
-              <div class="team-avatar" :style="{ background: memberColors[i % memberColors.length] }">
+              <div
+                class="team-avatar"
+                :style="{ background: memberColors[i % memberColors.length] }"
+              >
                 {{ m.name[0] }}
               </div>
               <span class="team-name">{{ m.name }}</span>
@@ -139,7 +152,7 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
 
 .header-btn {
   padding: 6px 14px;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   border: none;
   border-radius: 6px;
   font-size: 13px;
@@ -148,7 +161,7 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
 }
 
 .header-btn:hover {
-  background: rgba(255,255,255,0.25);
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .header-btn-outline {
@@ -207,7 +220,7 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
 
 .nav-item--active {
   background: #eff6ff;
-  color: #2563EB;
+  color: #2563eb;
   font-weight: 600;
 }
 

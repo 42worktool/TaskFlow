@@ -72,8 +72,8 @@ const activeTab = ref<'알림' | '멘션' | '업데이트'>('알림')
 }
 
 .tab-btn.active {
-  color: #2563EB;
-  border-bottom-color: #2563EB;
+  color: #2563eb;
+  border-bottom-color: #2563eb;
   font-weight: 600;
 }
 
@@ -107,7 +107,7 @@ const activeTab = ref<'알림' | '멘션' | '업데이트'>('알림')
 }
 
 .unread-dot.visible {
-  background: #2563EB;
+  background: #2563eb;
 }
 
 .notif-avatar {

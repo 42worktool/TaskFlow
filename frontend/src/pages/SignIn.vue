@@ -132,14 +132,14 @@ function login() {
 }
 
 .form-input:focus {
-  border-color: #2563EB;
+  border-color: #2563eb;
   background: #fff;
   outline: none;
 }
 
 .login-btn {
   padding: 13px;
-  background: #2563EB;
+  background: #2563eb;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -160,7 +160,7 @@ function login() {
 }
 
 .signup-link a {
-  color: #2563EB;
+  color: #2563eb;
   font-weight: 500;
 }
 </style>

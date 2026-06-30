@@ -135,8 +135,8 @@ const activeNav = ref('홈')
 .search-input {
   width: 100%;
   padding: 7px 14px;
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   font-size: 14px;
   color: #fff;
@@ -144,7 +144,7 @@ const activeNav = ref('홈')
 }
 
 .search-input::placeholder {
-  color: rgba(255,255,255,0.55);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .header-nav {
@@ -158,19 +158,19 @@ const activeNav = ref('홈')
   background: none;
   border: none;
   font-size: 14px;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   border-radius: 6px;
 }
 
 .header-nav-btn:hover {
   color: #fff;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .new-btn {
   padding: 7px 16px;
-  background: #2563EB;
+  background: #2563eb;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -229,7 +229,7 @@ const activeNav = ref('홈')
 
 .sidebar-item--active {
   background: #eff6ff;
-  color: #2563EB;
+  color: #2563eb;
   font-weight: 600;
 }
 
@@ -274,7 +274,7 @@ const activeNav = ref('홈')
 }
 
 .project-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .card-color-bar {
@@ -308,7 +308,7 @@ const activeNav = ref('홈')
 
 .card-badge--public {
   background: #eff6ff;
-  color: #2563EB;
+  color: #2563eb;
 }
 
 .card-footer {
@@ -335,7 +335,7 @@ const activeNav = ref('홈')
 }
 
 .project-card--new:hover {
-  border-color: #2563EB;
+  border-color: #2563eb;
   box-shadow: none;
 }
 

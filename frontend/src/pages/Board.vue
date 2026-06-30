@@ -3,17 +3,17 @@ import { computed } from 'vue'
 import { lists, cards } from '../mock/data'
 
 const columns = computed(() =>
-  lists.map(list => ({
+  lists.map((list) => ({
     ...list,
-    cards: cards.filter(c => c.list_id === list.id),
-  }))
+    cards: cards.filter((c) => c.list_id === list.id),
+  })),
 )
 
 const badgeColors: Record<string, string> = {
   '할 일': '#6b7280',
   '진행 중': '#2563EB',
   '검토 중': '#F59E0B',
-  '완료': '#10B981',
+  완료: '#10B981',
 }
 
 function formatDate(iso: string | null) {
@@ -44,7 +44,14 @@ function formatDate(iso: string | null) {
           <li v-for="card in col.cards" :key="card.id" class="board-card">
             <p class="card-title">{{ card.title }}</p>
             <div class="card-meta">
-              <span v-if="card.label" class="card-label" :style="{ background: (card.label_color ?? '#6b7280') + '20', color: card.label_color ?? '#6b7280' }">
+              <span
+                v-if="card.label"
+                class="card-label"
+                :style="{
+                  background: (card.label_color ?? '#6b7280') + '20',
+                  color: card.label_color ?? '#6b7280',
+                }"
+              >
                 {{ card.label }}
               </span>
               <span class="card-date">{{ formatDate(card.deadline) }}</span>
@@ -93,9 +100,9 @@ function formatDate(iso: string | null) {
 }
 
 .toolbar-btn--primary {
-  background: #2563EB;
+  background: #2563eb;
   color: #fff;
-  border-color: #2563EB;
+  border-color: #2563eb;
 }
 
 .toolbar-btn--primary:hover {
@@ -161,11 +168,11 @@ function formatDate(iso: string | null) {
   border-radius: 8px;
   padding: 12px;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .board-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .card-title {
@@ -216,7 +223,7 @@ function formatDate(iso: string | null) {
 }
 
 .add-card-btn:hover {
-  background: rgba(0,0,0,0.05);
+  background: rgba(0, 0, 0, 0.05);
   color: #374151;
 }
 </style>

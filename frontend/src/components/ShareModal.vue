@@ -30,11 +30,7 @@ const roleLabels: Record<string, string> = {
       <div class="section">
         <p class="section-label">이메일로 초대</p>
         <div class="invite-row">
-          <input
-            v-model="inviteEmail"
-            class="invite-input"
-            placeholder="이메일 주소 입력..."
-          />
+          <input v-model="inviteEmail" class="invite-input" placeholder="이메일 주소 입력..." />
           <button class="role-btn">편집자 ▾</button>
         </div>
         <button class="send-btn">메일로 초대 보내기 (mailto:)</button>
@@ -52,7 +48,13 @@ const roleLabels: Record<string, string> = {
         <p class="section-label">현재 팀원</p>
         <ul class="member-list">
           <li v-for="m in workspaceMembers" :key="m.user_id" class="member-item">
-            <div class="member-avatar" :style="{ background: m.role === 'OWNER' ? '#2563EB' : m.role === 'EDITOR' ? '#10B981' : '#7C3AED' }">
+            <div
+              class="member-avatar"
+              :style="{
+                background:
+                  m.role === 'OWNER' ? '#2563EB' : m.role === 'EDITOR' ? '#10B981' : '#7C3AED',
+              }"
+            >
               {{ m.name[0] }}
             </div>
             <div class="member-info">
@@ -166,7 +168,7 @@ const roleLabels: Record<string, string> = {
 .send-btn {
   width: 100%;
   padding: 12px;
-  background: #2563EB;
+  background: #2563eb;
   color: #fff;
   border: none;
   border-radius: 8px;

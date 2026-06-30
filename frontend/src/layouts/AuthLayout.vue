@@ -5,9 +5,7 @@
     <main class="auth-card">
       <slot />
     </main>
-    <footer class="auth-footer">
-      © 2025 TaskFlow · 이용약관 · 개인정보처리방침
-    </footer>
+    <footer class="auth-footer">© 2025 TaskFlow · 이용약관 · 개인정보처리방침</footer>
   </div>
 </template>
 

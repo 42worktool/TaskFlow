@@ -19,7 +19,7 @@ defineProps<{ tagline: string }>()
 .logo-icon {
   width: 60px;
   height: 60px;
-  background: #2563EB;
+  background: #2563eb;
   border-radius: 14px;
   display: flex;
   align-items: center;
