@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import InboxPanel from '../components/InboxPanel.vue'
+import InboxDrawer from '../components/InboxDrawer.vue'
+import NotificationMenu from '../components/NotificationMenu.vue'
+import ProfileMenu from '../components/ProfileMenu.vue'
+import SearchInput from '../components/SearchInput.vue'
 import ShareModal from '../components/ShareModal.vue'
-import { myWorkspaces, openWorkspaces, workspaceMembers, currentUser } from '../mock/data'
+import { myWorkspaces, openWorkspaces, workspaceMembers } from '../mock/data'
 
 const route = useRoute()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
@@ -11,8 +14,10 @@ const allWorkspaces = [...myWorkspaces, ...openWorkspaces]
 const workspace = computed(
   () => allWorkspaces.find((w) => w.id === workspaceId.value) ?? myWorkspaces[0],
 )
+const isBoardRoute = computed(() => route.path.endsWith('/board'))
 
 const showShareModal = ref(false)
+const showInbox = ref(false)
 
 const memberColors = ['#2563EB', '#10B981', '#7C3AED']
 </script>
@@ -24,11 +29,16 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
       <RouterLink to="/workspaces" class="logo">TaskFlow</RouterLink>
       <span class="workspace-name">{{ workspace.name }}</span>
       <div class="header-right">
-        <div class="user-avatar" :style="{ background: currentUser.avatar_color }">
-          {{ currentUser.avatar }}
+        <SearchInput />
+        <div class="header-actions">
+          <NotificationMenu />
+          <button v-if="!isBoardRoute" class="header-btn" type="button" @click="showInbox = true">
+            인박스
+          </button>
         </div>
-        <button class="header-btn">팀원 관리</button>
-        <button class="header-btn-outline" @click="showShareModal = true">공유</button>
+        <div class="profile-slot">
+          <ProfileMenu />
+        </div>
       </div>
     </header>
 
@@ -79,14 +89,20 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
               <span class="team-name">{{ m.name }}</span>
             </li>
           </ul>
+          <div class="sidebar-actions">
+            <button class="sidebar-action-btn" type="button">팀원 관리</button>
+            <button
+              class="sidebar-action-btn sidebar-action-btn--primary"
+              type="button"
+              @click="showShareModal = true"
+            >
+              공유
+            </button>
+          </div>
         </div>
       </nav>
 
-      <!-- Main view + Inbox -->
-      <div class="main-with-inbox">
-        <RouterView />
-        <InboxPanel />
-      </div>
+      <RouterView />
     </div>
 
     <ShareModal
@@ -95,198 +111,8 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
       :workspace-id="workspaceId"
       @close="showShareModal = false"
     />
+    <InboxDrawer :open="showInbox" @close="showInbox = false" />
   </div>
 </template>
 
-<style scoped>
-.app-shell {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.app-header {
-  height: 52px;
-  background: #1a3a6b;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.logo {
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff;
-  text-decoration: none;
-  margin-right: 8px;
-}
-
-.workspace-name {
-  flex: 1;
-  text-align: center;
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  color: #fff;
-}
-
-.header-btn {
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #fff;
-  cursor: pointer;
-}
-
-.header-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.header-btn-outline {
-  padding: 6px 14px;
-  background: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #374151;
-  cursor: pointer;
-}
-
-.content-area {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.sidebar {
-  width: 200px;
-  flex-shrink: 0;
-  background: #fff;
-  border-right: 1px solid #e5e7eb;
-  display: flex;
-  flex-direction: column;
-  padding: 16px 0;
-  overflow-y: auto;
-}
-
-.sidebar-workspace-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: #111827;
-  padding: 0 16px 12px;
-}
-
-.sidebar-nav {
-  list-style: none;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  font-size: 14px;
-  color: #374151;
-  text-decoration: none;
-  cursor: pointer;
-  border-radius: 0;
-}
-
-.nav-item:hover {
-  background: #f3f4f6;
-}
-
-.nav-item--active {
-  background: #eff6ff;
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.nav-item--disabled {
-  color: #9ca3af;
-  cursor: default;
-}
-
-.nav-item--disabled:hover {
-  background: none;
-}
-
-.nav-icon {
-  font-size: 14px;
-  width: 18px;
-  text-align: center;
-}
-
-.sidebar-team {
-  margin-top: 20px;
-  padding: 0 16px;
-}
-
-.team-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 10px;
-}
-
-.team-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.team-member {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.team-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.team-name {
-  font-size: 13px;
-  color: #374151;
-}
-
-.main-with-inbox {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-</style>
+<style scoped src="../styles/workspace-layout.css"></style>

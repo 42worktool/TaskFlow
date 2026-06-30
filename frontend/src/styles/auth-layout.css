@@ -1,0 +1,46 @@
+.auth-bg {
+  min-height: 100vh;
+  background: #0b2249;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(30, 80, 150, 0.35);
+  pointer-events: none;
+}
+
+.circle-1 {
+  width: 420px;
+  height: 420px;
+  left: -120px;
+  top: 80px;
+}
+
+.circle-2 {
+  width: 320px;
+  height: 320px;
+  right: -60px;
+  bottom: 60px;
+}
+
+.auth-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px 44px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  z-index: 1;
+}
+
+.auth-footer-wrap {
+  position: absolute;
+  bottom: 24px;
+}
