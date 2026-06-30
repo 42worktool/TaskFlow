@@ -33,7 +33,7 @@ Browser → http://<domain>:4430 → cloud VM (public IP) → SSH reverse tunnel
 
 ### 4. SSH key setup
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_gcp -C "<nickname>"
+ssh-keygen -t ed25519 -f ~/.ssh/<private-key> -C "<nickname>"
 # leave passphrase empty for unattended tunneling
 ```
 Add the `.pub` key content to the VM via Console → VM instance → Edit → SSH Keys.
@@ -47,9 +47,25 @@ sudo systemctl restart sshd
 
 ### 6. Start the tunnel (run on local machine)
 ```bash
-ssh -i ~/.ssh/id_ed25519_gcp \
+ssh -i ~/.ssh/<private-key> \
     -R 4430:localhost:8080 \
     -N <nickname>@<domain>
+```
+
+or add below config to your ~/.ssh/config
+
+```
+Host tunnel
+  HostName <cloud-vm-ip>
+  User <nickname>
+  RemoteForward 4430 localhost:4430
+  SessionType none
+```
+
+and run
+
+```bash
+ssh tunnel
 ```
 
 ### 7. Vite config
