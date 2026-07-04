@@ -5,6 +5,7 @@ import { workspaceRouter } from "./modules/workspace";
 import { boardRouter } from "./modules/board";
 import { calendarRouter } from "./modules/calendar";
 import { inboxRouter } from "./modules/inbox";
+import { errorHandler } from "./utils/http";
 
 const app = express();
 
@@ -16,5 +17,7 @@ app.use("/api/workspaces", workspaceRouter);
 app.use("/api/boards", boardRouter);
 app.use("/api/calendar", calendarRouter);
 app.use("/api/inbox", inboxRouter);
+
+app.use(errorHandler);
 
 export default app;
