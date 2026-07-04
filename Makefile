@@ -4,7 +4,7 @@ NAME = korello
 # 사용할 도커 컴포즈 파일 지정
 COMPOSE = docker compose
 
-.PHONY: all up down start stop logs clean fclean re init check_init
+.PHONY: all up down start stop logs clean fclean re init check_init migrate seed db studio psql
 
 # 기본 실행
 all: up
@@ -77,3 +77,25 @@ fclean: clean
 
 # 완전 초기화 후 시스템 재구동
 re: fclean all
+
+# ----------------------------------------------------
+# 5. 데이터베이스 (Prisma) — compose 의 backend 컨테이너 안에서 실행
+# ----------------------------------------------------
+migrate:
+	@echo "Prisma 마이그레이션 적용 중 (db push)..."
+	$(COMPOSE) exec -T backend npx prisma db push --skip-generate
+
+seed:
+	@echo "시드 데이터 적용 중..."
+	$(COMPOSE) exec -T backend npx prisma db seed
+
+# 마이그레이션 + 시드 한 번에
+db: migrate seed
+	@echo "DB 준비 완료."
+
+studio:
+	@echo "Prisma Studio 실행: http://localhost:5555"
+	$(COMPOSE) exec -T backend npx prisma studio
+
+psql:
+	@$(COMPOSE) exec -T postgres psql -U user -d mydb

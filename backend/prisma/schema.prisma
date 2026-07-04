@@ -1,0 +1,233 @@
+// ============================================================
+// Prisma schema — ft_transcendence (korello)
+//   Source of truth for column names: docs/*.dto.ts + docs/CONSIDERATIONS.md
+//   Cascade rules (CONSIDERATIONS.md):
+//     - Workspace delete       -> Lists, Cards (via Lists), Labels
+//     - List delete            -> Cards.list_id SET NULL (inbox), cards kept
+//     - Card delete            -> CardMember, CardLabel, Attachment, Comment cascade
+//     - Label delete           -> CardLabel cascade (label removed from all cards)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum OAuthProvider {
+  google
+  naver
+  kakao
+}
+
+// ------------------------------------------------------------
+// User
+//   docs/users.dto.ts + docs/common.dto.ts (OAuthProvider)
+//   password_hash nullable: OAuth users have no password.
+//   email nullable: OAuth provider may not expose email.
+// ------------------------------------------------------------
+model User {
+  id               String        @id @default(uuid())
+  name             String
+  email            String?       @unique
+  password_hash    String?
+  profile_image_url String?
+  provider         OAuthProvider?
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+
+  workspaceMembers WorkspaceMember[]
+  cards            Card[]         @relation("CardOwner")   // inbox owner (user_id)
+  cardMembers      CardMember[]
+  comments         Comment[]
+
+  @@map("Users")
+}
+
+// ------------------------------------------------------------
+// Workspace  (= single-board container; planner footnote [d][f][g])
+//   No owner_id column: OWNER tracked via WorkspaceMember role (CONSIDERATIONS).
+// ------------------------------------------------------------
+model Workspace {
+  id         String   @id @default(uuid())
+  name       String
+  is_public  Boolean  @default(false) @map("is_public")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  members    WorkspaceMember[]
+  lists      List[]
+  labels     Label[]
+  cards      Card[]     @relation("WorkspaceCards")
+
+  @@map("Workspaces")
+}
+
+// ------------------------------------------------------------
+// WorkspaceMember  PK(user_id, workspace_id)
+//   CONSIDERATIONS: last-OWNER guard enforced in service layer.
+// ------------------------------------------------------------
+model WorkspaceMember {
+  user_id      String    @map("user_id")
+  workspace_id String    @map("workspace_id")
+  role         Role      @default(MEMBER)
+  created_at   DateTime  @default(now())
+
+  user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, workspace_id])
+  @@index([workspace_id])
+  @@map("WorkspaceMembers")
+}
+
+// ------------------------------------------------------------
+// List (column of the board)
+//   sequence: fractional-index float. Midpoint strategy; rebalance when gap < 1e-6.
+// ------------------------------------------------------------
+model List {
+  id           String   @id @default(uuid())
+  workspace_id String   @map("workspace_id")
+  name         String
+  sequence     Float    @default(32768)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  cards     Card[]    @relation("ListCards")
+
+  @@index([workspace_id])
+  @@map("Lists")
+}
+
+// ------------------------------------------------------------
+// Card
+//   list_id NULL  -> inbox card.
+//   user_id  NULL allowed -> inbox owner (distinct from assignees; CONSIDERATIONS).
+//   workspace_id denormalised for fast cross-workspace move validation & queries.
+// ------------------------------------------------------------
+model Card {
+  id           String    @id @default(uuid())
+  list_id      String?   @map("list_id")
+  user_id      String?   @map("user_id")    // inbox owner, not assignee
+  workspace_id String    @map("workspace_id")
+  title        String
+  description  String?
+  start_at     DateTime?
+  deadline     DateTime?
+  sequence     Float     @default(32768)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  list        List?      @relation("ListCards", fields: [list_id], references: [id], onDelete: SetNull)
+  owner       User?      @relation("CardOwner", fields: [user_id], references: [id], onDelete: SetNull)
+  workspace   Workspace  @relation("WorkspaceCards", fields: [workspace_id], references: [id], onDelete: Cascade)
+  members     CardMember[]
+  labels      CardLabel[]
+  attachments Attachment[]
+  comments    Comment[]
+
+  @@index([list_id])
+  @@index([workspace_id])
+  @@map("Cards")
+}
+
+// ------------------------------------------------------------
+// CardMember (assignees, N:M). Cascade on card & user delete.
+// ------------------------------------------------------------
+model CardMember {
+  card_id  String @map("card_id")
+  user_id  String @map("user_id")
+
+  card Card @relation(fields: [card_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([card_id, user_id])
+  @@index([user_id])
+  @@map("CardMembers")
+}
+
+// ------------------------------------------------------------
+// Label (workspace-scoped; CONSIDERATIONS).
+// ------------------------------------------------------------
+model Label {
+  id           String   @id @default(uuid())
+  workspace_id String   @map("workspace_id")
+  label_name   String   @map("label_name")
+  label_color  String   @map("label_color")   // "#RRGGBB"
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  workspace Workspace  @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  cards     CardLabel[]
+
+  @@unique([workspace_id, label_name])
+  @@index([workspace_id])
+  @@map("Labels")
+}
+
+// ------------------------------------------------------------
+// CardLabel (join). Deleting a Label removes it from all cards (cascade).
+// ------------------------------------------------------------
+model CardLabel {
+  card_id  String @map("card_id")
+  label_id String @map("label_id")
+
+  card  Card  @relation(fields: [card_id], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [label_id], references: [id], onDelete: Cascade)
+
+  @@id([card_id, label_id])
+  @@index([label_id])
+  @@map("CardLabels")
+}
+
+// ------------------------------------------------------------
+// Attachment
+//   DELETE /cards/attachments/{attachment_id} path has no card_id
+//   -> ownership traced back via this relation (CONSIDERATIONS).
+// ------------------------------------------------------------
+model Attachment {
+  id        String   @id @default(uuid())
+  card_id   String   @map("card_id")
+  file_url  String   @map("file_url")
+  file_name String   @map("file_name")
+  created_at DateTime @default(now())
+
+  card Card @relation(fields: [card_id], references: [id], onDelete: Cascade)
+
+  @@index([card_id])
+  @@map("Attachments")
+}
+
+// ------------------------------------------------------------
+// Comment
+//   author info joined; user_id from token, never body (CONSIDERATIONS).
+//   Edit: author only. Delete: author OR workspace ADMIN/OWNER.
+// ------------------------------------------------------------
+model Comment {
+  id          String   @id @default(uuid())
+  card_id     String   @map("card_id")
+  user_id     String   @map("user_id")
+  comment_str String   @map("comment_str")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  card Card @relation(fields: [card_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([card_id])
+  @@map("Comments")
+}
