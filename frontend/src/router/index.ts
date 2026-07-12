@@ -6,6 +6,7 @@ import Workspace from '../pages/Workspace.vue'
 import WorkspaceLayout from '../layouts/WorkspaceLayout.vue'
 import Board from '../pages/Board.vue'
 import Calendar from '../pages/Calendar.vue'
+import Search from '../pages/Search.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -14,6 +15,7 @@ const router = createRouter({
     { path: '/signin', component: SignIn },
     { path: '/signup', component: SignUp },
     { path: '/workspaces', component: Workspace },
+    { path: '/search', component: Search },
     {
       path: '/workspaces/:workspaceId',
       component: WorkspaceLayout,
