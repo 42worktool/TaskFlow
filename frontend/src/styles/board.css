@@ -1,0 +1,16 @@
+.board-page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+  background: #f3f4f6;
+}
+
+.board-columns {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 14px;
+  padding: 16px 20px;
+  overflow-x: auto;
+}
