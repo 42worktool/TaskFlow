@@ -52,4 +52,24 @@ the protected routers. No changes to the guard or services.
 - `src/db/prisma.ts`      — singleton client
 - `src/utils/http.ts`    — errors + asyncHandler + role helpers
 - `src/modules/board/workspaceGuard.ts` — role/membership checks (Phase 1)
+- `src/modules/board/list.{schema,service,controller,router}.ts` — List CRUD (Phase 2)
+- `src/modules/auth/devAuth.ts` — dev-only auth shim (email-or-uuid header)
 - `types/express.d.ts`    — `req.user`, `Role`, `ErrorResponse`
+
+## Dev auth header (devAuthByEmail)
+During dev, set `x-dev-user` to either a seeded user email (e.g.
+`dev-owner@example.com`) or a raw UUID. The middleware resolves email->id
+against the DB. Remove `devAuthByEmail` from `src/app.ts` when the real
+JWT middleware ships.
+
+## List endpoints (Phase 2)
+| Method | Path | Role | Body |
+|--------|------|------|------|
+| POST | `/api/workspaces/:workspace_id/lists` | MEMBER+ | `{ name }` |
+| PUT | `/api/lists/:list_id` | MEMBER+ | `{ name }` |
+| DELETE | `/api/lists/:list_id` | MEMBER+ | — (204) |
+| PATCH | `/api/lists/:list_id/order` | MEMBER+ | `{ before_list_id?, after_list_id? }` |
+
+- Sequence uses 65536-block fractional indexing; auto-rebalance when gap < 1e-6.
+- DELETE leaves cards as inbox (`list_id` SET NULL), cards are NOT deleted.
+- Errors: 401 no user, 403 below MEMBER, 404 list/workspace absent, 400 validation.

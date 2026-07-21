@@ -30,27 +30,30 @@ async function main() {
     },
   });
 
-  const workspace = await prisma.workspace.upsert({
+  const workspace = await prisma.workspace.findFirst({
     where: { name: "Korello 데모 워크스페이스" },
-    update: { is_public: true },
-    create: { name: "Korello 데모 워크스페이스", is_public: true },
   });
+  const wsRecord =
+    workspace ??
+    (await prisma.workspace.create({
+      data: { name: "Korello 데모 워크스페이스", is_public: true },
+    }));
 
   await prisma.workspaceMember.upsert({
-    where: { user_id_workspace_id: { user_id: owner.id, workspace_id: workspace.id } },
+    where: { user_id_workspace_id: { user_id: owner.id, workspace_id: wsRecord.id } },
     update: { role: "OWNER" },
-    create: { user_id: owner.id, workspace_id: workspace.id, role: "OWNER" },
+    create: { user_id: owner.id, workspace_id: wsRecord.id, role: "OWNER" },
   });
 
   await prisma.workspaceMember.upsert({
-    where: { user_id_workspace_id: { user_id: viewer.id, workspace_id: workspace.id } },
+    where: { user_id_workspace_id: { user_id: viewer.id, workspace_id: wsRecord.id } },
     update: { role: "VIEWER" },
-    create: { user_id: viewer.id, workspace_id: workspace.id, role: "VIEWER" },
+    create: { user_id: viewer.id, workspace_id: wsRecord.id, role: "VIEWER" },
   });
 
   const defaultListNames = ["할 일", "진행 중", "완료"];
   for (let i = 0; i < defaultListNames.length; i++) {
-    const base = { workspace_id: workspace.id, name: defaultListNames[i] };
+    const base = { workspace_id: wsRecord.id, name: defaultListNames[i] };
     const existing = await prisma.list.findFirst({ where: base });
     if (existing) continue;
     await prisma.list.create({
@@ -59,7 +62,7 @@ async function main() {
   }
 
   console.log("Seed complete.");
-  console.log("  workspaceId:", workspace.id);
+  console.log("  workspaceId:", wsRecord.id);
   console.log("  ownerId:    ", owner.id, "(role OWNER)");
   console.log("  viewerId:   ", viewer.id, "(role VIEWER)");
 }
