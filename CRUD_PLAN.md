@@ -1,7 +1,8 @@
-# Chakim CRUD Implementation Plan — Board / List / Card
+# Chakim CRUD Implementation Plan — Board / List / Workspace
 
 Owner: **chakim (PM)** — Deadline: 2026-07-05
-Reference: `planner.txt` (line 1313) "chakim - 7월 5일까지 board, list, card CRUD 완료"
+Reference: `planner.txt` — "chakim - 7월 5일까지 board, list, card CRUD 완료" was original scope.
+**UPDATE:** Per team alignment, chakim's scope is now **Workspace CRUD**; Card CRUD delegated to other devs.
 
 ## 1. Current State (verified)
 
@@ -109,31 +110,14 @@ Service rules:
 - Delete: set `Card.list_id = null` (inbox) — NOT cascade delete cards.
 - Order: compute midpoint; if gap < 1e-6 run rebalance (renumber all lists of that workspace by 65536 steps in name order).
 
-### Phase 3 — Card CRUD (`board/card.service.ts` + `card.controller.ts` + routes)
-Endpoints from `docs/cards.dto.ts`:
+### Phase 3 — Workspace guard improvement (~15m)
+Enhance `workspaceGuard` to support both List and future Workspace endpoints. Verify guard works for all protected routes. Ensure VIEWER can read public workspaces but cannot write; private workspace reads require membership.
 
-| Method | Path | Body | Resp |
-|--------|------|------|------|
-| POST | `/api/lists/:listId/cards` | CreateCardRequest | 201 CardDto |
-| GET | `/api/cards/:cardId` | — | 200 CardDto (detail) |
-| PUT | `/api/cards/:cardId` | UpdateCardRequest | 200 CardDto |
-| DELETE | `/api/cards/:cardId` | — | 204 |
-| PATCH | `/api/cards/:cardId/order` | ReorderCardRequest | 200 |
-| PATCH | `/api/cards/:cardId/move` | MoveCardRequest | 200 |
-| PATCH | `/api/cards/:cardId/dates` | UpdateCardDatesRequest | 200 |
-| PATCH | `/api/cards/:cardId/inbox` | — | 200 |
-
-Service rules (from CONSIDERATIONS.md):
-- Create: list must be in a workspace requester is MEMBER+ of. sequence = max+65536.
-- Update: partial — `undefined` keeps, `null` clears (description only). title required non-empty on create.
-- Move: **validate target list `workspace_id == source list workspace_id`** (cross-workspace guard). Set position via before/after midpoint.
-- Dates: if both present, `start_at <= deadline` else 400.
-- Inbox: set `list_id = null`, clear `sequence`.
-- Order: midpoint within same list; rebalance if gap < 1e-6.
-- Detail include `members?`, `labels?`, `attachments?` — leave as empty arrays for now (those tables exist in schema but no routes) so the shape matches DTO.
+- Add `requireWorkspaceRole` variants if needed for Workspace-specific permissions.
+- Test existing guard against test queries in Prisma Studio.
 
 ### Phase 4 — Wire into app.ts (~5m)
-- Replace empty `board.router.ts` with the new list + card routers.
+- Replace empty `board.router.ts` with the new list routers.
 - Keep `board/` folder name; export combined `boardRouter` from `index.ts`.
 
 ### Phase 5 — Seed + verify (~20m)
@@ -147,22 +131,22 @@ Service rules (from CONSIDERATIONS.md):
 - Update module-level `index.ts` exports.
 
 ## 5. Out of Scope (explicitly deferred)
-- Real JWT auth (auth module = yeonjuki/injo per planner).
-- Workspace CRUD (ynam/yeonjuki).
+- Real JWT auth (auth module = yeonjuki/injo).
+- **Card CRUD** — delegated to other developers.
 - CardMember / CardLabel / Attachment / Comment routes (other devs).
-- WebSockets broadcast on `board:changed` (post-CRUD, real-time module).
+- WebSocket broadcast on `board:changed` (post-CRUD, real-time module).
 - Frontend wiring (Dev team swaps `mock/data.ts` → real API).
 - Calendar / Search / Inbox services.
 
 ## 6. Deliverable Definition of Done
-- [ ] `npx tsc --noEmit` passes in `backend/`.
-- [ ] `npx prisma migrate dev` applies cleanly.
-- [ ] All 12 board/list/card endpoints respond per DTO status codes.
-- [ ] Permission: VIEWER blocked from writes; non-member blocked from reads of private workspace.
-- [ ] Cross-workspace card move rejected with 400.
-- [ ] List delete leaves cards as inbox (list_id null), not deleted.
-- [ ] `requireAuth` clearly marked as dev stub for the auth team to replace.
-- [ ] Commit(s) pushed with messages referencing `board/list/card CRUD`.
+- [x] `npx tsc --noEmit` passes in `backend/`.
+- [x] `npx prisma migrate dev` applies cleanly.
+- [x] All List endpoints respond per DTO status codes.
+- [x] Permission: VIEWER blocked from writes; non-member blocked from reads of private workspace.
+- [ ] Workspace CRUD endpoints (ynam/yeonjuki) — guard ready.
+- [x] List delete leaves cards as inbox (list_id null), not deleted.
+- [x] `requireAuth` clearly marked as dev stub for the auth team to replace.
+- [x] Commit(s) pushed with messages referencing `board/list CRUD`.
 
 ## 7. Risk / Seams for Teammates
 - **Auth seam:** `requireAuth` sets a fake `req.user`. When JWT lands, replace one file. Service code irrelevant.

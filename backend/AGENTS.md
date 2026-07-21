@@ -51,8 +51,9 @@ the protected routers. No changes to the guard or services.
 - `prisma/schema.prisma`  — canonical DB model (mirrors `docs/*.dto.ts`)
 - `src/db/prisma.ts`      — singleton client
 - `src/utils/http.ts`    — errors + asyncHandler + role helpers
-- `src/modules/board/workspaceGuard.ts` — role/membership checks (Phase 1)
-- `src/modules/board/list.{schema,service,controller,router}.ts` — List CRUD (Phase 2)
+- `src/modules/workspace/*` — Workspace CRUD (ynam/yeonjuki)
+- `src/modules/board/workspaceGuard.ts` — role/membership checks (chakim)
+- `src/modules/board/list.{schema,service,controller,router}.ts` — List CRUD (chakim)
 - `src/modules/auth/devAuth.ts` — dev-only auth shim (email-or-uuid header)
 - `types/express.d.ts`    — `req.user`, `Role`, `ErrorResponse`
 
@@ -62,7 +63,13 @@ During dev, set `x-dev-user` to either a seeded user email (e.g.
 against the DB. Remove `devAuthByEmail` from `src/app.ts` when the real
 JWT middleware ships.
 
-## List endpoints (Phase 2)
+## Workspace endpoints (ynam/yeonjuki)
+Workspace CRUD endpoints will be implemented under `src/modules/workspace/`. The guard in `src/modules/board/workspaceGuard.ts` validates:
+- Public workspace: readable by anyone
+- Private workspace: requires membership (OWNER/ADMIN/MEMBER/VIEWER)
+- Write operations (create/update/delete): require MEMBER+ role
+
+## List endpoints (chakim)
 | Method | Path | Role | Body |
 |--------|------|------|------|
 | POST | `/api/workspaces/:workspace_id/lists` | MEMBER+ | `{ name }` |
