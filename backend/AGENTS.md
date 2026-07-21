@@ -64,10 +64,23 @@ against the DB. Remove `devAuthByEmail` from `src/app.ts` when the real
 JWT middleware ships.
 
 ## Workspace endpoints (ynam/yeonjuki)
-Workspace CRUD endpoints will be implemented under `src/modules/workspace/`. The guard in `src/modules/board/workspaceGuard.ts` validates:
+Required endpoints per planner.txt API 명세:
+
+| Method | Endpoint | Auth | Body |
+|--------|----------|------|------|
+| POST | `/api/workspaces` | auth | `{ name, isPublic? }` |
+| GET | `/api/workspaces` | auth | — |
+| GET | `/api/workspaces/:workspace_id` | auth | — |
+| PUT | `/api/workspaces/:workspace_id` | ADMIN+ | `{ name?, isPublic? }` |
+| DELETE | `/api/workspaces/:workspace_id` | OWNER | — |
+| POST | `/api/workspaces/:workspace_id/members` | ADMIN+ | `{ email, role? }` |
+| PUT | `/api/workspaces/:workspace_id/members/:user_id` | ADMIN+ | `{ role }` |
+| DELETE | `/api/workspaces/:workspace_id/members/:user_id` | ADMIN+ | — |
+
+Guard ready in `src/modules/board/workspaceGuard.ts` — validates:
 - Public workspace: readable by anyone
-- Private workspace: requires membership (OWNER/ADMIN/MEMBER/VIEWER)
-- Write operations (create/update/delete): require MEMBER+ role
+- Private workspace: requires membership  
+- Write actions: MEMBER+ role
 
 ## List endpoints (chakim)
 | Method | Path | Role | Body |
