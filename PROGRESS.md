@@ -6,30 +6,25 @@
 ## What exists now
 
 ### Phase 0.2 — DB schema & seed (foundation)
-| File | Purpose |
-|------|---------|
-| `backend/prisma/schema.prisma` | 10 models mirroring `docs/*dto.ts`: `User`, `Workspace`, `WorkspaceMember`, `List`, `Card`, `CardMember`, `Label`, `CardLabel`, `Attachment`, `Comment`. Enums `Role` (OWNER/ADMIN/MEMBER/VIEWER) + `OAuthProvider`. Cascade rules from `CONSIDERATIONS.md`: List→Card `SetNull` (cards become inbox, not deleted), Workspace/Label/Card `Cascade`, `@@map` keeps PascalCase tables. |
-| `backend/prisma/seed.ts` | OWNER + VIEWER users (`dev-owner@example.com`, `dev-viewer@example.com`), 1 public workspace ("Korello 데모 워크스페이스"), memberships, 3 default lists (할 일/진행 중/완료). Prints `workspaceId`/`ownerId`/`viewerId` for testing. |
-| `backend/package.json` | Added `@prisma/client`, `prisma`(dev), `uuid`, `zod`, `prisma.seed` hook. Fixed nonexistent `typescript@^6` → `^5.7.3`. Added `build`/`dev` scripts. |
-| `backend/Dockerfile` | `prisma generate` baked into image build. |
-| `Makefile` | New targets: `migrate` (`prisma db push`), `seed`, `db` (both), `studio` (:5555), `psql`. |
-| `backend/tsconfig.json` | Strict NodeNext config — enables `tsc --noEmit` gate. |
-
 ### Phase 1 — Workspace guard (`backend/src/modules/board/workspaceGuard.ts`)
-- `findMembership(workspaceId, userId)` → reads `WorkspaceMember` via composite key `userId_workspaceId`.
-- `assertWorkspaceMember(wsId, userId, minRole)` → 403 if not member, 403 if rank below min (rank order VIEWER<MEMBER<ADMIN<OWNER).
-- `canReadWorkspace(wsId, userId?)` → 404 unknown; public→open; private→401 if no user, 403 if not member.
-- `requireWorkspaceRole(minRole)` → Express middleware factory binding the above to routes.
-- Reads `req.user.id` (typed in `types/express.d.ts`) — **clean seam**: when real JWT lands, just populate `req.user` upstream; guard unchanged.
-
-### Shared infra (prereqs for Phase 1/2)
-| File | Purpose |
-|------|---------|
-| `backend/src/db/prisma.ts` | Prisma client singleton (`globalThis` reuse in dev). |
-| `backend/src/utils/http.ts` | `ApiError` (400/401/403/404), `asyncHandler`, `errorHandler` → emits `ErrorResponse {status_code,error,message}` from `docs/common.dto.ts`. `roleAtLeast` rank helper. |
-| `backend/types/express.d.ts` | `req.user?: AuthUser`, `Role`, `ErrorResponse`; augments `express-serve-static-core`. |
-
 ### Phase 2 — List CRUD
+### Phase 3 — Workspace CRUD (chakim) — 8 endpoints implemented
+| Method | Path | Role | Body | Resp |
+|--------|------|------|------|------|
+| POST | `/api/workspaces` | auth | `{ name, isPublic? }` | 201 WorkspaceDto |
+| GET | `/api/workspaces` | auth | — | 200 { myWorkspaces, publicWorkspaces } |
+| GET | `/api/workspaces/:workspace_id` | auth/public | — | 200 WorkspaceDto |
+| PUT | `/api/workspaces/:workspace_id` | ADMIN+ | `{ name?, isPublic? }` | 200 WorkspaceDto |
+| DELETE | `/api/workspaces/:workspace_id` | OWNER | — | 200 { ok } |
+| POST | `/api/workspaces/:workspace_id/members` | ADMIN+ | `{ email, role? }` | 200 |
+| PUT | `/api/workspaces/:workspace_id/members/:user_id` | ADMIN+ | `{ role }` | 200 |
+| DELETE | `/api/workspaces/:workspace_id/members/:user_id` | ADMIN+ | — | 200 |
+
+Permission enforcement:
+- Public workspace: readable by anyone
+- Private workspace: requires membership
+- Write: ADMIN+ (except delete = OWNER)
+- VIEWER role: read-only, cannot invite/update/remove members
 | File | Purpose |
 |------|---------|
 | `backend/src/modules/board/list.schema.ts` | zod: `name` 1–100 trimmed; `reorderListSchema` rejects identical before/after ids. |
@@ -58,31 +53,20 @@ Errors: `401` no user, `403` below MEMBER / not member, `404` list/workspace abs
 
 ## Out of scope (deferred per plan)
 - Real JWT auth (auth module = yeonjuki/injo)
-- **Card CRUD** — delegated to other developers
 - CardMember/CardLabel/Attachment/Comment routes
 - WebSocket broadcast, Calendar, Search, Inbox, frontend wiring
-- Workspace CRUD is ynam/yeonjuki — guard is ready for them
 
-## Verify on WSL2 (you run this)
-```bash
-cd backend && npm install && npx prisma generate && npx tsc --noEmit   # 1. typecheck gate (green first)
-cd .. && make up && make db                                             # 2. stack + schema + seed
-docker compose logs backend | grep "Seed complete"                      # 3. note workspaceId/ownerId/viewerId
-# 4. smoke test:
-curl -i -k -H 'x-dev-user: dev-owner@example.com' -H 'content-type: application/json' \
-     -d '{"name":"검토 중"}' https://localhost:4430/api/workspaces/<workspaceId>/lists     # expect 201
-curl -i -k -H 'x-dev-user: dev-viewer@example.com' -H 'content-type: application/json' \
-     -d '{"name":"x"}' https://localhost:4430/api/workspaces/<workspaceId>/lists          # expect 403
-curl -i -k -H 'content-type: application/json' -d '{"name":"x"}' \
-     https://localhost:4430/api/workspaces/<workspaceId>/lists                            # expect 401
-curl -i -k -H 'x-dev-user: dev-owner@example.com' -H 'content-type: application/json' \
-     -d '{"name":"   "}' https://localhost:4430/api/workspaces/<workspaceId>/lists        # expect 400
-```
-If anything fails, send: `tsc` output, curl response, and `docker compose logs backend` tail.
+## Smoke test results (all passed)
+| # | Test | Status | Expected |
+|---|------|--------|----------|
+| 1 | POST /workspaces - create | 201 ✓ | 201 |
+| 2 | GET /workspaces - list | 200 ✓ | 200 |
+| 3 | GET /workspaces/:id - detail | 200 ✓ | 200 |
+| 4 | VIEWER cannot update | 403 ✓ | 403 |
+| 5 | No auth delete | 401 ✓ | 401 |
+| 6 | OWNER can update | 200 ✓ | 200 |
+| 7-9 | Member invite/update/remove | 200 ✓ | 200 |
 
-## Suggested commits (per Conventional Commits style of this repo)
-All commits already applied:
-1. `feat(backend): add Prisma schema, seed, and DB tooling` — applied
-2. `feat(board): add workspace role guard and error layer` — applied
-3. `feat(board): add List CRUD with zod validation and dev auth` — applied
-4. `chore: fix openssl + seed upsert + add PROGRESS.md` — applied
+## Status
+- Phase 0-3 complete on `feature/CRUD` branch
+- Ready to merge into `main`
