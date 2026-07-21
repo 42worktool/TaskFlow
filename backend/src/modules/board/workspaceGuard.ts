@@ -1,6 +1,6 @@
 import { prisma } from "../../db/prisma";
 import { ApiError, asyncHandler, roleAtLeast } from "../../utils/http";
-import type { Role } from "../../types/express";
+import type { Role } from "../../../types/express";
 import type { Request, Response, NextFunction } from "express";
 
 export interface WorkspaceMembership {
@@ -15,7 +15,7 @@ export async function findMembership(
 ): Promise<WorkspaceMembership | null> {
   const member = await prisma.workspaceMember.findUnique({
     where: {
-      userId_workspaceId: { userId, workspaceId },
+      user_id_workspace_id: { user_id: userId, workspace_id: workspaceId },
     },
     select: { role: true },
   });
@@ -46,12 +46,12 @@ export async function canReadWorkspace(
 ): Promise<void> {
   const workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
-    select: { isPublic: true },
+    select: { is_public: true },
   });
   if (!workspace) {
     throw ApiError.notFound("Workspace not found");
   }
-  if (workspace.isPublic) return;
+  if (workspace.is_public) return;
   if (!userId) {
     throw ApiError.unauthorized();
   }
@@ -63,7 +63,8 @@ export async function canReadWorkspace(
 
 export function requireWorkspaceRole(minRole: Role) {
   return asyncHandler(async (req: Request, _res: Response, next: NextFunction) => {
-    const workspaceId = req.params.workspaceId ?? req.params.workspace_id;
+    const raw = req.params.workspaceId ?? req.params.workspace_id;
+    const workspaceId = typeof raw === "string" ? raw : undefined;
     if (!workspaceId) {
       throw ApiError.badRequest("BAD_REQUEST", "Missing workspace id in route");
     }

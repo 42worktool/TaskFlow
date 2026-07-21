@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
-import { ErrorResponse, Role } from "../types/express";
+import type { ErrorResponse, Role } from "../../types/express";
 
 export class ApiError extends Error {
   readonly statusCode: number;
@@ -44,7 +44,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
 }
 
 export function asyncHandler<T = unknown>(fn: (req: Request, res: Response, next: NextFunction) => Promise<T>): RequestHandler {
-  return (req, res, next) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }

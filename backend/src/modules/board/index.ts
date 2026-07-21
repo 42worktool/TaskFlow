@@ -1,4 +1,5 @@
 export { boardRouter } from "./board.router";
+export { listRouter, listItemRouter } from "./list.router";
 export {
   assertWorkspaceMember,
   findMembership,
