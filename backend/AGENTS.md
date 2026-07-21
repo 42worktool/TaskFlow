@@ -51,11 +51,25 @@ the protected routers. No changes to the guard or services.
 - `prisma/schema.prisma`  — canonical DB model (mirrors `docs/*.dto.ts`)
 - `src/db/prisma.ts`      — singleton client
 - `src/utils/http.ts`    — errors + asyncHandler + role helpers
-- `src/modules/workspace/*` — Workspace CRUD (ynam/yeonjuki)
+- `src/modules/workspace/*` — Workspace CRUD (chakim - **implemented**)
 - `src/modules/board/workspaceGuard.ts` — role/membership checks (chakim)
 - `src/modules/board/list.{schema,service,controller,router}.ts` — List CRUD (chakim)
 - `src/modules/auth/devAuth.ts` — dev-only auth shim (email-or-uuid header)
 - `types/express.d.ts`    — `req.user`, `Role`, `ErrorResponse`
+
+## Workspace endpoints (chakim - **implemented**)
+| Method | Endpoint | Auth | Body |
+|--------|----------|------|------|
+| POST | `/api/workspaces` | auth | `{ name, isPublic? }` |
+| GET | `/api/workspaces` | auth | — |
+| GET | `/api/workspaces/:workspace_id` | auth/public | — |
+| PUT | `/api/workspaces/:workspace_id` | ADMIN+ | `{ name?, isPublic? }` |
+| DELETE | `/api/workspaces/:workspace_id` | OWNER | — |
+| POST | `/api/workspaces/:workspace_id/members` | ADMIN+ | `{ email, role? }` |
+| PUT | `/api/workspaces/:workspace_id/members/:user_id` | ADMIN+ | `{ role }` |
+| DELETE | `/api/workspaces/:workspace_id/members/:user_id` | ADMIN+ | — |
+
+All endpoints verified with smoke tests (201/200/401/403 codes).
 
 ## Dev auth header (devAuthByEmail)
 During dev, set `x-dev-user` to either a seeded user email (e.g.
@@ -63,24 +77,8 @@ During dev, set `x-dev-user` to either a seeded user email (e.g.
 against the DB. Remove `devAuthByEmail` from `src/app.ts` when the real
 JWT middleware ships.
 
-## Workspace endpoints (ynam/yeonjuki)
-Required endpoints per planner.txt API 명세:
-
-| Method | Endpoint | Auth | Body |
-|--------|----------|------|------|
-| POST | `/api/workspaces` | auth | `{ name, isPublic? }` |
-| GET | `/api/workspaces` | auth | — |
-| GET | `/api/workspaces/:workspace_id` | auth | — |
-| PUT | `/api/workspaces/:workspace_id` | ADMIN+ | `{ name?, isPublic? }` |
-| DELETE | `/api/workspaces/:workspace_id` | OWNER | — |
-| POST | `/api/workspaces/:workspace_id/members` | ADMIN+ | `{ email, role? }` |
-| PUT | `/api/workspaces/:workspace_id/members/:user_id` | ADMIN+ | `{ role }` |
-| DELETE | `/api/workspaces/:workspace_id/members/:user_id` | ADMIN+ | — |
-
-Guard ready in `src/modules/board/workspaceGuard.ts` — validates:
-- Public workspace: readable by anyone
-- Private workspace: requires membership  
-- Write actions: MEMBER+ role
+## Workspace endpoints (chakim - **implemented**)
+Guard integrated into each endpoint. All endpoints verified with smoke tests (201/200/401/403 codes).
 
 ## List endpoints (chakim)
 | Method | Path | Role | Body |

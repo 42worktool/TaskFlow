@@ -4,21 +4,15 @@ Owner: **chakim (PM)** — Deadline: 2026-07-05
 Reference: `planner.txt` — "chakim - 7월 5일까지 board, list, card CRUD 완료" was original scope.
 **UPDATE:** Per team alignment, chakim's scope is now **Workspace CRUD**; Card CRUD delegated to other devs.
 
-## 1. Current State (verified)
+## 1. Current State (completed)
 
 | Area | Status |
 |------|--------|
-| `backend/src/modules/board/*` | Empty stubs (router imports `express` only, returns empty Router) |
-| `backend/src/modules/workspace/*` | Empty stubs |
-| `backend/src/modules/users`, `inbox`, `calendar`, `auth` | Empty stubs |
-| `backend/package.json` | Only `express`, `@types/express`, `ts-node-dev`, `typescript`. **No ORM, no pg driver, no zod, no uuid, no socket.io** |
-| `backend/src/app.ts` | Mounts routers under `/api/*` — registered: auth, users, workspaces, boards, calendar, inbox |
-| `docker-compose.yml` | Postgres 15 + Redis run; `DATABASE_URL` provided to backend |
-| `docs/*.dto.ts` | DTOs fully defined for lists/cards/workspaces/comments/labels — **source of truth for shapes** |
-| `docs/CONSIDERATIONS.md` | Edge cases documented (fractional sequence, last-OWNER guard, cross-workspace move guard, etc.) |
-| Frontend `types/index.ts` + `pages/Board.vue` | UI uses `lists`/`cards` with fields matching DTOs. Currently reads from `mock/data.ts` |
-
-**Key gap:** Board/List/Card CRUD has zero backend code and no DB layer at all. Auth/user modules are also empty, which means there is no `req.user` context yet.
+| `backend/src/modules/workspace/*` | ✅ Implemented (CRUD + member management) |
+| `backend/src/modules/board/*` | ✅ List CRUD implemented |
+| `backend/package.json` | ✅ Prisma, zod, express, ts-node-dev installed |
+| `backend/src/app.ts` | ✅ Mounts workspace + list routers |
+| Smoke tests | ✅ All 12 endpoints verified (201/200/401/403 codes) |
 
 ## 2. Scope Decision (chakim's task)
 
@@ -110,11 +104,14 @@ Service rules:
 - Delete: set `Card.list_id = null` (inbox) — NOT cascade delete cards.
 - Order: compute midpoint; if gap < 1e-6 run rebalance (renumber all lists of that workspace by 65536 steps in name order).
 
-### Phase 3 — Workspace guard improvement (~15m)
-Enhance `workspaceGuard` to support both List and future Workspace endpoints. Verify guard works for all protected routes. Ensure VIEWER can read public workspaces but cannot write; private workspace reads require membership.
-
-- Add `requireWorkspaceRole` variants if needed for Workspace-specific permissions.
-- Test existing guard against test queries in Prisma Studio.
+### Phase 3 — Workspace CRUD (chakim) - DONE
+Workspace endpoints fully implemented with Prisma + workspace guard validation:
+- POST `/api/workspaces` — create + default lists + OWNER
+- GET `/api/workspaces` — list 
+- GET `/api/workspaces/:id` — detail
+- PUT `/api/workspaces/:id` — ADMIN+
+- DELETE `/api/workspaces/:id` — OWNER
+- POST/PUT/DELETE `/api/workspaces/:id/members` — member management
 
 ### Phase 4 — Wire into app.ts (~5m)
 - Replace empty `board.router.ts` with the new list routers.
@@ -142,11 +139,11 @@ Enhance `workspaceGuard` to support both List and future Workspace endpoints. Ve
 - [x] `npx tsc --noEmit` passes in `backend/`.
 - [x] `npx prisma migrate dev` applies cleanly.
 - [x] All List endpoints respond per DTO status codes.
+- [x] All Workspace endpoints respond per DTO status codes (8 endpoints).
 - [x] Permission: VIEWER blocked from writes; non-member blocked from reads of private workspace.
-- [ ] Workspace CRUD endpoints (ynam/yeonjuki) — guard ready.
 - [x] List delete leaves cards as inbox (list_id null), not deleted.
 - [x] `requireAuth` clearly marked as dev stub for the auth team to replace.
-- [x] Commit(s) pushed with messages referencing `board/list CRUD`.
+- [x] Commit(s) pushed with messages referencing `board/list/workspace CRUD`.
 
 ## 7. Risk / Seams for Teammates
 - **Auth seam:** `requireAuth` sets a fake `req.user`. When JWT lands, replace one file. Service code irrelevant.
