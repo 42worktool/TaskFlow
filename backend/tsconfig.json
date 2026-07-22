@@ -8,9 +8,10 @@
     "skipLibCheck": true,
     "ignoreDeprecations": "6.0",
     "outDir": "dist",
+    "rootDir": ".",
     "resolveJsonModule": true,
     "types": ["node", "express"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
-  "include": ["src", "prisma/seed.ts"]
+  "include": ["src", "index.ts", "prisma/seed.ts"]
 }
