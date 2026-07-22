@@ -15,6 +15,14 @@
   font-size: 13px;
   font-weight: 700;
   color: #fff;
+  overflow: hidden;
+  background: #2563eb;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatar-button:hover {
@@ -80,6 +88,7 @@
   text-align: left;
   font-size: 13px;
   color: #374151;
+  text-decoration: none;
 }
 
 .menu-item:hover {

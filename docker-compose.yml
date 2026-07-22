@@ -51,9 +51,17 @@ services:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://user:password@postgres:5432/mydb
       - REDIS_URL=redis://redis:6379
+      - APP_ORIGIN=${APP_ORIGIN}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - OAUTH_AUTO_LINK_VERIFIED_EMAIL=${OAUTH_AUTO_LINK_VERIFIED_EMAIL:-false}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - app-network
 
@@ -67,6 +75,11 @@ services:
       POSTGRES_DB: mydb
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     networks:
       - app-network
     restart: always
@@ -77,6 +90,11 @@ services:
     container_name: app_redis
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     networks:
       - app-network
     restart: always
