@@ -1,14 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import InboxDrawer from '../components/InboxDrawer.vue'
 import LegalFooter from '../components/LegalFooter.vue'
 import NotificationMenu from '../components/NotificationMenu.vue'
 import ProfileMenu from '../components/ProfileMenu.vue'
 import SearchInput from '../components/SearchInput.vue'
-import { myWorkspaces } from '../mock/data'
+import { WorkspaceAPI } from '../api/workspace'
+import { workspaceColor } from '../types'
+import type { Workspace } from '../types'
 
 const showInbox = ref(false)
+const myWorkspaces = ref<Workspace[]>([])
+const openWorkspaces = ref<Workspace[]>([])
+
+onMounted(async () => {
+  const data = await WorkspaceAPI.list()
+  myWorkspaces.value = data.my
+  openWorkspaces.value = data.public
+})
 </script>
 
 <template>
@@ -38,12 +48,15 @@ const showInbox = ref(false)
               :to="`/workspaces/${ws.id}/board`"
               class="project-card"
             >
-              <div class="card-color-bar" :style="{ background: ws.color }" />
+              <div class="card-color-bar" :style="{ background: workspaceColor(ws.id) }" />
               <div class="card-body">
                 <h3 class="card-name">{{ ws.name }}</h3>
-                <span class="card-badge card-badge--private">비공개</span>
+                <span
+                  class="card-badge"
+                  :class="ws.is_public ? 'card-badge--public' : 'card-badge--private'"
+                >{{ ws.is_public ? '공개' : '비공개' }}</span>
                 <div class="card-footer">
-                  <span class="card-members">멤버 {{ ws.member_count }}명</span>
+                  <span class="card-members">멤버 {{ ws.members.length }}명</span>
                   <span class="card-arrow">→</span>
                 </div>
               </div>
@@ -54,6 +67,30 @@ const showInbox = ref(false)
                 <span class="new-label">새 프로젝트 추가</span>
               </div>
             </div>
+          </div>
+        </section>
+
+        <!-- 공개 프로젝트 -->
+        <section v-if="openWorkspaces.length" class="project-section">
+          <h2 class="section-title">공개 프로젝트</h2>
+          <p class="section-desc">누구나 참여할 수 있는 오픈 프로젝트</p>
+          <div class="project-grid">
+            <RouterLink
+              v-for="ws in openWorkspaces"
+              :key="ws.id"
+              :to="`/workspaces/${ws.id}/board`"
+              class="project-card"
+            >
+              <div class="card-color-bar" :style="{ background: workspaceColor(ws.id) }" />
+              <div class="card-body">
+                <h3 class="card-name">{{ ws.name }}</h3>
+                <span class="card-badge card-badge--public">공개</span>
+                <div class="card-footer">
+                  <span class="card-members">멤버 {{ ws.members.length }}명</span>
+                  <span class="card-arrow">→</span>
+                </div>
+              </div>
+            </RouterLink>
           </div>
         </section>
       </main>
