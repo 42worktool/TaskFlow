@@ -6,19 +6,27 @@ import LegalFooter from '../components/LegalFooter.vue'
 import NotificationMenu from '../components/NotificationMenu.vue'
 import ProfileMenu from '../components/ProfileMenu.vue'
 import SearchInput from '../components/SearchInput.vue'
+import CreateWorkspaceModal from '../components/CreateWorkspaceModal.vue'
 import { WorkspaceAPI } from '../api/workspace'
 import { workspaceColor } from '../types'
 import type { Workspace } from '../types'
 
 const showInbox = ref(false)
+const showCreate = ref(false)
 const myWorkspaces = ref<Workspace[]>([])
 const openWorkspaces = ref<Workspace[]>([])
 
-onMounted(async () => {
+async function refreshList() {
   const data = await WorkspaceAPI.list()
   myWorkspaces.value = data.my
   openWorkspaces.value = data.public
-})
+}
+
+function onCreated(ws: Workspace) {
+  myWorkspaces.value.unshift(ws)
+}
+
+onMounted(refreshList)
 </script>
 
 <template>
@@ -61,7 +69,7 @@ onMounted(async () => {
                 </div>
               </div>
             </RouterLink>
-            <div class="project-card project-card--new">
+            <div class="project-card project-card--new" @click="showCreate = true">
               <div class="new-card-inner">
                 <span class="new-icon">+</span>
                 <span class="new-label">새 프로젝트 추가</span>
@@ -101,6 +109,11 @@ onMounted(async () => {
     </div>
 
     <InboxDrawer :open="showInbox" @close="showInbox = false" />
+    <CreateWorkspaceModal
+      v-if="showCreate"
+      @close="showCreate = false"
+      @created="onCreated"
+    />
   </div>
 </template>
 
