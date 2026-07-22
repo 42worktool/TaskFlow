@@ -40,6 +40,16 @@
   background: #1d4ed8;
 }
 
+.form-input:disabled,
+.submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.submit-btn:disabled:hover {
+  background: #2563eb;
+}
+
 .login-link {
   text-align: center;
   font-size: 13px;
@@ -55,4 +65,16 @@
   font-size: 13px;
   color: #ef4444;
   margin-top: -2px;
+}
+
+.legal-consent {
+  margin: 2px 0 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.legal-consent a {
+  color: #2563eb;
 }

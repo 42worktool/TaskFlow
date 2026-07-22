@@ -18,6 +18,13 @@
   border: 1px solid #e5e7eb;
 }
 
+.oauth-btn:disabled,
+.form-input:disabled,
+.login-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .oauth-google {
   background: #fff;
   color: #374151;
@@ -28,24 +35,9 @@
 }
 
 .google-icon {
-  font-size: 16px;
-  font-weight: 700;
-  color: #ea4335;
-}
-
-.oauth-github {
-  background: #1f2937;
-  color: #fff;
-  border-color: #1f2937;
-}
-
-.oauth-github:hover {
-  background: #111827;
-}
-
-.github-icon {
-  font-size: 14px;
-  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
 }
 
 .divider {
@@ -105,6 +97,25 @@
 
 .login-btn:hover {
   background: #1d4ed8;
+}
+
+.login-btn:disabled:hover {
+  background: #2563eb;
+}
+
+.auth-message {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.auth-message--error {
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .signup-link {

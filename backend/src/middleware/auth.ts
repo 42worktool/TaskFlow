@@ -1,21 +1,27 @@
-import type { Request, Response, NextFunction } from 'express'
-import { DEV_USER_ID, IS_DEV } from '../config'
+import { NextFunction, Request, Response } from 'express';
+import { verifyAccessToken } from '../modules/auth/auth.service';
 
-// ============================================================
-// Dev authentication middleware (temporary)
-//
-// Used only to verify workspace CRUD behavior until the auth owner
-// ships the real implementation. Treats every request as DEV_USER.
-//
-// IS_DEV guard: if this middleware is loaded in production
-// (NODE_ENV=production) it throws immediately, forcing the dev-only
-// shim to never ship by accident. The auth owner replaces this
-// entire file once real authentication is ready.
-// ============================================================
-export function requireAuth(req: Request, _res: Response, next: NextFunction) {
-  if (!IS_DEV) {
-    throw new Error('dev requireAuth must not be loaded outside development')
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authorization = req.get('authorization');
+  if (!authorization?.startsWith('Bearer ')) {
+    res.status(401).json({
+      status_code: 401,
+      error: 'UNAUTHORIZED',
+      message: 'A Bearer access token is required',
+    });
+    return;
   }
-  req.user = { id: DEV_USER_ID }
-  next()
+
+  try {
+    const userId = verifyAccessToken(authorization.slice('Bearer '.length));
+    req.auth = { userId };
+    req.user = { id: userId };
+    next();
+  } catch {
+    res.status(401).json({
+      status_code: 401,
+      error: 'INVALID_ACCESS_TOKEN',
+      message: 'The access token is invalid or expired',
+    });
+  }
 }

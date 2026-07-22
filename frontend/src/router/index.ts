@@ -7,6 +7,10 @@ import WorkspaceLayout from '../layouts/WorkspaceLayout.vue'
 import Board from '../pages/Board.vue'
 import Calendar from '../pages/Calendar.vue'
 import Search from '../pages/Search.vue'
+import Account from '../pages/Account.vue'
+import PrivacyPolicy from '../pages/PrivacyPolicy.vue'
+import TermsOfService from '../pages/TermsOfService.vue'
+import { authState, initializeAuth } from '../services/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -14,11 +18,15 @@ const router = createRouter({
     { path: '/', redirect: '/signin' },
     { path: '/signin', component: SignIn },
     { path: '/signup', component: SignUp },
-    { path: '/workspaces', component: Workspace },
-    { path: '/search', component: Search },
+    { path: '/privacy', component: PrivacyPolicy },
+    { path: '/terms', component: TermsOfService },
+    { path: '/account', component: Account, meta: { requiresAuth: true } },
+    { path: '/workspaces', component: Workspace, meta: { requiresAuth: true } },
+    { path: '/search', component: Search, meta: { requiresAuth: true } },
     {
       path: '/workspaces/:workspaceId',
       component: WorkspaceLayout,
+      meta: { requiresAuth: true },
       children: [
         { path: '', redirect: 'board' },
         { path: 'board', component: Board },
@@ -26,6 +34,23 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach(async (to) => {
+  await initializeAuth()
+
+  if (to.meta.requiresAuth && !authState.user) {
+    return {
+      path: '/signin',
+      query: { redirect: to.fullPath },
+    }
+  }
+
+  if ((to.path === '/signin' || to.path === '/signup') && authState.user) {
+    return '/workspaces'
+  }
+
+  return true
 })
 
 export default router
