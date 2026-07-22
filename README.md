@@ -16,6 +16,10 @@ my-project<br>
 Authentication, account, Google OAuth, and session endpoints are documented in
 [`docs/auth-api.md`](docs/auth-api.md).
 
+With the Docker stack running, interactive Swagger documentation is available at
+`http://localhost:8080/api/docs/`. The raw OpenAPI document is available at
+`http://localhost:8080/api/docs.json`.
+
 ## Google OAuth local setup
 
 The local Docker entrypoint is `http://localhost:8080`. The backend supports the
