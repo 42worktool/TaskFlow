@@ -10,7 +10,7 @@ const inviteLink = computed(() => `taskflow.app/invite/${props.workspaceId}`)
 
 const roleLabels: Record<string, string> = {
   OWNER: '관리자',
-  EDITOR: '편집자',
+  ADMIN: '관리자',
   VIEWER: '뷰어',
   MEMBER: '멤버',
 }
@@ -52,14 +52,14 @@ const roleLabels: Record<string, string> = {
               class="member-avatar"
               :style="{
                 background:
-                  m.role === 'OWNER' ? '#2563EB' : m.role === 'EDITOR' ? '#10B981' : '#7C3AED',
+                  m.role === 'OWNER' ? '#2563EB' : m.role === 'ADMIN' ? '#10B981' : '#7C3AED',
               }"
             >
-              {{ m.name[0] }}
+              {{ m.user.name[0] }}
             </div>
             <div class="member-info">
-              <p class="member-name">{{ m.name }}</p>
-              <p class="member-email">{{ m.email }}</p>
+              <p class="member-name">{{ m.user.name }}</p>
+              <p class="member-email">{{ m.user.email }}</p>
             </div>
             <div class="member-actions">
               <span class="role-badge">{{ roleLabels[m.role] }}</span>

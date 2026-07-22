@@ -83,6 +83,71 @@
   gap: 16px;
 }
 
+.project-card-wrapper {
+  position: relative;
+}
+
+.card-menu-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.project-card-wrapper:hover .card-menu-btn {
+  opacity: 1;
+}
+.card-menu-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.card-menu-dropdown {
+  position: absolute;
+  top: 40px;
+  right: 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+  min-width: 120px;
+  overflow: hidden;
+}
+.card-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: #fff;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  color: #374151;
+}
+.card-menu-item:hover {
+  background: #f9fafb;
+}
+.card-menu-item--danger {
+  color: #ef4444;
+}
+.card-menu-item--danger:hover {
+  background: #fef2f2;
+}
+
 .project-card {
   background: #fff;
   border-radius: 10px;

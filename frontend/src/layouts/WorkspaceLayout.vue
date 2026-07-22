@@ -84,9 +84,9 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
                 class="team-avatar"
                 :style="{ background: memberColors[i % memberColors.length] }"
               >
-                {{ m.name[0] }}
+                {{ m.user.name[0] }}
               </div>
-              <span class="team-name">{{ m.name }}</span>
+              <span class="team-name">{{ m.user.name }}</span>
             </li>
           </ul>
           <div class="sidebar-actions">

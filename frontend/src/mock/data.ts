@@ -8,98 +8,27 @@ export const currentUser = {
   avatar_color: '#2563EB',
 }
 
+const _membersA: WorkspaceMember[] = [
+  { user_id: 'user-1', role: 'OWNER',  user: { id: 'user-1', name: '김연준', email: 'yeonjunky@gmail.com', profile_image_url: null } },
+  { user_id: 'user-2', role: 'ADMIN',  user: { id: 'user-2', name: '이지우', email: 'jiwoo@example.com',   profile_image_url: null } },
+  { user_id: 'user-3', role: 'MEMBER', user: { id: 'user-3', name: '박서준', email: 'seojun@example.com',  profile_image_url: null } },
+  { user_id: 'user-4', role: 'VIEWER', user: { id: 'user-4', name: '정민수', email: 'minsoo@example.com',  profile_image_url: null } },
+]
+
 export const myWorkspaces: Workspace[] = [
-  {
-    id: 'ws-1',
-    name: 'MiliDeal 앱 개발',
-    is_public: false,
-    member_count: 4,
-    color: '#2563EB',
-    created_at: '2025-05-01T00:00:00Z',
-    updated_at: '2025-05-20T00:00:00Z',
-  },
-  {
-    id: 'ws-2',
-    name: '마케팅 캠페인 Q2',
-    is_public: false,
-    member_count: 6,
-    color: '#EF4444',
-    created_at: '2025-04-01T00:00:00Z',
-    updated_at: '2025-05-20T00:00:00Z',
-  },
-  {
-    id: 'ws-3',
-    name: '인프라 마이그레이션',
-    is_public: false,
-    member_count: 3,
-    color: '#F59E0B',
-    created_at: '2025-03-01T00:00:00Z',
-    updated_at: '2025-05-20T00:00:00Z',
-  },
+  { id: 'ws-1', name: 'MiliDeal 앱 개발',       is_public: false, created_at: '2025-05-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z', members: _membersA },
+  { id: 'ws-2', name: '마케팅 캠페인 Q2',        is_public: false, created_at: '2025-04-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z', members: _membersA.slice(0, 3) },
+  { id: 'ws-3', name: '인프라 마이그레이션',       is_public: false, created_at: '2025-03-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z', members: _membersA.slice(0, 2) },
 ]
 
 export const openWorkspaces: Workspace[] = [
-  {
-    id: 'ws-4',
-    name: 'Open Source Tracker',
-    is_public: true,
-    member_count: 12,
-    color: '#10B981',
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-05-20T00:00:00Z',
-  },
-  {
-    id: 'ws-5',
-    name: 'Design System Hub',
-    is_public: true,
-    member_count: 8,
-    color: '#7C3AED',
-    created_at: '2025-02-01T00:00:00Z',
-    updated_at: '2025-05-20T00:00:00Z',
-  },
-  {
-    id: 'ws-6',
-    name: 'Community Blog',
-    is_public: true,
-    member_count: 5,
-    color: '#0EA5E9',
-    created_at: '2025-02-15T00:00:00Z',
-    updated_at: '2025-05-20T00:00:00Z',
-  },
-  {
-    id: 'ws-7',
-    name: 'Dev Roadmap 2025',
-    is_public: true,
-    member_count: 20,
-    color: '#F59E0B',
-    created_at: '2025-01-15T00:00:00Z',
-    updated_at: '2025-05-20T00:00:00Z',
-  },
+  { id: 'ws-4', name: 'Open Source Tracker', is_public: true, created_at: '2025-01-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z', members: [_membersA[0]] },
+  { id: 'ws-5', name: 'Design System Hub',   is_public: true, created_at: '2025-02-01T00:00:00Z', updated_at: '2025-05-20T00:00:00Z', members: [_membersA[1]] },
+  { id: 'ws-6', name: 'Community Blog',      is_public: true, created_at: '2025-02-15T00:00:00Z', updated_at: '2025-05-20T00:00:00Z', members: [_membersA[2]] },
+  { id: 'ws-7', name: 'Dev Roadmap 2025',    is_public: true, created_at: '2025-01-15T00:00:00Z', updated_at: '2025-05-20T00:00:00Z', members: [_membersA[3]] },
 ]
 
-export const workspaceMembers: WorkspaceMember[] = [
-  {
-    user_id: 'user-1',
-    name: '김연준',
-    email: 'yeonjunky@gmail.com',
-    profile_image_url: null,
-    role: 'OWNER',
-  },
-  {
-    user_id: 'user-2',
-    name: '이지우',
-    email: 'jiwoo@example.com',
-    profile_image_url: null,
-    role: 'EDITOR',
-  },
-  {
-    user_id: 'user-3',
-    name: '박서준',
-    email: 'seojun@example.com',
-    profile_image_url: null,
-    role: 'VIEWER',
-  },
-]
+export const workspaceMembers: WorkspaceMember[] = _membersA
 
 export const lists: List[] = [
   { id: 'list-1', workspace_id: 'ws-1', name: '할 일', sequence: 1 },

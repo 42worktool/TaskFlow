@@ -6,6 +6,7 @@ import NotificationMenu from '../components/NotificationMenu.vue'
 import ProfileMenu from '../components/ProfileMenu.vue'
 import SearchInput from '../components/SearchInput.vue'
 import { cards, lists, myWorkspaces, openWorkspaces } from '../mock/data'
+import { workspaceColor } from '../types'
 
 const route = useRoute()
 const query = computed(() => String(route.query.q ?? '').trim())
@@ -77,12 +78,12 @@ const hasResults = computed(() => workspaceResults.value.length > 0 || cardResul
               :to="`/workspaces/${workspace.id}/board`"
               class="result-row"
             >
-              <span class="result-color" :style="{ background: workspace.color }" />
+              <span class="result-color" :style="{ background: workspaceColor(workspace.id) }" />
               <div class="result-content">
                 <p class="result-title">{{ workspace.name }}</p>
                 <p class="result-meta">
                   {{ workspace.is_public ? '공개 프로젝트' : '비공개 프로젝트' }} · 멤버
-                  {{ workspace.member_count }}명
+                  {{ workspace.members.length }}명
                 </p>
               </div>
               <span class="result-arrow">→</span>
