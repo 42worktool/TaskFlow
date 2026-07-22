@@ -13,7 +13,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   try {
-    req.auth = { userId: verifyAccessToken(authorization.slice('Bearer '.length)) };
+    const userId = verifyAccessToken(authorization.slice('Bearer '.length));
+    req.auth = { userId };
+    req.user = { id: userId };
     next();
   } catch {
     res.status(401).json({

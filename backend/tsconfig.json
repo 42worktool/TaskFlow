@@ -9,7 +9,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node"]
+    "ignoreDeprecations": "6.0",
+    "resolveJsonModule": true,
+    "types": ["node", "express"]
   },
   "include": [
     "index.ts",
@@ -23,7 +25,8 @@
     "src/modules/workspace/**/*.ts",
     "src/modules/calendar/**/*.ts",
     "src/modules/inbox/**/*.ts",
-    "src/types/**/*.d.ts"
+    "src/types/**/*.d.ts",
+    "prisma/seed.ts"
   ],
   "exclude": ["src/**/*.test.ts"]
 }
