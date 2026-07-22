@@ -11,7 +11,8 @@ withDefaults(
 
 <template>
   <footer class="legal-footer" :class="`legal-footer--${variant}`">
-    © 2025 TaskFlow · 이용약관 · 개인정보처리방침
+    © 2026 TaskFlow · <RouterLink to="/terms">이용약관</RouterLink> ·
+    <RouterLink to="/privacy">개인정보처리방침</RouterLink>
   </footer>
 </template>
 

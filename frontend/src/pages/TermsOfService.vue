@@ -1,0 +1,44 @@
+<template>
+  <div class="legal-page-shell">
+    <header class="legal-page-header">
+      <RouterLink to="/signin" class="legal-page-logo">TaskFlow</RouterLink>
+    </header>
+    <main class="legal-document">
+      <h1>이용약관</h1>
+      <p class="effective-date">시행일: 2026년 7월 22일</p>
+
+      <h2>1. 서비스 목적</h2>
+      <p>TaskFlow는 학습 및 기능 시연을 위한 협업 도구 프로젝트입니다.</p>
+
+      <h2>2. 계정</h2>
+      <p>
+        사용자는 본인이 이용할 권한이 있는 Google 계정으로 로그인해야 합니다. 계정과 로그인
+        세션을 안전하게 관리할 책임은 사용자에게 있습니다.
+      </p>
+
+      <h2>3. 금지 행위</h2>
+      <ul>
+        <li>타인의 계정 또는 정보를 무단으로 사용하는 행위</li>
+        <li>서비스의 인증·보안 장치를 우회하거나 방해하는 행위</li>
+        <li>서비스 또는 다른 이용자에게 피해를 주는 자동화 요청과 악성 코드 배포</li>
+      </ul>
+
+      <h2>4. 서비스 변경 및 중단</h2>
+      <p>
+        Toy 프로젝트의 특성상 기능, 데이터 또는 서비스 제공이 사전 통지 없이 변경되거나 중단될
+        수 있습니다. 중요한 자료의 영구 보관 용도로 사용하지 마세요.
+      </p>
+
+      <h2>5. 계정 해지</h2>
+      <p>사용자는 계정 설정에서 언제든지 계정을 삭제하고 이용을 종료할 수 있습니다.</p>
+
+      <h2>6. 책임 제한</h2>
+      <p>
+        서비스는 학습 목적으로 현재 상태 그대로 제공됩니다. 법령이 허용하는 범위에서 서비스의
+        중단, 데이터 손실 또는 이용으로 발생한 간접 손해를 보증하지 않습니다.
+      </p>
+    </main>
+  </div>
+</template>
+
+<style scoped src="../styles/legal-page.css"></style>

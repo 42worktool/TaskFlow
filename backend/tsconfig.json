@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "rootDir": ".",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": [
+    "index.ts",
+    "src/app.ts",
+    "src/config/**/*.ts",
+    "src/lib/**/*.ts",
+    "src/middleware/**/*.ts",
+    "src/modules/auth/**/*.ts",
+    "src/modules/users/**/*.ts",
+    "src/modules/workspace/**/*.ts",
+    "src/modules/calendar/**/*.ts",
+    "src/modules/inbox/**/*.ts",
+    "src/types/**/*.d.ts"
+  ],
+  "exclude": ["src/**/*.test.ts"]
+}

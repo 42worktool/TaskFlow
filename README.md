@@ -11,12 +11,36 @@ my-project<br>
     ├── Dockerfile<br>
     └── ... (Node.js + TypeScript 프로젝트 파일)<br>
 
+## API documentation
+
+Authentication, account, Google OAuth, and session endpoints are documented in
+[`docs/auth-api.md`](docs/auth-api.md).
+
+## Google OAuth local setup
+
+The local Docker entrypoint is `http://localhost:8080`. The backend supports the
+currently registered Google callback URI:
+
+```text
+http://localhost:8080/oauth/google
+```
+
+1. Copy `.env.example` to `.env` and set the OAuth client values.
+2. Set a `JWT_ACCESS_SECRET` with at least 32 characters.
+3. Rebuild and start the stack with `docker compose up --build`.
+4. Open `http://localhost:8080/signin` and choose Google login.
+
+The canonical callback endpoint is also available at
+`/api/auth/oauth/callback/google`. For a public deployment, add the exact HTTPS
+URL to the Google OAuth client and update both `APP_ORIGIN` and
+`GOOGLE_REDIRECT_URI`; never derive the redirect URI from request headers.
+
 ## External Access Setup (SSH Reverse Tunnel)
 
 Since the dev machine has no public IP, a cloud VM is used as a relay to expose the local server for OAuth, E2E testing.
 
 ```
-Browser → http://<domain>:4430 → cloud VM (public IP) → SSH reverse tunnel → localhost:4430
+Browser → https://<domain>:4430 → cloud VM (public IP) → SSH reverse tunnel → localhost:4430
 ```
 
 ### 1. Cloud VM (GCP)
@@ -48,7 +72,7 @@ sudo systemctl restart sshd
 ### 6. Start the tunnel (run on local machine)
 ```bash
 ssh -i ~/.ssh/<private-key> \
-    -R 4430:localhost:8080 \
+    -R 4430:localhost:4430 \
     -N <nickname>@<domain>
 ```
 
@@ -68,6 +92,11 @@ and run
 ssh tunnel
 ```
 
+For this public origin, add `https://<domain>:4430/oauth/google` to the Google
+client's authorized redirect URIs and set the same value as
+`GOOGLE_REDIRECT_URI`. Set `APP_ORIGIN=https://<domain>:4430` and install a
+publicly trusted TLS certificate for the domain.
+
 ### 7. Vite config
 ```ts
 // vite.config.ts
@@ -86,4 +115,3 @@ export default defineConfig({
 | `remote port forwarding failed for listen port 443` | port < 1024 needs root | use port ≥ 1024 (e.g. 4430) |
 | `refused to connect` | `GatewayPorts` not enabled | set `GatewayPorts yes` in `sshd_config` |
 | `allowedHosts` error | Vite blocks unknown host | add domain to `vite.config.ts` |
-

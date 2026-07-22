@@ -1,3 +1,29 @@
-import { Router } from "express";
+import { NextFunction, Request, Response, Router } from 'express';
+import { config } from '../../config';
+import { requireAuth } from '../../middleware/auth';
+import * as controller from './auth.controller';
+
+function requireSameOrigin(req: Request, res: Response, next: NextFunction): void {
+  const origin = req.get('origin');
+  if (origin && origin !== config.appOrigin) {
+    res.status(403).json({
+      status_code: 403,
+      error: 'INVALID_ORIGIN',
+      message: 'The request origin is not allowed',
+    });
+    return;
+  }
+  next();
+}
 
 export const authRouter = Router();
+
+authRouter.post('/signup', requireSameOrigin, controller.signup);
+authRouter.post('/login', requireSameOrigin, controller.login);
+authRouter.get('/oauth/google', controller.beginGoogle);
+authRouter.get('/oauth/callback/google', controller.googleCallback);
+authRouter.post('/refresh', requireSameOrigin, controller.refresh);
+authRouter.post('/logout', requireSameOrigin, controller.logout);
+authRouter.get('/me', requireAuth, controller.me);
+authRouter.patch('/account', requireSameOrigin, requireAuth, controller.updateAccount);
+authRouter.delete('/account', requireSameOrigin, requireAuth, controller.deleteAccount);
