@@ -1,4 +1,5 @@
 import { api } from './client'
+import { authFetch } from '../services/auth'
 import type { Workspace } from '../types'
 
 export const WorkspaceAPI = {
@@ -14,4 +15,28 @@ export const WorkspaceAPI = {
     api.put<Workspace>(`/workspaces/${id}`, patch).then((r) => r.data),
 
   remove: (id: string) => api.delete(`/workspaces/${id}`).then((r) => r.data),
+
+  inviteMember: async (workspaceId: string, email: string, role: 'ADMIN' | 'MEMBER' | 'VIEWER') => {
+    const response = await authFetch(`/api/workspaces/${workspaceId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, role }),
+    })
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null
+      throw new Error(body?.error || '초대를 보내지 못했습니다.')
+    }
+    return response.json() as Promise<{ ok: true }>
+  },
+
+  acceptInvite: async (token: string) => {
+    const response = await authFetch(`/api/workspaces/invite/${token}`, {
+      method: 'POST',
+    })
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null
+      throw new Error(body?.error || '초대 수락에 실패했습니다.')
+    }
+    return response.json() as Promise<Workspace>
+  },
 }

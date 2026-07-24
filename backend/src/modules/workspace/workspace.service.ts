@@ -5,8 +5,18 @@
 // Authorization checks are done here; the controller only handles
 // HTTP concerns (parsing, validation, status codes).
 // ============================================================
+import jwt from 'jsonwebtoken'
 import { prisma } from '../../db'
+import { config } from '../../config'
 import type { Workspace, WorkspaceMember, User, Role } from '@prisma/client'
+
+const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
+
+interface InvitePayload {
+  workspace_id: string
+  role: Role
+  email: string
+}
 
 // ------------------------------------------------------------
 // Error classes — the controller maps these to HTTP status codes
@@ -36,7 +46,7 @@ async function getRole(wsId: string, userId: string): Promise<Role | null> {
 }
 
 /** Throw ForbiddenError if the user's role is below the required minimum. */
-async function requireRole(wsId: string, userId: string, minRole: Role): Promise<void> {
+export async function requireRole(wsId: string, userId: string, minRole: Role): Promise<void> {
   const role = await getRole(wsId, userId)
   if (!role || ROLE_RANK[role] < ROLE_RANK[minRole]) {
     throw new ForbiddenError()
@@ -172,6 +182,67 @@ export async function deleteWorkspace(userId: string, wsId: string) {
   await requireRole(wsId, userId, 'OWNER')
 
   await prisma.workspace.delete({ where: { id: wsId } })
+}
+
+/**
+ * Generate a signed invite token. The caller sends this link by email.
+ */
+export function generateInviteToken(workspaceId: string, role: Role, email: string): string {
+  return jwt.sign({ workspace_id: workspaceId, role, email }, config.jwtAccessSecret, {
+    expiresIn: INVITE_TTL_SECONDS,
+  })
+}
+
+/**
+ * Accept an invite: verify the token and add the user as a member.
+ * Returns the workspace DTO on success.
+ */
+export async function acceptInvite(userId: string, token: string) {
+  let payload: InvitePayload
+  try {
+    payload = jwt.verify(token, config.jwtAccessSecret) as InvitePayload
+  } catch {
+    throw new InviteTokenError()
+  }
+
+  const ws = await prisma.workspace.findUnique({
+    where: { id: payload.workspace_id },
+    include: workspaceInclude,
+  })
+
+  if (!ws) throw new InviteTokenError()
+
+  const existing = await prisma.workspaceMember.findUnique({
+    where: {
+      workspace_id_user_id: {
+        workspace_id: payload.workspace_id,
+        user_id: userId,
+      },
+    },
+  })
+
+  if (existing) {
+    return toDTO(ws)
+  }
+
+  await prisma.workspaceMember.create({
+    data: {
+      workspace_id: payload.workspace_id,
+      user_id: userId,
+      role: payload.role,
+    },
+  })
+
+  const updated = await prisma.workspace.findUnique({
+    where: { id: payload.workspace_id },
+    include: workspaceInclude,
+  })
+
+  return toDTO(updated!)
+}
+
+export class InviteTokenError extends Error {
+  code = 'INVITE_TOKEN_INVALID' as const
 }
 
 // ============================================================

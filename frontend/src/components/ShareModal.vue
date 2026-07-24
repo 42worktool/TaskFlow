@@ -1,18 +1,45 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { workspaceMembers } from '../mock/data'
+import { WorkspaceAPI } from '../api/workspace'
+import type { Workspace } from '../types'
 
-const props = defineProps<{ workspaceName: string; workspaceId: string }>()
+const props = defineProps<{
+  workspaceName: string
+  workspaceId: string
+  workspace: Workspace
+}>()
 defineEmits<{ close: [] }>()
 
 const inviteEmail = ref('')
-const inviteLink = computed(() => `taskflow.app/invite/${props.workspaceId}`)
+const inviteRole = ref<'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER')
+const sending = ref(false)
+const error = ref('')
 
 const roleLabels: Record<string, string> = {
-  OWNER: '관리자',
+  OWNER: '소유자',
   ADMIN: '관리자',
-  VIEWER: '뷰어',
   MEMBER: '멤버',
+  VIEWER: '뷰어',
+}
+
+const inviteRoles: { value: 'ADMIN' | 'MEMBER' | 'VIEWER'; label: string }[] = [
+  { value: 'MEMBER', label: '멤버' },
+  { value: 'ADMIN', label: '관리자' },
+  { value: 'VIEWER', label: '뷰어' },
+]
+
+async function sendInvite() {
+  if (!inviteEmail.value.trim()) return
+  sending.value = true
+  error.value = ''
+  try {
+    await WorkspaceAPI.inviteMember(props.workspaceId, inviteEmail.value, inviteRole.value)
+    inviteEmail.value = ''
+  } catch (e: any) {
+    error.value = e.message || '초대를 보내지 못했습니다.'
+  } finally {
+    sending.value = false
+  }
 }
 </script>
 
@@ -30,24 +57,26 @@ const roleLabels: Record<string, string> = {
       <div class="section">
         <p class="section-label">이메일로 초대</p>
         <div class="invite-row">
-          <input v-model="inviteEmail" class="invite-input" placeholder="이메일 주소 입력..." />
-          <button class="role-btn">편집자 ▾</button>
+          <input
+            v-model="inviteEmail"
+            class="invite-input"
+            placeholder="이메일 주소 입력..."
+            @keyup.enter="sendInvite"
+          />
+          <select v-model="inviteRole" class="role-btn">
+            <option v-for="r in inviteRoles" :key="r.value" :value="r.value">{{ r.label }}</option>
+          </select>
         </div>
-        <button class="send-btn">메일로 초대 보내기 (mailto:)</button>
-      </div>
-
-      <div class="section">
-        <p class="section-label">초대 링크</p>
-        <div class="link-row">
-          <input class="link-input" :value="inviteLink" readonly />
-          <button class="copy-btn">복사</button>
-        </div>
+        <button class="send-btn" :disabled="sending" @click="sendInvite">
+          {{ sending ? '전송 중...' : '초대 메일 보내기' }}
+        </button>
+        <p v-if="error" class="error-text">{{ error }}</p>
       </div>
 
       <div class="section">
         <p class="section-label">현재 팀원</p>
         <ul class="member-list">
-          <li v-for="m in workspaceMembers" :key="m.user_id" class="member-item">
+          <li v-for="m in props.workspace.members" :key="m.user_id" class="member-item">
             <div
               class="member-avatar"
               :style="{

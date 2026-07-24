@@ -81,4 +81,11 @@ export const config = {
   redisUrl: required('REDIS_URL'),
   cookieSecure: new URL(appOrigin).protocol === 'https:',
   autoLinkVerifiedEmail: booleanValue('OAUTH_AUTO_LINK_VERIFIED_EMAIL', false),
+  smtp: {
+    host: required('SMTP_HOST'),
+    port: positiveInteger('SMTP_PORT', 587),
+    user: required('SMTP_USER'),
+    pass: required('SMTP_PASS'),
+    from: required('SMTP_FROM'),
+  },
 } as const;

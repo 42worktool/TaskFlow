@@ -109,6 +109,7 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
       v-if="showShareModal"
       :workspace-name="workspace.name"
       :workspace-id="workspaceId"
+      :workspace="workspace"
       @close="showShareModal = false"
     />
     <InboxDrawer :open="showInbox" @close="showInbox = false" />
