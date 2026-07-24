@@ -1,8 +1,0 @@
-# Workflow
-- Prefers thorough project exploration before implementation — survey codebase structure, existing implementations, and documentation before writing new code. Confidence: 0.85
-- Prefers manual code review and implementation over AI-generated changes — wants the AI to identify issues and provide a checklist, but prefers to review and fix code with their own eyes to avoid "AI slop." Confidence: 0.85
-- Prefers the assistant to handle the full git workflow (stage, commit, push, and PR creation with a descriptive body) in a single step — a terse "make commit and pr with pr message" is enough instruction. Confidence: 0.85
-- When fixing issues on an existing PR, expects the assistant to commit, push, and post a summary comment on the PR — from a terse instruction like "commit and message to pr#17 that I fixed." Confidence: 0.80
-- Expects the assistant to handle merge conflict resolution end-to-end — fetch, identify conflicting commits, merge, resolve conflicts (adapting to upstream conventions where appropriate), typecheck, commit with co-author, and push — from a terse heads-up like "merge gonna conflict, we need to fix it." Confidence: 0.80
-- Expects the assistant to handle PR feedback end-to-end — fetch review comments via `gh`, build a todo checklist of required changes, read affected files, apply all fixes, and validate with typecheck — from a terse instruction like "apply feedback and fix it then validate." Confidence: 0.85
-- When applying code review feedback, appreciates the assistant proactively finding and fixing all instances of the same pattern in the file/codebase, not just the specifically flagged ones (e.g., fixing all search-then-mutate functions, not just the two called out). Confidence: 0.85
