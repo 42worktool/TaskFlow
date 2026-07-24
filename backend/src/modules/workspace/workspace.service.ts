@@ -5,8 +5,18 @@
 // Authorization checks are done here; the controller only handles
 // HTTP concerns (parsing, validation, status codes).
 // ============================================================
+import jwt from 'jsonwebtoken'
 import { prisma } from '../../db'
+import { config } from '../../config'
 import type { Workspace, WorkspaceMember, User, Role } from '@prisma/client'
+
+const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
+
+interface InvitePayload {
+  workspace_id: string
+  role: Role
+  email: string
+}
 
 // ------------------------------------------------------------
 // Error classes — the controller maps these to HTTP status codes
@@ -36,7 +46,7 @@ async function getRole(wsId: string, userId: string): Promise<Role | null> {
 }
 
 /** Throw ForbiddenError if the user's role is below the required minimum. */
-async function requireRole(wsId: string, userId: string, minRole: Role): Promise<void> {
+export async function requireRole(wsId: string, userId: string, minRole: Role): Promise<void> {
   const role = await getRole(wsId, userId)
   if (!role || ROLE_RANK[role] < ROLE_RANK[minRole]) {
     throw new ForbiddenError()
@@ -147,18 +157,26 @@ export async function updateWorkspace(
   wsId: string,
   data: { name?: string; is_public?: boolean },
 ) {
-  const ws = await prisma.workspace.findUnique({ where: { id: wsId } })
-  if (!ws) throw new NotFoundError()
+  return prisma.$transaction(async (tx) => {
+    const ws = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: { members: true },
+    })
+    if (!ws) throw new NotFoundError()
 
-  await requireRole(wsId, userId, 'ADMIN')
+    const callerRole = ws.members.find((m) => m.user_id === userId)?.role
+    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
+      throw new ForbiddenError()
+    }
 
-  const updated = await prisma.workspace.update({
-    where: { id: wsId },
-    data,
-    include: workspaceInclude,
+    const updated = await tx.workspace.update({
+      where: { id: wsId },
+      data,
+      include: workspaceInclude,
+    })
+
+    return toDTO(updated)
   })
-
-  return toDTO(updated)
 }
 
 /**
@@ -166,12 +184,164 @@ export async function updateWorkspace(
  * Requires OWNER.
  */
 export async function deleteWorkspace(userId: string, wsId: string) {
-  const ws = await prisma.workspace.findUnique({ where: { id: wsId } })
-  if (!ws) throw new NotFoundError()
+  return prisma.$transaction(async (tx) => {
+    const ws = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: { members: true },
+    })
+    if (!ws) throw new NotFoundError()
 
-  await requireRole(wsId, userId, 'OWNER')
+    const callerRole = ws.members.find((m) => m.user_id === userId)?.role
+    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.OWNER) {
+      throw new ForbiddenError()
+    }
 
-  await prisma.workspace.delete({ where: { id: wsId } })
+    await tx.workspace.delete({ where: { id: wsId } })
+  })
+}
+
+/**
+ * Change a member's role. Caller must be ADMIN+.
+ * Prevents demoting the sole OWNER (would leave the workspace with 0 owners).
+ */
+export async function changeMemberRole(
+  callerId: string,
+  wsId: string,
+  targetUserId: string,
+  newRole: Role,
+) {
+  return prisma.$transaction(async (tx) => {
+    const ws = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: { members: true },
+    })
+    if (!ws) throw new NotFoundError()
+
+    const callerRole = ws.members.find((m) => m.user_id === callerId)?.role
+    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
+      throw new ForbiddenError()
+    }
+
+    const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
+    if (!targetMembership) throw new NotFoundError()
+
+    if (targetMembership.role === 'OWNER' && newRole !== 'OWNER') {
+      const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
+      if (ownerCount <= 1) throw new LastOwnerError()
+    }
+
+    await tx.workspaceMember.update({
+      where: {
+        workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+      },
+      data: { role: newRole },
+    })
+
+    const updated = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: workspaceInclude,
+    })
+
+    return toDTO(updated!)
+  })
+}
+
+/**
+ * Remove a member from the workspace. Caller must be ADMIN+.
+ * Prevents removing the sole OWNER.
+ */
+export async function removeMember(callerId: string, wsId: string, targetUserId: string) {
+  return prisma.$transaction(async (tx) => {
+    const ws = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: { members: true },
+    })
+    if (!ws) throw new NotFoundError()
+
+    const callerRole = ws.members.find((m) => m.user_id === callerId)?.role
+    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
+      throw new ForbiddenError()
+    }
+
+    const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
+    if (!targetMembership) throw new NotFoundError()
+
+    if (targetMembership.role === 'OWNER') {
+      const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
+      if (ownerCount <= 1) throw new LastOwnerError()
+    }
+
+    await tx.workspaceMember.delete({
+      where: {
+        workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+      },
+    })
+  })
+}
+
+export class InviteTokenError extends Error {
+  code = 'INVITE_TOKEN_INVALID' as const
+}
+
+export class LastOwnerError extends Error {
+  code = 'LAST_OWNER' as const
+}
+
+/**
+ * Generate a signed invite token. The caller sends this link by email.
+ */
+export function generateInviteToken(workspaceId: string, role: Role, email: string): string {
+  return jwt.sign({ workspace_id: workspaceId, role, email }, config.jwtAccessSecret, {
+    expiresIn: INVITE_TTL_SECONDS,
+  })
+}
+
+/**
+ * Accept an invite: verify the token and add the user as a member.
+ * Returns the workspace DTO on success.
+ */
+export async function acceptInvite(userId: string, token: string) {
+  let payload: InvitePayload
+  try {
+    payload = jwt.verify(token, config.jwtAccessSecret) as InvitePayload
+  } catch {
+    throw new InviteTokenError()
+  }
+
+  const ws = await prisma.workspace.findUnique({
+    where: { id: payload.workspace_id },
+    include: workspaceInclude,
+  })
+
+  if (!ws) throw new InviteTokenError()
+
+  const existing = await prisma.workspaceMember.findUnique({
+    where: {
+      workspace_id_user_id: {
+        workspace_id: payload.workspace_id,
+        user_id: userId,
+      },
+    },
+  })
+
+  if (existing) {
+    return toDTO(ws)
+  }
+
+  await prisma.workspaceMember.create({
+    data: {
+      workspace_id: payload.workspace_id,
+      user_id: userId,
+      role: payload.role,
+    },
+  })
+
+  const updated = await prisma.workspace.findUnique({
+    where: { id: payload.workspace_id },
+    include: workspaceInclude,
+  })
+
+  return toDTO(updated!)
 }
 
 // ============================================================
