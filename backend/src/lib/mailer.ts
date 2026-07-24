@@ -4,7 +4,7 @@ import { config } from '../config';
 const transporter = createTransport({
   host: config.smtp.host,
   port: config.smtp.port,
-  secure: config.smtp.port === 465,
+  secure: config.smtp.port === 587,
   auth: {
     user: config.smtp.user,
     pass: config.smtp.pass,
