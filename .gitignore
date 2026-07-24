@@ -9,6 +9,3 @@ frontend/dist/
 
 .DS_Store
 *.log
-
-COMMANDCODE.md
-.commandcode/
