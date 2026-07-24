@@ -11,4 +11,4 @@ frontend/dist/
 *.log
 
 COMMANDCODE.md
-.commandcode
+.commandcode/
