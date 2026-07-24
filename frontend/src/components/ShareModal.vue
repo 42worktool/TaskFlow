@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { WorkspaceAPI } from '../api/workspace'
 import type { Workspace } from '../types'
 
@@ -14,6 +14,7 @@ const inviteEmail = ref('')
 const inviteRole = ref<'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER')
 const sending = ref(false)
 const error = ref('')
+const removing = ref<string | null>(null)
 
 const roleLabels: Record<string, string> = {
   OWNER: '소유자',
@@ -39,6 +40,20 @@ async function sendInvite() {
     error.value = e.message || '초대를 보내지 못했습니다.'
   } finally {
     sending.value = false
+  }
+}
+
+async function handleRemoveMember(userId: string) {
+  removing.value = userId
+  error.value = ''
+  try {
+    await WorkspaceAPI.removeMember(props.workspaceId, userId)
+    const index = props.workspace.members.findIndex((m) => m.user_id === userId)
+    if (index !== -1) props.workspace.members.splice(index, 1)
+  } catch (e: any) {
+    error.value = e.message || '멤버를 제거하지 못했습니다.'
+  } finally {
+    removing.value = null
   }
 }
 </script>
@@ -92,7 +107,14 @@ async function sendInvite() {
             </div>
             <div class="member-actions">
               <span class="role-badge">{{ roleLabels[m.role] }}</span>
-              <button v-if="m.role !== 'OWNER'" class="remove-btn">제거</button>
+              <button
+                v-if="m.role !== 'OWNER'"
+                class="remove-btn"
+                :disabled="removing === m.user_id"
+                @click="handleRemoveMember(m.user_id)"
+              >
+                {{ removing === m.user_id ? '제거 중...' : '제거' }}
+              </button>
             </div>
           </li>
         </ul>

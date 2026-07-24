@@ -185,6 +185,83 @@ export async function deleteWorkspace(userId: string, wsId: string) {
 }
 
 /**
+ * Change a member's role. Caller must be ADMIN+.
+ * Prevents demoting the sole OWNER (would leave the workspace with 0 owners).
+ */
+export async function changeMemberRole(
+  callerId: string,
+  wsId: string,
+  targetUserId: string,
+  newRole: Role,
+) {
+  const ws = await prisma.workspace.findUnique({
+    where: { id: wsId },
+    include: { members: true },
+  })
+  if (!ws) throw new NotFoundError()
+
+  await requireRole(wsId, callerId, 'ADMIN')
+
+  const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
+  if (!targetMembership) throw new NotFoundError()
+
+  if (targetMembership.role === 'OWNER' && newRole !== 'OWNER') {
+    const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
+    if (ownerCount <= 1) throw new LastOwnerError()
+  }
+
+  await prisma.workspaceMember.update({
+    where: {
+      workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+    },
+    data: { role: newRole },
+  })
+
+  const updated = await prisma.workspace.findUnique({
+    where: { id: wsId },
+    include: workspaceInclude,
+  })
+
+  return toDTO(updated!)
+}
+
+/**
+ * Remove a member from the workspace. Caller must be ADMIN+.
+ * Prevents removing the sole OWNER.
+ */
+export async function removeMember(callerId: string, wsId: string, targetUserId: string) {
+  const ws = await prisma.workspace.findUnique({
+    where: { id: wsId },
+    include: { members: true },
+  })
+  if (!ws) throw new NotFoundError()
+
+  await requireRole(wsId, callerId, 'ADMIN')
+
+  const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
+  if (!targetMembership) throw new NotFoundError()
+
+  if (targetMembership.role === 'OWNER') {
+    const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
+    if (ownerCount <= 1) throw new LastOwnerError()
+  }
+
+  await prisma.workspaceMember.delete({
+    where: {
+      workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+    },
+  })
+}
+
+export class InviteTokenError extends Error {
+  code = 'INVITE_TOKEN_INVALID' as const
+}
+
+export class LastOwnerError extends Error {
+  code = 'LAST_OWNER' as const
+}
+
+/**
  * Generate a signed invite token. The caller sends this link by email.
  */
 export function generateInviteToken(workspaceId: string, role: Role, email: string): string {
@@ -239,10 +316,6 @@ export async function acceptInvite(userId: string, token: string) {
   })
 
   return toDTO(updated!)
-}
-
-export class InviteTokenError extends Error {
-  code = 'INVITE_TOKEN_INVALID' as const
 }
 
 // ============================================================

@@ -39,4 +39,32 @@ export const WorkspaceAPI = {
     }
     return response.json() as Promise<Workspace>
   },
+
+  changeMemberRole: async (
+    workspaceId: string,
+    userId: string,
+    role: 'ADMIN' | 'MEMBER' | 'VIEWER',
+  ) => {
+    const response = await authFetch(`/api/workspaces/${workspaceId}/members/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    })
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null
+      throw new Error(body?.error || '권한을 변경하지 못했습니다.')
+    }
+    return response.json() as Promise<Workspace>
+  },
+
+  removeMember: async (workspaceId: string, userId: string) => {
+    const response = await authFetch(`/api/workspaces/${workspaceId}/members/${userId}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null
+      throw new Error(body?.error || '멤버를 제거하지 못했습니다.')
+    }
+    return response.json() as Promise<{ ok: true }>
+  },
 }
