@@ -1,12 +1,50 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { workspaceMembers } from '../mock/data'
+import { ref, computed, onMounted, watch } from 'vue'
+import { WorkspaceAPI } from '../api/workspace'
+import type { WorkspaceMember } from '../types'
 
 const props = defineProps<{ workspaceName: string; workspaceId: string }>()
 defineEmits<{ close: [] }>()
 
 const inviteEmail = ref('')
 const inviteLink = computed(() => `taskflow.app/invite/${props.workspaceId}`)
+const members = ref<WorkspaceMember[]>([])
+const membersError = ref('')
+const removingUserId = ref<string | null>(null)
+
+async function loadMembers() {
+  membersError.value = ''
+  try {
+    const ws = await WorkspaceAPI.get(props.workspaceId)
+    members.value = ws.members
+  } catch (e) {
+    membersError.value = e instanceof Error ? e.message : '팀원 목록을 불러오지 못했습니다.'
+  }
+}
+
+async function removeMember(userId: string) {
+  removingUserId.value = userId
+  membersError.value = ''
+  try {
+    await WorkspaceAPI.removeMember(props.workspaceId, userId)
+    members.value = members.value.filter((m) => m.user_id !== userId)
+  } catch (e) {
+    membersError.value = e instanceof Error ? e.message : '팀원 제거에 실패했습니다.'
+  } finally {
+    removingUserId.value = null
+  }
+}
+
+onMounted(() => {
+  void loadMembers()
+})
+
+watch(
+  () => props.workspaceId,
+  () => {
+    void loadMembers()
+  },
+)
 
 const roleLabels: Record<string, string> = {
   OWNER: '관리자',
@@ -46,8 +84,9 @@ const roleLabels: Record<string, string> = {
 
       <div class="section">
         <p class="section-label">현재 팀원</p>
+        <p v-if="membersError" class="section-label">{{ membersError }}</p>
         <ul class="member-list">
-          <li v-for="m in workspaceMembers" :key="m.user_id" class="member-item">
+          <li v-for="m in members" :key="m.user_id" class="member-item">
             <div
               class="member-avatar"
               :style="{
@@ -63,7 +102,14 @@ const roleLabels: Record<string, string> = {
             </div>
             <div class="member-actions">
               <span class="role-badge">{{ roleLabels[m.role] }}</span>
-              <button v-if="m.role !== 'OWNER'" class="remove-btn">제거</button>
+              <button
+                v-if="m.role !== 'OWNER'"
+                class="remove-btn"
+                :disabled="removingUserId === m.user_id"
+                @click="removeMember(m.user_id)"
+              >
+                제거
+              </button>
             </div>
           </li>
         </ul>

@@ -1,4 +1,4 @@
-import type { Workspace } from '../types'
+import type { Role, Workspace, WorkspaceMember } from '../types'
 import { apiRequest } from '../services/auth'
 
 export const WorkspaceAPI = {
@@ -23,4 +23,21 @@ export const WorkspaceAPI = {
 
   remove: (id: string) =>
     apiRequest<{ ok: true }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
+
+  inviteMember: (workspaceId: string, email: string, role: Role = 'MEMBER') =>
+    apiRequest<WorkspaceMember>(`/api/workspaces/${workspaceId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, role }),
+    }),
+
+  updateMemberRole: (workspaceId: string, userId: string, role: Role) =>
+    apiRequest<WorkspaceMember>(`/api/workspaces/${workspaceId}/members/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    }),
+
+  removeMember: (workspaceId: string, userId: string) =>
+    apiRequest<void>(`/api/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' }),
 }

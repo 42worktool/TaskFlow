@@ -26,6 +26,17 @@ const updateSchema = z
     message: 'either name or is_public is required',
   })
 
+const roleSchema = z.enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'])
+
+const inviteMemberSchema = z.object({
+  email: z.string().email(),
+  role: roleSchema.optional().default('MEMBER'),
+})
+
+const updateMemberRoleSchema = z.object({
+  role: roleSchema,
+})
+
 // ------------------------------------------------------------
 // Handlers
 // ------------------------------------------------------------
@@ -82,21 +93,91 @@ export async function remove(req: Request, res: Response) {
   }
 }
 
+/** POST /workspaces/:workspaceId/members */
+export async function inviteMember(req: Request, res: Response) {
+  try {
+    const body = inviteMemberSchema.parse(req.body)
+    const data = await svc.inviteMember(
+      req.user!.id,
+      req.params.workspaceId as string,
+      body.email,
+      body.role,
+    )
+    res.status(201).json(data)
+  } catch (e) {
+    handleError(res, e)
+  }
+}
+
+/** PUT /workspaces/:workspaceId/members/:userId */
+export async function updateMemberRole(req: Request, res: Response) {
+  try {
+    const body = updateMemberRoleSchema.parse(req.body)
+    const data = await svc.updateWorkspaceMemberRole(
+      req.user!.id,
+      req.params.workspaceId as string,
+      req.params.userId as string,
+      body.role,
+    )
+    res.status(200).json(data)
+  } catch (e) {
+    handleError(res, e)
+  }
+}
+
+/** DELETE /workspaces/:workspaceId/members/:userId */
+export async function removeMember(req: Request, res: Response) {
+  try {
+    await svc.removeWorkspaceMember(
+      req.user!.id,
+      req.params.workspaceId as string,
+      req.params.userId as string,
+    )
+    res.status(204).send()
+  } catch (e) {
+    handleError(res, e)
+  }
+}
+
 // ------------------------------------------------------------
 // Error mapping (service errors → HTTP status)
 // ------------------------------------------------------------
 function handleError(res: Response, e: unknown) {
   if (e instanceof svc.NotFoundError) {
-    res.status(404).json({ error: 'workspace not found' })
+    res.status(404).json({
+      status_code: 404,
+      error: e.code,
+      message: e.message,
+    })
     return
   }
   if (e instanceof svc.ForbiddenError) {
-    res.status(403).json({ error: 'forbidden' })
+    res.status(403).json({
+      status_code: 403,
+      error: e.code,
+      message: e.message,
+    })
+    return
+  }
+  if (e instanceof svc.BadRequestError) {
+    res.status(400).json({
+      status_code: 400,
+      error: e.code,
+      message: e.message,
+    })
     return
   }
   if (e instanceof z.ZodError) {
-    res.status(400).json({ error: e.issues[0].message })
+    res.status(400).json({
+      status_code: 400,
+      error: 'VALIDATION_ERROR',
+      message: e.issues[0].message,
+    })
     return
   }
-  res.status(500).json({ error: 'server error' })
+  res.status(500).json({
+    status_code: 500,
+    error: 'INTERNAL_ERROR',
+    message: 'Internal server error',
+  })
 }

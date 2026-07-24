@@ -13,9 +13,24 @@ import type { Workspace, WorkspaceMember, User, Role } from '@prisma/client'
 // ------------------------------------------------------------
 export class ForbiddenError extends Error {
   code = 'FORBIDDEN' as const
+
+  constructor(message = 'forbidden') {
+    super(message)
+  }
 }
 export class NotFoundError extends Error {
   code = 'NOT_FOUND' as const
+
+  constructor(message = 'not found') {
+    super(message)
+  }
+}
+export class BadRequestError extends Error {
+  code = 'BAD_REQUEST' as const
+
+  constructor(message = 'bad request') {
+    super(message)
+  }
 }
 
 // ------------------------------------------------------------
@@ -67,6 +82,10 @@ type WorkspaceWithMembers = Workspace & {
   })[]
 }
 
+type WorkspaceMemberWithUser = WorkspaceMember & {
+  user: Pick<User, 'id' | 'name' | 'email' | 'profile_image_url'>
+}
+
 // ============================================================
 // Public API
 // ============================================================
@@ -116,6 +135,55 @@ export async function getWorkspace(userId: string, wsId: string) {
   if (!isMember && !ws.is_public) throw new ForbiddenError()
 
   return toDTO(ws)
+}
+
+/**
+ * Invite (add) a member by email. Requires ADMIN or above.
+ */
+export async function inviteMember(
+  userId: string,
+  wsId: string,
+  email: string,
+  role: Role = 'MEMBER',
+) {
+  await requireRole(wsId, userId, 'ADMIN')
+
+  const ws = await prisma.workspace.findUnique({ where: { id: wsId } })
+  if (!ws) throw new NotFoundError('workspace not found')
+
+  const invitedUser = await prisma.user.findUnique({
+    where: { email: email.trim().toLowerCase() },
+  })
+  if (!invitedUser) throw new NotFoundError('user not found')
+
+  const member = await prisma.workspaceMember.upsert({
+    where: {
+      workspace_id_user_id: {
+        workspace_id: wsId,
+        user_id: invitedUser.id,
+      },
+    },
+    create: {
+      workspace_id: wsId,
+      user_id: invitedUser.id,
+      role,
+    },
+    update: {
+      role,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          profile_image_url: true,
+        },
+      },
+    },
+  })
+
+  return toMemberDTO(member)
 }
 
 /**
@@ -174,6 +242,86 @@ export async function deleteWorkspace(userId: string, wsId: string) {
   await prisma.workspace.delete({ where: { id: wsId } })
 }
 
+/**
+ * Change a workspace member's role. Requires ADMIN or above.
+ * Demoting the final OWNER is blocked.
+ */
+export async function updateWorkspaceMemberRole(
+  userId: string,
+  wsId: string,
+  targetUserId: string,
+  role: Role,
+) {
+  await requireRole(wsId, userId, 'ADMIN')
+
+  const member = await prisma.workspaceMember.findUnique({
+    where: {
+      workspace_id_user_id: {
+        workspace_id: wsId,
+        user_id: targetUserId,
+      },
+    },
+  })
+  if (!member) throw new NotFoundError('member not found')
+
+  if (member.role === 'OWNER' && role !== 'OWNER') {
+    await ensureNotLastOwner(wsId, 'cannot demote the last owner')
+  }
+
+  const updated = await prisma.workspaceMember.update({
+    where: {
+      workspace_id_user_id: {
+        workspace_id: wsId,
+        user_id: targetUserId,
+      },
+    },
+    data: { role },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          profile_image_url: true,
+        },
+      },
+    },
+  })
+
+  return toMemberDTO(updated)
+}
+
+/**
+ * Remove a workspace member. Requires ADMIN or above.
+ * Removing the final OWNER is blocked.
+ */
+export async function removeWorkspaceMember(userId: string, wsId: string, targetUserId: string) {
+  await requireRole(wsId, userId, 'ADMIN')
+
+  const member = await prisma.workspaceMember.findUnique({
+    where: {
+      workspace_id_user_id: {
+        workspace_id: wsId,
+        user_id: targetUserId,
+      },
+    },
+  })
+  if (!member) throw new NotFoundError('member not found')
+
+  if (member.role === 'OWNER') {
+    await ensureNotLastOwner(wsId, 'cannot remove the last owner')
+  }
+
+  await prisma.workspaceMember.delete({
+    where: {
+      workspace_id_user_id: {
+        workspace_id: wsId,
+        user_id: targetUserId,
+      },
+    },
+  })
+}
+
 // ============================================================
 // DTO conversion — Prisma (camelCase) → API response (snake_case)
 // ============================================================
@@ -194,5 +342,31 @@ function toDTO(ws: WorkspaceWithMembers) {
         profile_image_url: m.user.profile_image_url,
       },
     })),
+  }
+}
+
+function toMemberDTO(member: WorkspaceMemberWithUser) {
+  return {
+    user_id: member.user_id,
+    role: member.role,
+    user: {
+      id: member.user.id,
+      name: member.user.name,
+      email: member.user.email,
+      profile_image_url: member.user.profile_image_url,
+    },
+  }
+}
+
+async function ensureNotLastOwner(wsId: string, message: string): Promise<void> {
+  const ownerCount = await prisma.workspaceMember.count({
+    where: {
+      workspace_id: wsId,
+      role: 'OWNER',
+    },
+  })
+
+  if (ownerCount === 1) {
+    throw new BadRequestError(message)
   }
 }
