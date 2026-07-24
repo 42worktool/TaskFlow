@@ -185,6 +185,21 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
   return response
 }
 
+export async function apiRequest<T>(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await authFetch(input, init)
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null
+    throw new Error(body?.message || `Request failed with status ${response.status}`)
+  }
+
+  if (response.status === 204) return undefined as T
+  return response.json() as Promise<T>
+}
+
 export async function logout(): Promise<void> {
   try {
     await fetch('/api/auth/logout', {
@@ -199,28 +214,18 @@ export async function logout(): Promise<void> {
 }
 
 export async function updateAccount(name: string): Promise<AuthUser> {
-  const response = await authFetch('/api/auth/account', {
+  const user = await apiRequest<AuthUser>('/api/auth/account', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ name }),
   })
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null
-    throw new Error(body?.message || '계정 정보를 수정하지 못했습니다.')
-  }
-
-  const user = (await response.json()) as AuthUser
   authState.user = user
   return user
 }
 
 export async function deleteAccount(): Promise<void> {
-  const response = await authFetch('/api/auth/account', { method: 'DELETE' })
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null
-    throw new Error(body?.message || '계정을 삭제하지 못했습니다.')
-  }
+  await apiRequest<void>('/api/auth/account', { method: 'DELETE' })
   clearAuth()
   authState.initialized = true
 }

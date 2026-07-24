@@ -1,70 +1,54 @@
-import { api } from './client'
-import { authFetch } from '../services/auth'
 import type { Workspace } from '../types'
+import { apiRequest } from '../services/auth'
 
 export const WorkspaceAPI = {
   list: () =>
-    api.get<{ my: Workspace[]; public: Workspace[] }>('/workspaces').then((r) => r.data),
+    apiRequest<{ my: Workspace[]; public: Workspace[] }>('/api/workspaces'),
 
-  get: (id: string) => api.get<Workspace>(`/workspaces/${id}`).then((r) => r.data),
+  get: (id: string) => apiRequest<Workspace>(`/api/workspaces/${id}`),
 
   create: (name: string, isPublic = false) =>
-    api.post<Workspace>('/workspaces', { name, is_public: isPublic }).then((r) => r.data),
+    apiRequest<Workspace>('/api/workspaces', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, is_public: isPublic }),
+    }),
 
   update: (id: string, patch: { name?: string; is_public?: boolean }) =>
-    api.put<Workspace>(`/workspaces/${id}`, patch).then((r) => r.data),
+    apiRequest<Workspace>(`/api/workspaces/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }),
 
-  remove: (id: string) => api.delete(`/workspaces/${id}`).then((r) => r.data),
+  remove: (id: string) =>
+    apiRequest<{ ok: true }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
 
-  inviteMember: async (workspaceId: string, email: string, role: 'ADMIN' | 'MEMBER' | 'VIEWER') => {
-    const response = await authFetch(`/api/workspaces/${workspaceId}/members`, {
+  inviteMember: async (workspaceId: string, email: string, role: 'ADMIN' | 'MEMBER' | 'VIEWER') =>
+    apiRequest<{ ok: true }>(`/api/workspaces/${workspaceId}/members`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, role }),
-    })
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null
-      throw new Error(body?.error || '초대를 보내지 못했습니다.')
-    }
-    return response.json() as Promise<{ ok: true }>
-  },
+    }),
 
-  acceptInvite: async (token: string) => {
-    const response = await authFetch(`/api/workspaces/invite/${token}`, {
+  acceptInvite: async (token: string) =>
+    apiRequest<Workspace>(`/api/workspaces/invite/${token}`, {
       method: 'POST',
-    })
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null
-      throw new Error(body?.error || '초대 수락에 실패했습니다.')
-    }
-    return response.json() as Promise<Workspace>
-  },
+    }),
 
   changeMemberRole: async (
     workspaceId: string,
     userId: string,
     role: 'ADMIN' | 'MEMBER' | 'VIEWER',
-  ) => {
-    const response = await authFetch(`/api/workspaces/${workspaceId}/members/${userId}`, {
+  ) =>
+    apiRequest<Workspace>(`/api/workspaces/${workspaceId}/members/${userId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role }),
-    })
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null
-      throw new Error(body?.error || '권한을 변경하지 못했습니다.')
-    }
-    return response.json() as Promise<Workspace>
-  },
+    }),
 
-  removeMember: async (workspaceId: string, userId: string) => {
-    const response = await authFetch(`/api/workspaces/${workspaceId}/members/${userId}`, {
+  removeMember: async (workspaceId: string, userId: string) =>
+    apiRequest<{ ok: true }>(`/api/workspaces/${workspaceId}/members/${userId}`, {
       method: 'DELETE',
-    })
-    if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null
-      throw new Error(body?.error || '멤버를 제거하지 못했습니다.')
-    }
-    return response.json() as Promise<{ ok: true }>
-  },
+    }),
 }
