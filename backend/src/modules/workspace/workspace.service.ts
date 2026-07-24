@@ -157,18 +157,26 @@ export async function updateWorkspace(
   wsId: string,
   data: { name?: string; is_public?: boolean },
 ) {
-  const ws = await prisma.workspace.findUnique({ where: { id: wsId } })
-  if (!ws) throw new NotFoundError()
+  return prisma.$transaction(async (tx) => {
+    const ws = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: { members: true },
+    })
+    if (!ws) throw new NotFoundError()
 
-  await requireRole(wsId, userId, 'ADMIN')
+    const callerRole = ws.members.find((m) => m.user_id === userId)?.role
+    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
+      throw new ForbiddenError()
+    }
 
-  const updated = await prisma.workspace.update({
-    where: { id: wsId },
-    data,
-    include: workspaceInclude,
+    const updated = await tx.workspace.update({
+      where: { id: wsId },
+      data,
+      include: workspaceInclude,
+    })
+
+    return toDTO(updated)
   })
-
-  return toDTO(updated)
 }
 
 /**
@@ -176,12 +184,20 @@ export async function updateWorkspace(
  * Requires OWNER.
  */
 export async function deleteWorkspace(userId: string, wsId: string) {
-  const ws = await prisma.workspace.findUnique({ where: { id: wsId } })
-  if (!ws) throw new NotFoundError()
+  return prisma.$transaction(async (tx) => {
+    const ws = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: { members: true },
+    })
+    if (!ws) throw new NotFoundError()
 
-  await requireRole(wsId, userId, 'OWNER')
+    const callerRole = ws.members.find((m) => m.user_id === userId)?.role
+    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.OWNER) {
+      throw new ForbiddenError()
+    }
 
-  await prisma.workspace.delete({ where: { id: wsId } })
+    await tx.workspace.delete({ where: { id: wsId } })
+  })
 }
 
 /**
@@ -194,35 +210,40 @@ export async function changeMemberRole(
   targetUserId: string,
   newRole: Role,
 ) {
-  const ws = await prisma.workspace.findUnique({
-    where: { id: wsId },
-    include: { members: true },
+  return prisma.$transaction(async (tx) => {
+    const ws = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: { members: true },
+    })
+    if (!ws) throw new NotFoundError()
+
+    const callerRole = ws.members.find((m) => m.user_id === callerId)?.role
+    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
+      throw new ForbiddenError()
+    }
+
+    const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
+    if (!targetMembership) throw new NotFoundError()
+
+    if (targetMembership.role === 'OWNER' && newRole !== 'OWNER') {
+      const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
+      if (ownerCount <= 1) throw new LastOwnerError()
+    }
+
+    await tx.workspaceMember.update({
+      where: {
+        workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+      },
+      data: { role: newRole },
+    })
+
+    const updated = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: workspaceInclude,
+    })
+
+    return toDTO(updated!)
   })
-  if (!ws) throw new NotFoundError()
-
-  await requireRole(wsId, callerId, 'ADMIN')
-
-  const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
-  if (!targetMembership) throw new NotFoundError()
-
-  if (targetMembership.role === 'OWNER' && newRole !== 'OWNER') {
-    const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
-    if (ownerCount <= 1) throw new LastOwnerError()
-  }
-
-  await prisma.workspaceMember.update({
-    where: {
-      workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
-    },
-    data: { role: newRole },
-  })
-
-  const updated = await prisma.workspace.findUnique({
-    where: { id: wsId },
-    include: workspaceInclude,
-  })
-
-  return toDTO(updated!)
 }
 
 /**
@@ -230,26 +251,31 @@ export async function changeMemberRole(
  * Prevents removing the sole OWNER.
  */
 export async function removeMember(callerId: string, wsId: string, targetUserId: string) {
-  const ws = await prisma.workspace.findUnique({
-    where: { id: wsId },
-    include: { members: true },
-  })
-  if (!ws) throw new NotFoundError()
+  return prisma.$transaction(async (tx) => {
+    const ws = await tx.workspace.findUnique({
+      where: { id: wsId },
+      include: { members: true },
+    })
+    if (!ws) throw new NotFoundError()
 
-  await requireRole(wsId, callerId, 'ADMIN')
+    const callerRole = ws.members.find((m) => m.user_id === callerId)?.role
+    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
+      throw new ForbiddenError()
+    }
 
-  const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
-  if (!targetMembership) throw new NotFoundError()
+    const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
+    if (!targetMembership) throw new NotFoundError()
 
-  if (targetMembership.role === 'OWNER') {
-    const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
-    if (ownerCount <= 1) throw new LastOwnerError()
-  }
+    if (targetMembership.role === 'OWNER') {
+      const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
+      if (ownerCount <= 1) throw new LastOwnerError()
+    }
 
-  await prisma.workspaceMember.delete({
-    where: {
-      workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
-    },
+    await tx.workspaceMember.delete({
+      where: {
+        workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+      },
+    })
   })
 }
 
