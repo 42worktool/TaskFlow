@@ -22,6 +22,8 @@ async function main() {
       email: 'dev@local.test',
       name: '개발유저',
       password_hash: null,
+      created_by: DEV_USER_ID,
+      updated_by: DEV_USER_ID,
     },
   })
 
@@ -33,8 +35,15 @@ async function main() {
       id: DEV_WORKSPACE_ID,
       name: '개발용 워크스페이스',
       is_public: false,
+      created_by: user.id,
+      updated_by: user.id,
       members: {
-        create: { user_id: user.id, role: 'OWNER' },
+        create: {
+          user_id: user.id,
+          role: 'OWNER',
+          created_by: user.id,
+          updated_by: user.id,
+        },
       },
     },
   })
@@ -53,10 +62,24 @@ async function main() {
       workspace_id: DEV_WORKSPACE_ID,
       name: 'To Do',
       sequence: 1024.0,
+      created_by: user.id,
+      updated_by: user.id,
       cards: {
         create: [
-          {title: '할 일 1', description: '첫 번 째 할 일', sequence: 1024.0},
-          {title: '할 일 2', description: '두 번 째 할 일', sequence: 2048.0},
+          {
+            title: '할 일 1',
+            description: '첫 번 째 할 일',
+            sequence: 1024.0,
+            created_by: user.id,
+            updated_by: user.id,
+          },
+          {
+            title: '할 일 2',
+            description: '두 번 째 할 일',
+            sequence: 2048.0,
+            created_by: user.id,
+            updated_by: user.id,
+          },
         ],
       },
     },
@@ -70,10 +93,24 @@ async function main() {
       workspace_id: DEV_WORKSPACE_ID,
       name: 'In Progress',
       sequence: 2048.0,
+      created_by: user.id,
+      updated_by: user.id,
       cards: {
         create: [
-          {title: '하는 중', description: '하고 있음', sequence: 1024.0},
-          {title: '하고 있는데', description: '하고 있음', sequence: 2048.0},
+          {
+            title: '하는 중',
+            description: '하고 있음',
+            sequence: 1024.0,
+            created_by: user.id,
+            updated_by: user.id,
+          },
+          {
+            title: '하고 있는데',
+            description: '하고 있음',
+            sequence: 2048.0,
+            created_by: user.id,
+            updated_by: user.id,
+          },
         ],
       },
     },
@@ -88,10 +125,25 @@ async function main() {
       workspace_id: DEV_WORKSPACE_ID,
       name: 'Done',
       sequence: 3072.0,
+      is_done: true,
+      created_by: user.id,
+      updated_by: user.id,
       cards: {
         create: [
-          {title: '다 함', description: '끝', sequence: 1024.0},
-          {title: '완', description: '끝', sequence: 2048.0},
+          {
+            title: '다 함',
+            description: '끝',
+            sequence: 1024.0,
+            created_by: user.id,
+            updated_by: user.id,
+          },
+          {
+            title: '완',
+            description: '끝',
+            sequence: 2048.0,
+            created_by: user.id,
+            updated_by: user.id,
+          },
         ],
       },
     },

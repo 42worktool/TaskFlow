@@ -7,11 +7,11 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "tsx --test src/modules/auth/*.test.ts src/docs/*.test.ts",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate deploy",
-    "migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate --schema ./prisma",
+    "db:migrate": "prisma migrate deploy --schema ./prisma",
+    "migrate": "prisma migrate deploy --schema ./prisma",
     "db:seed": "ts-node prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force && npm run db:seed"
+    "db:reset": "prisma migrate reset --schema ./prisma --force && npm run db:seed"
   },
   "keywords": [],
   "author": "",

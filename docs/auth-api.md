@@ -1,12 +1,12 @@
 # 인증·계정 API 명세
 
-로컬 기준 Base URL은 `http://localhost:8080`이다. JSON API는 `/api` 아래에 있고,
+로컬 기준 Base URL은 `https://localhost:4430`이다. JSON API는 `/api` 아래에 있고,
 Google Cloud에 등록된 호환 콜백만 `/oauth/google` 경로를 추가로 사용한다.
 
 ## Swagger UI
 
-- Swagger UI: `http://localhost:8080/api/docs/`
-- OpenAPI JSON: `http://localhost:8080/api/docs.json`
+- Swagger UI: `https://localhost:4430/api/docs/`
+- OpenAPI JSON: `https://localhost:4430/api/docs.json`
 
 Swagger UI에서 회원가입 또는 로그인을 실행하면 HttpOnly Refresh Token 쿠키는 브라우저에
 자동 저장된다. Bearer 인증이 필요한 API는 로그인 응답의 `access_token`을 복사한 뒤
@@ -134,7 +134,7 @@ Google ID Token의 서명·audience·이메일 인증 여부·nonce를 검증한
 현재 Google Cloud에 등록된 로컬 콜백 URI와의 호환 경로다.
 
 ```text
-http://localhost:8080/oauth/google
+https://localhost:4430/oauth/google
 ```
 
 콜백 성공 시 Refresh Token 쿠키를 발급하고 `return_to`로 `302` 리디렉션한다.

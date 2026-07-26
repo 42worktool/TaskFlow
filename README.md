@@ -17,22 +17,22 @@ Authentication, account, Google OAuth, and session endpoints are documented in
 [`docs/auth-api.md`](docs/auth-api.md).
 
 With the Docker stack running, interactive Swagger documentation is available at
-`http://localhost:8080/api/docs/`. The raw OpenAPI document is available at
-`http://localhost:8080/api/docs.json`.
+`https://localhost:4430/api/docs/`. The raw OpenAPI document is available at
+`https://localhost:4430/api/docs.json`.
 
 ## Google OAuth local setup
 
-The local Docker entrypoint is `http://localhost:8080`. The backend supports the
+The local Docker entrypoint is `https://localhost:4430`. The backend supports the
 currently registered Google callback URI:
 
 ```text
-http://localhost:8080/oauth/google
+https://localhost:4430/oauth/google
 ```
 
 1. Copy `.env.example` to `.env` and set the OAuth client values.
 2. Set a `JWT_ACCESS_SECRET` with at least 32 characters.
 3. Rebuild and start the stack with `docker compose up --build`.
-4. Open `http://localhost:8080/signin` and choose Google login.
+4. Open `https://localhost:4430/signin` and choose Google login.
 
 The canonical callback endpoint is also available at
 `/api/auth/oauth/callback/google`. For a public deployment, add the exact HTTPS
