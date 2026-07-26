@@ -2,6 +2,9 @@ import app from "./src/app";
 import { config } from './src/config';
 import { prisma } from './src/lib/prisma';
 import { closeRedis } from './src/lib/redis';
+import { startMailWorker } from './src/lib/mail-queue';
+
+startMailWorker();
 
 const server = app.listen(config.port, () => {
   console.log(`Backend server is running on port ${config.port}`);
