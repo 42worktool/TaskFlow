@@ -57,6 +57,11 @@ services:
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
       - OAUTH_AUTO_LINK_VERIFIED_EMAIL=${OAUTH_AUTO_LINK_VERIFIED_EMAIL:-false}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
     depends_on:
       postgres:
         condition: service_healthy

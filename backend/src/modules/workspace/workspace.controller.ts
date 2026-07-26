@@ -9,6 +9,9 @@ import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { config } from '../../config'
 import * as svc from './workspace.service'
+import { checkMailRateLimit, MailRateLimitError } from '../../lib/mail-rate-limiter'
+import { inviteEmail } from '../../lib/mail-templates'
+import { enqueue } from '../../lib/mail-queue'
 
 // ------------------------------------------------------------
 // Zod schemas
@@ -107,16 +110,15 @@ export async function inviteMember(req: Request, res: Response) {
 
     const inviteUrl = `${config.appOrigin}/invite/${token}`
 
-    const { sendMail } = await import('../../lib/mailer')
-    await sendMail({
-      to: body.email,
-      subject: `${ws.name}에서 당신을 초대했습니다`,
-      text: `${ws.name}에서 당신을 초대했습니다.\n\n링크를 클릭하여 참여하세요:\n${inviteUrl}`,
-      html: `<h2>${ws.name}</h2><p>워크스페이스에 초대되었습니다.</p><p><a href="${inviteUrl}">워크스페이스 참여하기</a></p>`,
-    })
+    await checkMailRateLimit(body.email)
+    await enqueue({ to: body.email, ...inviteEmail(ws.name, inviteUrl) })
 
     res.status(201).json({ ok: true })
   } catch (e) {
+    if (e instanceof MailRateLimitError) {
+      res.status(429).json({ error: 'too many email invitations to this address' })
+      return
+    }
     handleError(res, e)
   }
 }

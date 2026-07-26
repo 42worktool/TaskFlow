@@ -47,7 +47,7 @@ SMTP_PASS=your-app-password        # Generate via Google Account > App Passwords
 SMTP_FROM="TaskFlow <noreply@yourdomain.com>"
 ```
 
-Port 587 uses STARTTLS. Port 465 uses implicit TLS (`secure: true` is set automatically when port is 465).
+Port 587 uses STARTTLS (`secure: false`). Port 465 uses implicit TLS (`secure: true` is set automatically when port is 465).
 
 ---
 
