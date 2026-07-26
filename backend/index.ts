@@ -2,7 +2,7 @@ import app from "./src/app";
 import { config } from './src/config';
 import { prisma } from './src/lib/prisma';
 import { closeRedis } from './src/lib/redis';
-import { startMailWorker } from './src/lib/mail-queue';
+import { startMailWorker, stopMailWorker } from './src/lib/mail-queue';
 
 startMailWorker();
 
@@ -13,6 +13,7 @@ const server = app.listen(config.port, () => {
 async function shutdown(signal: string): Promise<void> {
   console.log(`Received ${signal}, shutting down`);
   server.close(async () => {
+    await stopMailWorker();
     await Promise.allSettled([prisma.$disconnect(), closeRedis()]);
     process.exit(0);
   });

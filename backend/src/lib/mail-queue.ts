@@ -4,6 +4,7 @@ import { sendMail, MailOptions } from './mailer';
 const KEY = 'mail:queue';
 
 let running = false;
+let done: (() => void) | null = null;
 
 export async function enqueue(options: MailOptions): Promise<void> {
   const redis = await getRedisClient();
@@ -13,26 +14,30 @@ export async function enqueue(options: MailOptions): Promise<void> {
 async function processJob(): Promise<void> {
   const redis = await getRedisClient();
   while (running) {
-    const result = await redis.brPop(KEY, 1);
-    if (!result) continue;
     try {
+      const result = await redis.brPop(KEY, 1);
+      if (!result) continue;
       const options = JSON.parse(result.element) as MailOptions;
       await sendMail(options);
     } catch (err) {
-      console.error('[mail-queue] send failed:', err instanceof Error ? err.message : err);
+      if (running) {
+        console.error('[mail-queue] send failed:', err instanceof Error ? err.message : err);
+      }
     }
   }
+  done?.();
 }
 
 export function startMailWorker(): void {
   if (running) return;
   running = true;
-  processJob().catch((err) => {
-    console.error('[mail-queue] worker crashed:', err);
-    running = false;
-  });
+  processJob();
 }
 
-export async function stopMailWorker(): Promise<void> {
-  running = false;
+export function stopMailWorker(): Promise<void> {
+  return new Promise((resolve) => {
+    if (!running) return resolve();
+    running = false;
+    done = resolve;
+  });
 }
