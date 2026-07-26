@@ -1,0 +1,66 @@
+// ============================================================
+// activity.prisma — 워크스페이스 활동 로그
+//
+// 대시보드의 기여 잔디, 활동 추세, 최근 활동 피드의 원천 데이터다.
+// 로그는 생성 후 수정하지 않는 append-only 데이터로 취급한다.
+// ============================================================
+
+enum ActivityEventType {
+  WORKSPACE_CREATED
+  WORKSPACE_UPDATED
+  WORKSPACE_DELETED
+
+  MEMBER_ADDED
+  MEMBER_REMOVED
+  MEMBER_ROLE_CHANGED
+
+  LIST_CREATED
+  LIST_UPDATED
+  LIST_MOVED
+  LIST_DELETED
+
+  CARD_CREATED
+  CARD_UPDATED
+  CARD_MOVED
+  CARD_COMPLETED
+  CARD_REOPENED
+  CARD_DELETED
+
+  COMMENT_CREATED
+  COMMENT_UPDATED
+  COMMENT_DELETED
+}
+
+enum ActivityOperation {
+  INSERT
+  UPDATE
+  DELETE
+}
+
+enum ActivityTargetType {
+  WORKSPACE
+  MEMBER
+  LIST
+  CARD
+  COMMENT
+}
+
+model ActivityLog {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id   String             @db.Uuid
+  actor_user_id  String?            @db.Uuid
+  operation      ActivityOperation
+  event_type     ActivityEventType
+  target_type    ActivityTargetType
+  // TEXT로 두어 UUID뿐 아니라 향후 복합 키 대상도 표현할 수 있게 한다.
+  target_id      String             @db.Text
+  // 하나의 API 변경에서 파생된 로그를 묶는 PostgreSQL transaction id.
+  transaction_id BigInt             @default(dbgenerated("txid_current()"))
+  created_at     DateTime           @default(now()) @db.Timestamptz(3)
+
+  @@index([workspace_id, created_at])
+  @@index([actor_user_id, created_at])
+  @@index([workspace_id, event_type, created_at])
+  @@index([transaction_id])
+  @@map("ActivityLogs")
+}

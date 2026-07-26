@@ -6,7 +6,7 @@ RUN apt-get update \
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npx prisma generate
+RUN npx prisma generate --schema ./prisma
 RUN chmod +x /app/docker-entrypoint.sh
 EXPOSE 3000
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

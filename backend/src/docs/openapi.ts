@@ -199,7 +199,7 @@ export const openApiDocument = {
         tags: ['Google OAuth'],
         summary: 'Google OAuth 로컬 호환 콜백',
         description: [
-          '현재 Google Cloud에 등록된 `http://localhost:8080/oauth/google` 콜백입니다.',
+          '현재 Google Cloud에 등록된 `https://localhost:4430/oauth/google` 콜백입니다.',
           '처리 방식은 정규 콜백과 동일하며 직접 호출하지 않습니다.',
         ].join('\n'),
         operationId: 'googleOAuthCompatibilityCallback',

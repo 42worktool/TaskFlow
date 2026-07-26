@@ -39,8 +39,13 @@ const ROLE_RANK: Record<Role, number> = {
 }
 
 async function getRole(wsId: string, userId: string): Promise<Role | null> {
-  const m = await prisma.workspaceMember.findUnique({
-    where: { workspace_id_user_id: { workspace_id: wsId, user_id: userId } },
+  const m = await prisma.workspaceMember.findFirst({
+    where: {
+      workspace_id: wsId,
+      user_id: userId,
+      deleted_at: null,
+      workspace: { deleted_at: null },
+    },
   })
   return m?.role ?? null
 }
@@ -58,6 +63,9 @@ export async function requireRole(wsId: string, userId: string, minRole: Role): 
 // ------------------------------------------------------------
 const workspaceInclude = {
   members: {
+    where: {
+      deleted_at: null,
+    },
     include: {
       user: {
         select: {
@@ -90,14 +98,18 @@ type WorkspaceWithMembers = Workspace & {
 export async function listWorkspaces(userId: string) {
   const [my, public_] = await Promise.all([
     prisma.workspace.findMany({
-      where: { members: { some: { user_id: userId } } },
+      where: {
+        deleted_at: null,
+        members: { some: { user_id: userId, deleted_at: null } },
+      },
       include: workspaceInclude,
       orderBy: { created_at: 'desc' },
     }),
     prisma.workspace.findMany({
       where: {
+        deleted_at: null,
         is_public: true,
-        members: { none: { user_id: userId } },
+        members: { none: { user_id: userId, deleted_at: null } },
       },
       include: workspaceInclude,
       orderBy: { created_at: 'desc' },
@@ -115,8 +127,8 @@ export async function listWorkspaces(userId: string) {
  * Accessible if the user is a member OR the workspace is public.
  */
 export async function getWorkspace(userId: string, wsId: string) {
-  const ws = await prisma.workspace.findUnique({
-    where: { id: wsId },
+  const ws = await prisma.workspace.findFirst({
+    where: { id: wsId, deleted_at: null },
     include: workspaceInclude,
   })
 
@@ -137,8 +149,15 @@ export async function createWorkspace(userId: string, name: string, isPublic: bo
       data: {
         name,
         is_public: isPublic,
+        created_by: userId,
+        updated_by: userId,
         members: {
-          create: { user_id: userId, role: 'OWNER' },
+          create: {
+            user_id: userId,
+            role: 'OWNER',
+            created_by: userId,
+            updated_by: userId,
+          },
         },
       },
       include: workspaceInclude,
@@ -158,9 +177,13 @@ export async function updateWorkspace(
   data: { name?: string; is_public?: boolean },
 ) {
   return prisma.$transaction(async (tx) => {
-    const ws = await tx.workspace.findUnique({
-      where: { id: wsId },
-      include: { members: true },
+    const ws = await tx.workspace.findFirst({
+      where: { id: wsId, deleted_at: null },
+      include: {
+        members: {
+          where: { deleted_at: null },
+        },
+      },
     })
     if (!ws) throw new NotFoundError()
 
@@ -171,7 +194,10 @@ export async function updateWorkspace(
 
     const updated = await tx.workspace.update({
       where: { id: wsId },
-      data,
+      data: {
+        ...data,
+        updated_by: userId,
+      },
       include: workspaceInclude,
     })
 
@@ -180,14 +206,18 @@ export async function updateWorkspace(
 }
 
 /**
- * Delete a workspace (cascade deletes lists, cards, labels, memberships).
- * Requires OWNER.
+ * Soft-delete a workspace. Child rows stay intact for auditability and are
+ * hidden by active-workspace filters. Requires OWNER.
  */
 export async function deleteWorkspace(userId: string, wsId: string) {
   return prisma.$transaction(async (tx) => {
-    const ws = await tx.workspace.findUnique({
-      where: { id: wsId },
-      include: { members: true },
+    const ws = await tx.workspace.findFirst({
+      where: { id: wsId, deleted_at: null },
+      include: {
+        members: {
+          where: { deleted_at: null },
+        },
+      },
     })
     if (!ws) throw new NotFoundError()
 
@@ -196,7 +226,14 @@ export async function deleteWorkspace(userId: string, wsId: string) {
       throw new ForbiddenError()
     }
 
-    await tx.workspace.delete({ where: { id: wsId } })
+    await tx.workspace.update({
+      where: { id: wsId },
+      data: {
+        updated_by: userId,
+        deleted_at: new Date(),
+        deleted_by: userId,
+      },
+    })
   })
 }
 
@@ -211,9 +248,13 @@ export async function changeMemberRole(
   newRole: Role,
 ) {
   return prisma.$transaction(async (tx) => {
-    const ws = await tx.workspace.findUnique({
-      where: { id: wsId },
-      include: { members: true },
+    const ws = await tx.workspace.findFirst({
+      where: { id: wsId, deleted_at: null },
+      include: {
+        members: {
+          where: { deleted_at: null },
+        },
+      },
     })
     if (!ws) throw new NotFoundError()
 
@@ -234,11 +275,14 @@ export async function changeMemberRole(
       where: {
         workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
       },
-      data: { role: newRole },
+      data: {
+        role: newRole,
+        updated_by: callerId,
+      },
     })
 
-    const updated = await tx.workspace.findUnique({
-      where: { id: wsId },
+    const updated = await tx.workspace.findFirst({
+      where: { id: wsId, deleted_at: null },
       include: workspaceInclude,
     })
 
@@ -252,9 +296,13 @@ export async function changeMemberRole(
  */
 export async function removeMember(callerId: string, wsId: string, targetUserId: string) {
   return prisma.$transaction(async (tx) => {
-    const ws = await tx.workspace.findUnique({
-      where: { id: wsId },
-      include: { members: true },
+    const ws = await tx.workspace.findFirst({
+      where: { id: wsId, deleted_at: null },
+      include: {
+        members: {
+          where: { deleted_at: null },
+        },
+      },
     })
     if (!ws) throw new NotFoundError()
 
@@ -271,9 +319,14 @@ export async function removeMember(callerId: string, wsId: string, targetUserId:
       if (ownerCount <= 1) throw new LastOwnerError()
     }
 
-    await tx.workspaceMember.delete({
+    await tx.workspaceMember.update({
       where: {
         workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+      },
+      data: {
+        updated_by: callerId,
+        deleted_at: new Date(),
+        deleted_by: callerId,
       },
     })
   })
@@ -308,8 +361,8 @@ export async function acceptInvite(userId: string, token: string) {
     throw new InviteTokenError()
   }
 
-  const ws = await prisma.workspace.findUnique({
-    where: { id: payload.workspace_id },
+  const ws = await prisma.workspace.findFirst({
+    where: { id: payload.workspace_id, deleted_at: null },
     include: workspaceInclude,
   })
 
@@ -324,20 +377,39 @@ export async function acceptInvite(userId: string, token: string) {
     },
   })
 
-  if (existing) {
+  if (existing?.deleted_at === null) {
     return toDTO(ws)
   }
 
-  await prisma.workspaceMember.create({
-    data: {
-      workspace_id: payload.workspace_id,
-      user_id: userId,
-      role: payload.role,
-    },
-  })
+  if (existing) {
+    await prisma.workspaceMember.update({
+      where: {
+        workspace_id_user_id: {
+          workspace_id: payload.workspace_id,
+          user_id: userId,
+        },
+      },
+      data: {
+        role: payload.role,
+        updated_by: userId,
+        deleted_at: null,
+        deleted_by: null,
+      },
+    })
+  } else {
+    await prisma.workspaceMember.create({
+      data: {
+        workspace_id: payload.workspace_id,
+        user_id: userId,
+        role: payload.role,
+        created_by: userId,
+        updated_by: userId,
+      },
+    })
+  }
 
-  const updated = await prisma.workspace.findUnique({
-    where: { id: payload.workspace_id },
+  const updated = await prisma.workspace.findFirst({
+    where: { id: payload.workspace_id, deleted_at: null },
     include: workspaceInclude,
   })
 
