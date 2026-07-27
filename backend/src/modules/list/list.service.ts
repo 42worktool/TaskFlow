@@ -24,8 +24,8 @@ async function assertReadAccess(userId: string, workspaceId: string): Promise<vo
  * List all lists in a workspace, with their cards, for the board's initial render.
  * Member of the workspace OR a public workspace.
  */
-export async function listLists(input: { actorId: string; workspaceId: string }) {
-  await assertReadAccess(input.actorId, input.workspaceId)
+export async function listLists(input: { userId: string; workspaceId: string }) {
+  await assertReadAccess(input.userId, input.workspaceId)
 
   const lists = await prisma.list.findMany({
     where: { workspace_id: input.workspaceId, deleted_at: null },
@@ -45,11 +45,11 @@ export async function listLists(input: { actorId: string; workspaceId: string })
  * Create a list at the end of the workspace's board. Requires MEMBER+.
  */
 export async function createList(input: {
-  actorId: string
+  userId: string
   workspaceId: string
   name: string
 }) {
-  await requireRole(input.workspaceId, input.actorId, 'MEMBER')
+  await requireRole(input.workspaceId, input.userId, 'MEMBER')
 
   const agg = await prisma.list.aggregate({
     where: { workspace_id: input.workspaceId, deleted_at: null },
@@ -61,7 +61,7 @@ export async function createList(input: {
       workspace_id: input.workspaceId,
       name: input.name,
       sequence: (agg._max.sequence ?? 0) + 1,
-      ...createdBy(input.actorId),
+      ...createdBy(input.userId),
     },
   })
   return toListDto(list)
@@ -70,14 +70,14 @@ export async function createList(input: {
 /**
  * Rename a list. Requires MEMBER+.
  */
-export async function updateList(input: { actorId: string; listId: string; name: string }) {
+export async function updateList(input: { userId: string; listId: string; name: string }) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, input.actorId, 'MEMBER')
+  await requireRole(list.workspace_id, input.userId, 'MEMBER')
 
   const updated = await prisma.list.update({
     where: { id: input.listId },
-    data: { name: input.name, ...updatedBy(input.actorId) },
+    data: { name: input.name, ...updatedBy(input.userId) },
   })
   return toListDto(updated)
 }
@@ -87,23 +87,23 @@ export async function updateList(input: { actorId: string; listId: string; name:
  * onDelete: SetNull relation semantics we replicate manually since this is
  * a soft delete, not a hard delete). Requires MEMBER+.
  */
-export async function deleteList(input: { actorId: string; listId: string }): Promise<void> {
+export async function deleteList(input: { userId: string; listId: string }): Promise<void> {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, input.actorId, 'MEMBER')
+  await requireRole(list.workspace_id, input.userId, 'MEMBER')
 
   await prisma.$transaction([
     prisma.card.updateMany({
       where: { list_id: input.listId, deleted_at: null },
       data: {
         list_id: null,
-        user_id: input.actorId,
-        ...updatedBy(input.actorId),
+        user_id: input.userId,
+        ...updatedBy(input.userId),
       },
     }),
     prisma.list.update({
       where: { id: input.listId },
-      data: softDeletedBy(input.actorId),
+      data: softDeletedBy(input.userId),
     }),
   ])
 }
@@ -114,7 +114,7 @@ export async function deleteList(input: { actorId: string; listId: string }): Pr
  */
 export async function reorderList(
   input: {
-    actorId: string
+    userId: string
     listId: string
     beforeListId?: string | null
     afterListId?: string | null
@@ -122,7 +122,7 @@ export async function reorderList(
 ) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, input.actorId, 'MEMBER')
+  await requireRole(list.workspace_id, input.userId, 'MEMBER')
 
   const siblings = await prisma.list.findMany({
     where: { workspace_id: list.workspace_id, deleted_at: null, id: { not: input.listId } },
@@ -136,7 +136,7 @@ export async function reorderList(
   )
   const updated = await prisma.list.update({
     where: { id: input.listId },
-    data: { sequence: newSequence, ...updatedBy(input.actorId) },
+    data: { sequence: newSequence, ...updatedBy(input.userId) },
   })
   return toListDto(updated)
 }

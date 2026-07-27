@@ -4,7 +4,7 @@ import { listNameSchema, listReorderSchema } from './list.validation'
 
 export const list: RequestHandler = async (req, res) => {
   const lists = await svc.listLists({
-    actorId: req.user!.id,
+    userId: req.user!.id,
     workspaceId: req.params.workspaceId as string,
   })
   res.status(200).json(lists)
@@ -13,7 +13,7 @@ export const list: RequestHandler = async (req, res) => {
 export const create: RequestHandler = async (req, res) => {
   const body = listNameSchema.parse(req.body)
   const list = await svc.createList({
-    actorId: req.user!.id,
+    userId: req.user!.id,
     workspaceId: req.params.workspaceId as string,
     name: body.name,
   })
@@ -23,7 +23,7 @@ export const create: RequestHandler = async (req, res) => {
 export const update: RequestHandler = async (req, res) => {
   const body = listNameSchema.parse(req.body)
   const list = await svc.updateList({
-    actorId: req.user!.id,
+    userId: req.user!.id,
     listId: req.params.list_id as string,
     name: body.name,
   })
@@ -32,7 +32,7 @@ export const update: RequestHandler = async (req, res) => {
 
 export const remove: RequestHandler = async (req, res) => {
   await svc.deleteList({
-    actorId: req.user!.id,
+    userId: req.user!.id,
     listId: req.params.list_id as string,
   })
   res.status(204).send()
@@ -41,7 +41,7 @@ export const remove: RequestHandler = async (req, res) => {
 export const reorder: RequestHandler = async (req, res) => {
   const data = listReorderSchema.parse(req.body)
   const list = await svc.reorderList({
-    actorId: req.user!.id,
+    userId: req.user!.id,
     listId: req.params.list_id as string,
     beforeListId: data.before_list_id,
     afterListId: data.after_list_id,

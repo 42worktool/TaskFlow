@@ -61,7 +61,7 @@ test('deleteList transfers cards to the deleting member inbox', async (t) => {
   stubMethod(t, prisma, '$transaction', async (operations: Promise<unknown>[]) =>
     Promise.all(operations))
 
-  await deleteList({ actorId: USER_ID, listId: LIST_ID })
+  await deleteList({ userId: USER_ID, listId: LIST_ID })
 
   assert.deepEqual(cardUpdate, {
     where: { list_id: LIST_ID, deleted_at: null },
@@ -94,7 +94,7 @@ test('deleteList rejects viewers before creating transaction operations', async 
   })
 
   await assert.rejects(
-    () => deleteList({ actorId: USER_ID, listId: LIST_ID }),
+    () => deleteList({ userId: USER_ID, listId: LIST_ID }),
     /Forbidden/,
   )
   assert.equal(cardUpdateCalls, 0)

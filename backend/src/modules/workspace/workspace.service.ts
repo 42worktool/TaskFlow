@@ -109,12 +109,12 @@ function requireRemovableOwner(
  *   my    — workspaces where the user is a member (private + public)
  *   public — public workspaces the user has NOT joined
  */
-export async function listWorkspaces(input: { actorId: string }) {
+export async function listWorkspaces(input: { userId: string }) {
   const [my, public_] = await Promise.all([
     prisma.workspace.findMany({
       where: {
         deleted_at: null,
-        members: { some: { user_id: input.actorId, deleted_at: null } },
+        members: { some: { user_id: input.userId, deleted_at: null } },
       },
       include: workspaceInclude,
       orderBy: { created_at: 'desc' },
@@ -123,7 +123,7 @@ export async function listWorkspaces(input: { actorId: string }) {
       where: {
         deleted_at: null,
         is_public: true,
-        members: { none: { user_id: input.actorId, deleted_at: null } },
+        members: { none: { user_id: input.userId, deleted_at: null } },
       },
       include: workspaceInclude,
       orderBy: { created_at: 'desc' },
@@ -140,7 +140,7 @@ export async function listWorkspaces(input: { actorId: string }) {
  * Get a single workspace by ID.
  * Accessible if the user is a member OR the workspace is public.
  */
-export async function getWorkspace(input: { actorId: string; workspaceId: string }) {
+export async function getWorkspace(input: { userId: string; workspaceId: string }) {
   const ws = await prisma.workspace.findFirst({
     where: { id: input.workspaceId, deleted_at: null },
     include: workspaceInclude,
@@ -148,7 +148,7 @@ export async function getWorkspace(input: { actorId: string; workspaceId: string
 
   if (!ws) throw new NotFoundError()
 
-  const isMember = ws.members.some((member) => member.user_id === input.actorId)
+  const isMember = ws.members.some((member) => member.user_id === input.userId)
   if (!isMember && !ws.is_public) throw new ForbiddenError()
 
   return toWorkspaceDto(ws)
@@ -158,7 +158,7 @@ export async function getWorkspace(input: { actorId: string; workspaceId: string
  * Create a workspace and register the creator as OWNER in a single transaction.
  */
 export async function createWorkspace(input: {
-  actorId: string
+  userId: string
   name: string
   isPublic: boolean
 }) {
@@ -167,12 +167,12 @@ export async function createWorkspace(input: {
       data: {
         name: input.name,
         is_public: input.isPublic,
-        ...createdBy(input.actorId),
+        ...createdBy(input.userId),
         members: {
           create: {
-            user_id: input.actorId,
+            user_id: input.userId,
             role: 'OWNER',
-            ...createdBy(input.actorId),
+            ...createdBy(input.userId),
           },
         },
       },
@@ -189,21 +189,21 @@ export async function createWorkspace(input: {
  */
 export async function updateWorkspace(
   input: {
-    actorId: string
+    userId: string
     workspaceId: string
     name?: string
     isPublic?: boolean
   },
 ) {
   return prisma.$transaction(async (tx) => {
-    await requireManagedWorkspace(tx, input.workspaceId, input.actorId, 'ADMIN')
+    await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
 
     const updated = await tx.workspace.update({
       where: { id: input.workspaceId },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...('isPublic' in input ? { is_public: input.isPublic } : {}),
-        ...updatedBy(input.actorId),
+        ...updatedBy(input.userId),
       },
       include: workspaceInclude,
     })
@@ -216,13 +216,13 @@ export async function updateWorkspace(
  * Soft-delete a workspace. Child rows stay intact for auditability and are
  * hidden by active-workspace filters. Requires OWNER.
  */
-export async function deleteWorkspace(input: { actorId: string; workspaceId: string }) {
+export async function deleteWorkspace(input: { userId: string; workspaceId: string }) {
   return prisma.$transaction(async (tx) => {
-    await requireManagedWorkspace(tx, input.workspaceId, input.actorId, 'OWNER')
+    await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'OWNER')
 
     await tx.workspace.update({
       where: { id: input.workspaceId },
-      data: softDeletedBy(input.actorId),
+      data: softDeletedBy(input.userId),
     })
   })
 }
@@ -233,7 +233,7 @@ export async function deleteWorkspace(input: { actorId: string; workspaceId: str
  */
 export async function changeMemberRole(
   input: {
-    actorId: string
+    userId: string
     workspaceId: string
     targetUserId: string
     role: Role
@@ -243,7 +243,7 @@ export async function changeMemberRole(
     const ws = await requireManagedWorkspace(
       tx,
       input.workspaceId,
-      input.actorId,
+      input.userId,
       'ADMIN',
     )
 
@@ -263,7 +263,7 @@ export async function changeMemberRole(
       },
       data: {
         role: input.role,
-        ...updatedBy(input.actorId),
+        ...updatedBy(input.userId),
       },
     })
 
@@ -281,7 +281,7 @@ export async function changeMemberRole(
  * Prevents removing the sole OWNER.
  */
 export async function removeMember(input: {
-  actorId: string
+  userId: string
   workspaceId: string
   targetUserId: string
 }) {
@@ -289,7 +289,7 @@ export async function removeMember(input: {
     const ws = await requireManagedWorkspace(
       tx,
       input.workspaceId,
-      input.actorId,
+      input.userId,
       'ADMIN',
     )
 
@@ -307,7 +307,7 @@ export async function removeMember(input: {
           user_id: input.targetUserId,
         },
       },
-      data: softDeletedBy(input.actorId),
+      data: softDeletedBy(input.userId),
     })
   })
 }
@@ -322,16 +322,16 @@ function generateInviteToken(workspaceId: string, role: Role, email: string): st
 }
 
 export async function inviteWorkspaceMember(input: {
-  actorId: string
+  userId: string
   workspaceId: string
   email: string
   role: Exclude<Role, 'OWNER'>
 }): Promise<void> {
   const workspace = await getWorkspace({
-    actorId: input.actorId,
+    userId: input.userId,
     workspaceId: input.workspaceId,
   })
-  await requireRole(input.workspaceId, input.actorId, 'ADMIN')
+  await requireRole(input.workspaceId, input.userId, 'ADMIN')
 
   const token = generateInviteToken(
     input.workspaceId,
@@ -351,7 +351,7 @@ export async function inviteWorkspaceMember(input: {
  * Accept an invite: verify the token and add the user as a member.
  * Returns the workspace DTO on success.
  */
-export async function acceptInvite(input: { actorId: string; token: string }) {
+export async function acceptInvite(input: { userId: string; token: string }) {
   let payload: InvitePayload
   try {
     payload = jwt.verify(input.token, config.jwtAccessSecret) as InvitePayload
@@ -370,7 +370,7 @@ export async function acceptInvite(input: { actorId: string; token: string }) {
     where: {
       workspace_id_user_id: {
         workspace_id: payload.workspace_id,
-        user_id: input.actorId,
+        user_id: input.userId,
       },
     },
   })
@@ -384,18 +384,18 @@ export async function acceptInvite(input: { actorId: string; token: string }) {
       where: {
         workspace_id_user_id: {
           workspace_id: payload.workspace_id,
-          user_id: input.actorId,
+          user_id: input.userId,
         },
       },
-      data: { role: payload.role, ...restoredBy(input.actorId) },
+      data: { role: payload.role, ...restoredBy(input.userId) },
     })
   } else {
     await prisma.workspaceMember.create({
       data: {
         workspace_id: payload.workspace_id,
-        user_id: input.actorId,
+        user_id: input.userId,
         role: payload.role,
-        ...createdBy(input.actorId),
+        ...createdBy(input.userId),
       },
     })
   }

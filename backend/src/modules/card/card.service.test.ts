@@ -109,7 +109,7 @@ test('moveCard rejects a target list in another workspace', async (t) => {
 
   await assert.rejects(
     () => moveCard({
-      actorId: USER_ID,
+      userId: USER_ID,
       cardId: CARD_ID,
       targetListId: TARGET_LIST_ID,
     }),
@@ -141,7 +141,7 @@ test('moveCard allows a member to move a card within its workspace', async (t) =
   })
 
   const moved = await moveCard({
-    actorId: USER_ID,
+    userId: USER_ID,
     cardId: CARD_ID,
     targetListId: TARGET_LIST_ID,
   })
@@ -177,7 +177,7 @@ test('moveCard rejects viewers before mutating a card', async (t) => {
 
   await assert.rejects(
     () => moveCard({
-      actorId: USER_ID,
+      userId: USER_ID,
       cardId: CARD_ID,
       targetListId: TARGET_LIST_ID,
     }),
@@ -209,7 +209,7 @@ test('getCard includes active labels in its detail response', async (t) => {
   })
   stubMethod(t, prisma.attachment, 'findMany', async () => [])
 
-  const detail = await getCard({ actorId: USER_ID, cardId: CARD_ID })
+  const detail = await getCard({ userId: USER_ID, cardId: CARD_ID })
 
   assert.deepEqual(detail.labels, [{
     label_id: '00000000-0000-4000-8000-000000000007',

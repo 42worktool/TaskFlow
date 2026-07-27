@@ -84,7 +84,7 @@ async function requireCardRole(card: Card, userId: string, minRole?: Role): Prom
 
 export async function createCard(
   input: {
-    actorId: string
+    userId: string
     listId: string
     title: string
     description?: string | null
@@ -93,7 +93,7 @@ export async function createCard(
   },
 ) {
   const list = await getListOrThrow(input.listId)
-  const role = await getRole(list.workspace_id, input.actorId)
+  const role = await getRole(list.workspace_id, input.userId)
   if (!role || ROLE_RANK[role] < ROLE_RANK.MEMBER) throw new ForbiddenError()
 
   const agg = await prisma.card.aggregate({
@@ -109,28 +109,28 @@ export async function createCard(
       start_at: input.startAt ? new Date(input.startAt) : null,
       deadline: input.deadline ? new Date(input.deadline) : null,
       sequence: (agg._max.sequence ?? 0) + 1,
-      ...createdBy(input.actorId),
+      ...createdBy(input.userId),
     },
   })
   return toCardDto(card)
 }
 
-export async function getCard(input: { actorId: string; cardId: string }) {
+export async function getCard(input: { userId: string; cardId: string }) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardRole(card, input.actorId)
+  await requireCardRole(card, input.userId)
   return buildCardDetail(card)
 }
 
 export async function updateCard(
   input: {
-    actorId: string
+    userId: string
     cardId: string
     title?: string
     description?: string | null
   },
 ) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   const updated = await prisma.card.update({
     where: { id: input.cardId },
@@ -139,32 +139,32 @@ export async function updateCard(
       ...('description' in input
         ? { description: input.description ?? '' }
         : {}),
-      ...updatedBy(input.actorId),
+      ...updatedBy(input.userId),
     },
   })
   return toCardDto(updated)
 }
 
-export async function deleteCard(input: { actorId: string; cardId: string }): Promise<void> {
+export async function deleteCard(input: { userId: string; cardId: string }): Promise<void> {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   await prisma.card.update({
     where: { id: input.cardId },
-    data: softDeletedBy(input.actorId),
+    data: softDeletedBy(input.userId),
   })
 }
 
 export async function reorderCard(
   input: {
-    actorId: string
+    userId: string
     cardId: string
     beforeCardId?: string | null
     afterCardId?: string | null
   },
 ) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
   if (!card.list_id) throw new BadRequestError('Cannot reorder inbox cards')
 
   const siblings = await prisma.card.findMany({
@@ -179,14 +179,14 @@ export async function reorderCard(
   )
   const updated = await prisma.card.update({
     where: { id: input.cardId },
-    data: { sequence: newSequence, ...updatedBy(input.actorId) },
+    data: { sequence: newSequence, ...updatedBy(input.userId) },
   })
   return toCardDto(updated)
 }
 
 export async function moveCard(
   input: {
-    actorId: string
+    userId: string
     cardId: string
     targetListId: string
     beforeCardId?: string | null
@@ -194,7 +194,7 @@ export async function moveCard(
   },
 ) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   const targetList = await getListOrThrow(input.targetListId)
   if (card.list_id !== null) {
@@ -203,7 +203,7 @@ export async function moveCard(
       throw new BadRequestError('Cards cannot be moved between workspaces')
     }
   }
-  const targetRole = await getRole(targetList.workspace_id, input.actorId)
+  const targetRole = await getRole(targetList.workspace_id, input.userId)
   if (!targetRole || ROLE_RANK[targetRole] < ROLE_RANK.MEMBER) {
     throw new ForbiddenError()
   }
@@ -227,7 +227,7 @@ export async function moveCard(
     data: {
       list_id: input.targetListId,
       sequence: newSequence,
-      ...updatedBy(input.actorId),
+      ...updatedBy(input.userId),
     },
   })
   return toCardDto(updated)
@@ -235,14 +235,14 @@ export async function moveCard(
 
 export async function updateCardDates(
   input: {
-    actorId: string
+    userId: string
     cardId: string
     startAt?: string | null
     deadline?: string | null
   },
 ) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   const newStart =
     'startAt' in input ? input.startAt : card.start_at?.toISOString() ?? null
@@ -261,19 +261,19 @@ export async function updateCardDates(
       ...('deadline' in input
         ? { deadline: input.deadline ? new Date(input.deadline) : null }
         : {}),
-      ...updatedBy(input.actorId),
+      ...updatedBy(input.userId),
     },
   })
   return toCardDto(updated)
 }
 
-export async function moveCardToInbox(input: { actorId: string; cardId: string }) {
+export async function moveCardToInbox(input: { userId: string; cardId: string }) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   const updated = await prisma.card.update({
     where: { id: input.cardId },
-    data: { list_id: null, user_id: input.actorId, ...updatedBy(input.actorId) },
+    data: { list_id: null, user_id: input.userId, ...updatedBy(input.userId) },
   })
   return toCardDto(updated)
 }
@@ -281,12 +281,12 @@ export async function moveCardToInbox(input: { actorId: string; cardId: string }
 // ─── Card Members ─────────────────────────────────────────────
 
 export async function addCardMember(input: {
-  actorId: string
+  userId: string
   cardId: string
   targetUserId: string
 }) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   if (card.list_id) {
     const list = await getListOrThrow(card.list_id)
@@ -308,14 +308,14 @@ export async function addCardMember(input: {
       where: {
         card_id_user_id: { card_id: input.cardId, user_id: input.targetUserId },
       },
-      data: restoredBy(input.actorId),
+      data: restoredBy(input.userId),
     })
   } else {
     await prisma.cardMember.create({
       data: {
         card_id: input.cardId,
         user_id: input.targetUserId,
-        ...createdBy(input.actorId),
+        ...createdBy(input.userId),
       },
     })
   }
@@ -332,12 +332,12 @@ export async function addCardMember(input: {
 }
 
 export async function removeCardMember(input: {
-  actorId: string
+  userId: string
   cardId: string
   targetUserId: string
 }): Promise<void> {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   const existing = await prisma.cardMember.findUnique({
     where: {
@@ -350,7 +350,7 @@ export async function removeCardMember(input: {
     where: {
       card_id_user_id: { card_id: input.cardId, user_id: input.targetUserId },
     },
-    data: softDeletedBy(input.actorId),
+    data: softDeletedBy(input.userId),
   })
 }
 
@@ -358,28 +358,28 @@ export async function removeCardMember(input: {
 
 export async function addAttachment(
   input: {
-    actorId: string
+    userId: string
     cardId: string
     fileUrl: string
     fileName: string
   },
 ) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   const attachment = await prisma.attachment.create({
     data: {
       card_id: input.cardId,
       file_url: input.fileUrl,
       file_name: input.fileName,
-      ...createdBy(input.actorId),
+      ...createdBy(input.userId),
     },
   })
   return toAttachmentDto(attachment)
 }
 
 export async function removeAttachment(input: {
-  actorId: string
+  userId: string
   attachmentId: string
 }): Promise<void> {
   const attachment = await prisma.attachment.findFirst({
@@ -387,30 +387,30 @@ export async function removeAttachment(input: {
   })
   if (!attachment) throw new NotFoundError()
   const card = await getCardOrThrow(attachment.card_id)
-  await requireCardWrite(card, input.actorId)
+  await requireCardWrite(card, input.userId)
 
   await prisma.attachment.update({
     where: { id: input.attachmentId },
-    data: softDeletedBy(input.actorId),
+    data: softDeletedBy(input.userId),
   })
 }
 
 // ─── Comments ─────────────────────────────────────────────────
 
 export async function createComment(input: {
-  actorId: string
+  userId: string
   cardId: string
   comment: string
 }) {
   const card = await getCardOrThrow(input.cardId)
-  await requireCardRole(card, input.actorId)
+  await requireCardRole(card, input.userId)
 
   const comment = await prisma.comment.create({
     data: {
       card_id: input.cardId,
-      user_id: input.actorId,
+      user_id: input.userId,
       comment_str: input.comment,
-      ...createdBy(input.actorId),
+      ...createdBy(input.userId),
     },
     include: { user: { select: { id: true, name: true, profile_image_url: true } } },
   })
@@ -418,7 +418,7 @@ export async function createComment(input: {
 }
 
 export async function updateComment(input: {
-  actorId: string
+  userId: string
   commentId: string
   comment: string
 }) {
@@ -426,13 +426,13 @@ export async function updateComment(input: {
     where: { id: input.commentId, deleted_at: null },
   })
   if (!comment) throw new NotFoundError()
-  if (comment.user_id !== input.actorId) throw new ForbiddenError()
+  if (comment.user_id !== input.userId) throw new ForbiddenError()
 
   const updated = await prisma.comment.update({
     where: { id: input.commentId },
     data: {
       comment_str: input.comment,
-      ...updatedBy(input.actorId),
+      ...updatedBy(input.userId),
     },
     include: { user: { select: { id: true, name: true, profile_image_url: true } } },
   })
@@ -440,7 +440,7 @@ export async function updateComment(input: {
 }
 
 export async function deleteComment(input: {
-  actorId: string
+  userId: string
   commentId: string
 }): Promise<void> {
   const comment = await prisma.comment.findFirst({
@@ -448,16 +448,16 @@ export async function deleteComment(input: {
   })
   if (!comment) throw new NotFoundError()
 
-  if (comment.user_id !== input.actorId) {
+  if (comment.user_id !== input.userId) {
     const card = await getCardOrThrow(comment.card_id)
     if (!card.list_id) throw new ForbiddenError()
     const list = await getListOrThrow(card.list_id)
-    const role = await getRole(list.workspace_id, input.actorId)
+    const role = await getRole(list.workspace_id, input.userId)
     if (!role || ROLE_RANK[role] < ROLE_RANK.ADMIN) throw new ForbiddenError()
   }
 
   await prisma.comment.update({
     where: { id: input.commentId },
-    data: softDeletedBy(input.actorId),
+    data: softDeletedBy(input.userId),
   })
 }
