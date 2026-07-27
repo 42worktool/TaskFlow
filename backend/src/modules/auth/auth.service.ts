@@ -381,6 +381,7 @@ export async function createSession(userId: string): Promise<{
 export async function rotateSession(refreshToken: string): Promise<{
   accessToken: string;
   refreshToken: string;
+  user: UserPublic;
 }> {
   const redis = await getRedisClient();
   const oldSessionKey = refreshKey(refreshToken);
@@ -402,7 +403,8 @@ export async function rotateSession(refreshToken: string): Promise<{
   }
 
   await redis.sRem(userSessionsKey(user.id), oldSessionKey);
-  return createSession(user.id);
+  const newSession = await createSession(user.id);
+  return { ...newSession, user: publicUser(user) };
 }
 
 export async function revokeSession(refreshToken: string): Promise<void> {

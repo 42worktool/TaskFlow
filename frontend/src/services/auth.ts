@@ -9,13 +9,10 @@ export interface AuthUser {
 }
 
 interface RefreshResponse {
+  user: AuthUser
   access_token: string
   token_type: 'Bearer'
   expires_in: number
-}
-
-interface AuthSessionResponse extends RefreshResponse {
-  user: AuthUser
 }
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -55,7 +52,7 @@ async function authRequestError(response: Response, fallback: string): Promise<E
   )
 }
 
-function applyAuthenticatedSession(session: AuthSessionResponse): AuthUser {
+function applyAuthenticatedSession(session: RefreshResponse): AuthUser {
   authState.user = session.user
   authState.accessToken = session.access_token
   authState.initialized = true
@@ -79,6 +76,7 @@ async function requestRefresh(): Promise<boolean> {
 
     const body = (await response.json()) as RefreshResponse
     authState.accessToken = body.access_token
+    authState.user = body.user
     return true
   })()
 
@@ -92,33 +90,12 @@ async function requestRefresh(): Promise<boolean> {
   }
 }
 
-async function requestCurrentUser(): Promise<boolean> {
-  if (!authState.accessToken) return false
-
-  const response = await fetch('/api/auth/me', {
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${authState.accessToken}`,
-    },
-    credentials: 'same-origin',
-  })
-
-  if (!response.ok) {
-    clearAuth()
-    return false
-  }
-
-  authState.user = (await response.json()) as AuthUser
-  return true
-}
-
 export async function initializeAuth(): Promise<void> {
   if (authState.initialized) return
   if (initialization) return initialization
 
   initialization = (async () => {
-    const refreshed = await requestRefresh()
-    if (refreshed) await requestCurrentUser()
+    await requestRefresh()
     authState.initialized = true
   })()
 
@@ -147,7 +124,7 @@ export async function loginWithPassword(email: string, password: string): Promis
     throw await authRequestError(response, '로그인하지 못했습니다.')
   }
 
-  return applyAuthenticatedSession((await response.json()) as AuthSessionResponse)
+  return applyAuthenticatedSession((await response.json()) as RefreshResponse)
 }
 
 export async function signupWithPassword(
@@ -166,7 +143,7 @@ export async function signupWithPassword(
     throw await authRequestError(response, '회원가입을 완료하지 못했습니다.')
   }
 
-  return applyAuthenticatedSession((await response.json()) as AuthSessionResponse)
+  return applyAuthenticatedSession((await response.json()) as RefreshResponse)
 }
 
 export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {

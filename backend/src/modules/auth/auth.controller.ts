@@ -144,6 +144,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     const session = await authService.rotateSession(currentToken);
     res.cookie(REFRESH_TOKEN_COOKIE, session.refreshToken, refreshCookieOptions);
     res.json({
+      user: session.user,
       access_token: session.accessToken,
       token_type: 'Bearer',
       expires_in: config.accessTokenTtlSeconds,

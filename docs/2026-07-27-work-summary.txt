@@ -1,0 +1,112 @@
+================================================================
+작업 정리 — 2026-07-27
+================================================================
+
+1. Git 브랜치/커밋 정리
+----------------------------------------------------------------
+- 기존 origin/feat/cards 브랜치는 현재 main의 조상 커밋(673c4fe)에
+  불과, main이 이미 44커밋 앞서 있어 사실상 병합 완료된 stale 브랜치로
+  확인됨. 그 위에 작업을 얹는 대신 현재 main에서 새 브랜치
+  feat/board-list-card 를 생성하기로 함.
+- 진행 중이던 변경사항(백엔드 list/card 모듈 + 프론트 렌더링)을
+  아래 2개 커밋으로 분리하도록 안내:
+    1) feat(backend): add list module, rewrite card module on Prisma,
+       unify error handling
+    2) feat(frontend): render board lists/cards from API with
+       drag-and-drop ordering
+- 커밋 메시지는 기존 저장소 컨벤션(Conventional Commits,
+  `type(scope): description`)을 따름.
+
+2. 구글 로그인 502 Bad Gateway 버그 수정
+----------------------------------------------------------------
+- 원인: backend/src/config/index.ts 가 SMTP_HOST/SMTP_USER/SMTP_PASS/
+  SMTP_FROM 을 필수 환경변수로 요구하는데, 로컬 .env 파일에 해당
+  키들이 아예 없어서 백엔드가 부팅 중 크래시 → nginx가 백엔드에
+  연결하지 못해 502 발생.
+- 조치: .env 에 SMTP_* 값 채워 넣도록 안내. (실제 메일 발송 없이
+  로그인만 테스트할 경우 더미 값으로도 부팅 가능함을 확인)
+
+3. 리스트 추가 시 항목이 2개씩 생기는 버그 수정
+----------------------------------------------------------------
+- 파일: frontend/src/pages/Board.vue
+- 원인: 리스트 추가 폼이 Enter(submit)와 input의 blur 이벤트 둘 다에
+  submitAddList를 바인딩해두었는데, submit 처리 중
+  showAddList.value = false 로 폼을 숨기면서 input이 DOM에서
+  제거되어 blur가 다시 발생 → submitAddList가 비동기 처리 중(await
+  구간)에 중복 호출되어 API가 두 번 호출됨.
+- 조치: isSubmittingList 플래그를 추가해 중복 호출을 함수 진입
+  시점에 즉시 차단.
+
+4. 리스트/카드 추가에 제출 버튼 추가
+----------------------------------------------------------------
+- 기존엔 Enter 입력으로만 제출 가능하고 클릭 가능한 버튼이 없었음.
+- frontend/src/pages/Board.vue: 리스트 추가 폼에 "추가" 버튼 추가.
+- frontend/src/components/TaskList.vue: 카드 추가 폼에 "추가" 버튼
+  추가.
+- frontend/src/styles/board.css, task-list.css: 폼을 flex 레이아웃으로
+  바꾸고 버튼 스타일(add-list-submit-btn, add-card-submit-btn) 추가.
+- 버튼 클릭 시에도 blur로 인한 중복 제출이 나지 않음을 확인
+  (리스트는 isSubmittingList 플래그, 카드는 동기 함수라 값을 먼저
+  비워서 안전).
+
+5. 초기 렌더링이 느린 문제 진단 및 수정 (2단계)
+----------------------------------------------------------------
+[1차: 인증 부트스트랩 요청 1회 축소]
+- frontend/src/router/index.ts 의 전역 네비게이션 가드가 매 최초
+  진입 시 initializeAuth() 를 기다리는데, 그 내부가
+  POST /api/auth/refresh → GET /api/auth/me 를 순차 호출하고 있었음.
+- 발견: backend rotateSession() 이 refresh 처리 중 이미
+  prisma.user.findUnique 로 유저 정보를 가져오는데, 컨트롤러가
+  access_token 만 응답하고 유저 정보를 버려서 프론트가 동일한 유저를
+  /api/auth/me 로 또 조회하고 있었음 (완전 중복 DB 왕복).
+- 조치:
+  - backend/src/modules/auth/auth.service.ts: rotateSession() 이
+    user 정보도 함께 반환하도록 변경.
+  - backend/src/modules/auth/auth.controller.ts: refresh 응답에
+    user 필드 포함 (login/signup과 동일한 응답 형태로 통일).
+  - frontend/src/services/auth.ts: RefreshResponse에 user 필드 추가,
+    requestRefresh()가 응답의 user로 authState.user를 바로 채움.
+    이제 불필요해진 requestCurrentUser()(/api/auth/me 별도 호출)와
+    중복 타입 AuthSessionResponse 제거.
+  - 효과: 최초 진입 시 직렬 요청 3개(refresh, me, lists) → 2개
+    (refresh, lists)로 축소.
+
+[2차: 진짜 핵심 원인 — Redis 블로킹 명령이 전체 커넥션을 막고 있었음]
+- 그래도 느리다는 피드백을 받고 실측(curl -w)해보니
+  POST /api/auth/refresh 가 매번 정확히 약 3초 걸리는 것을 확인.
+  (프론트 개선과 무관하게 백엔드 자체가 느렸음)
+- backend/src/modules/auth/auth.service.ts의 rotateSession() 내부에
+  console.time 계측을 임시로 넣어 확인한 결과, Redis 명령
+  (getDel, sRem, createSession의 multi/exec) 각각이 순수 Redis
+  레이턴시(<1ms, redis-cli --latency로 확인)와 무관하게 약 1초씩
+  걸리고 있음을 확인.
+- 원인: backend/src/lib/mail-queue.ts 의 메일 워커가
+  redis.brPop(KEY, 1) (1초 타임아웃 블로킹 명령)을 무한 루프로
+  호출하는데, 이때 앱 전체가 공유하는 싱글턴 Redis 커넥션
+  (lib/redis.ts의 getRedisClient())을 그대로 사용하고 있었음.
+  node-redis는 한 커넥션의 명령을 FIFO로 처리하므로, 다른 요청이
+  보낸 Redis 명령이 진행 중인 BRPOP이 끝날 때까지(최대 1초) 대기해야
+  했음. refresh 요청 하나가 Redis 명령을 3번 쓰다 보니 3초가 걸린 것.
+- 조치: mail-queue.ts의 블로킹 폴링 루프가 redis.duplicate()로 만든
+  전용 커넥션을 쓰도록 변경 (node-redis 공식 권장 패턴 — 블로킹
+  명령은 항상 별도 커넥션에서 실행).
+- 효과: POST /api/auth/refresh 응답 시간 3007ms → 5ms (약 600배
+  개선). 계측용 console.time 코드는 확인 후 원복.
+
+변경된 주요 파일
+----------------------------------------------------------------
+backend/src/modules/auth/auth.service.ts
+backend/src/modules/auth/auth.controller.ts
+backend/src/lib/mail-queue.ts
+frontend/src/services/auth.ts
+frontend/src/pages/Board.vue
+frontend/src/components/TaskList.vue
+frontend/src/styles/board.css
+frontend/src/styles/task-list.css
+.env (SMTP_* 값 추가, 사용자가 직접 채움)
+
+남은 작업 / 참고
+----------------------------------------------------------------
+- 위 변경사항은 아직 커밋되지 않은 상태. docs/board-list-card-plan.txt
+  작업분과 함께 커밋 분리 필요.
+- InboxCardsPanel.vue는 여전히 mock 데이터 사용 중 (범위 밖, 별도 작업).
