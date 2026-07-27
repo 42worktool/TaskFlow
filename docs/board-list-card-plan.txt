@@ -1,0 +1,95 @@
+================================================================
+보드/리스트/카드 백엔드 API & 기본 렌더링 — 작업 계획
+작성일: 2026-07-27
+================================================================
+
+배경
+----
+- "보드"는 별도 모델이 아니라 Workspace 자체가 보드다. List는 workspace_id에
+  직접 연결된다 (Planner.md 팀 논의로 확정: Workspace와 Board를 하나로 합침).
+- 기존 backend/src/modules/card/{card.controller,card.service,card.repository,
+  list.router,comment.router}.ts는 죽은 코드다. 존재하지 않는 '../../store',
+  '../../errors'를 import하고 있어 컴파일조차 안 되고, app.ts / board/index.ts
+  어디에도 연결돼 있지 않다. 인증도 나머지 모듈이 쓰는 requireAuth(JWT) 대신
+  x-user-id 헤더를 쓴다 — 현재 아키텍처와 맞지 않는다.
+- workspace.service.ts가 이 프로젝트의 실제 컨벤션을 보여주는 참고 모델:
+  Prisma 직접 호출 + zod 검증 + req.user!.id + 커스텀 에러 클래스를
+  컨트롤러에서 HTTP 상태로 매핑. Repository 레이어는 쓰지 않는다.
+- API 계약은 docs/lists.dto.ts, docs/cards.dto.ts, docs/comments.dto.ts에
+  이미 스펙업되어 있다.
+- 프론트 Board.vue는 현재 mock/data.ts 정적 데이터만 렌더링 중이고
+  "+ 카드 추가" 등 버튼은 동작하지 않는다.
+  (docs/INITIAL_UI_MILESTONES.md의 Milestone 3: Board And Inbox MVP)
+
+결정된 범위 (사용자 확인 완료)
+------------------------------
+- 백엔드: 죽은 코드가 다루던 범위 전부 포함
+  (카드 CRUD, 순서변경/이동, 날짜, 인박스 이동, 카드 멤버, 첨부파일, 댓글)
+- 라벨(Label) API는 죽은 코드의 라우터에 실제로 노출된 적이 없어서 이번
+  범위에서 제외, 다음 작업으로 남김.
+- 프론트: 기본 렌더링 + 드래그 앤 드롭(DnD) 순서 변경까지 포함.
+  카드 상세 모달(댓글/멤버/첨부파일 편집 UI)은 이번 범위 밖
+  (Milestone 4에서 별도 작업).
+
+Phase 1 — 백엔드: List 모듈 (신규)
+-----------------------------------
+backend/src/modules/list/ 신설 (list.service.ts, list.controller.ts,
+list.router.ts). Prisma 기반, requireAuth + zod, ROLE_RANK 재사용.
+
+엔드포인트:
+- POST   /api/workspaces/:workspaceId/lists        생성 (workspace.router.ts에 추가)
+- GET    /api/workspaces/:workspaceId/lists         lists + nested cards
+         (docs에는 없지만 보드 초기 렌더링에 필수라서 이번에 추가)
+- PUT    /api/lists/:listId                         이름 수정
+- DELETE /api/lists/:listId                         삭제 (Card.list_id는 SetNull)
+- PUT    /api/lists/:listId/order                   before/after 이웃 id로
+         fractional sequence 계산
+
+권한: OWNER/ADMIN/MEMBER 쓰기 가능, VIEWER 읽기 전용.
+
+Phase 2 — 백엔드: Card 모듈 (재작성)
+-------------------------------------
+기존 card.controller/service/repository.ts 삭제 후 Prisma 기반으로 재작성.
+Repository 레이어 없이 card.service.ts가 Prisma를 직접 호출 (workspace 모듈과
+동일 패턴).
+
+엔드포인트:
+- POST   /api/lists/:listId/cards
+- GET    /api/cards/:cardId
+- PUT    /api/cards/:cardId
+- DELETE /api/cards/:cardId
+- PUT    /api/cards/:cardId/order
+- PUT    /api/cards/:cardId/move           (대상 리스트가 같은 workspace인지 검증)
+- PATCH  /api/cards/:cardId/dates          (start_at <= deadline 검증)
+- PUT    /api/cards/:cardId/inbox
+- POST   /api/cards/:cardId/members
+- DELETE /api/cards/:cardId/members/:userId  (대상이 워크스페이스 멤버인지 검증)
+- POST   /api/cards/:cardId/attachments      (메타데이터만, 실제 업로드는 범위 밖)
+- DELETE /api/cards/attachments/:attachmentId
+- POST   /api/cards/:cardId/comments
+- PATCH  /api/comments/:commentId            (작성자만 수정)
+- DELETE /api/comments/:commentId            (작성자 또는 ADMIN/OWNER)
+
+app.ts에 /api/lists, /api/cards, /api/comments 라우터 연결.
+사용하지 않는 board/index.ts 빈 스텁 정리(삭제).
+
+Phase 3 — 프론트엔드: API 클라이언트
+--------------------------------------
+- frontend/src/api/list.ts, frontend/src/api/card.ts
+  (frontend/src/api/workspace.ts와 동일하게 apiRequest 기반)
+- frontend/src/types/index.ts의 Card 타입을 mock 전용 label/label_color
+  필드 대신 실제 CardDto(members/labels/attachments optional)에 맞게 정리
+
+Phase 4 — 프론트엔드: 기본 렌더링 + DnD
+------------------------------------------
+- Board.vue: route의 workspaceId로 GET /api/workspaces/:id/lists 호출해
+  실데이터 렌더링(로딩/에러 상태 포함), mock 데이터 제거
+- 리스트 생성 버튼, TaskList.vue "+ 카드 추가" 실제 동작 연결,
+  리스트 이름 수정/삭제
+- vuedraggable(Vue3 + SortableJS 래퍼) 신규 의존성 추가.
+  - 카드: 리스트 간 이동은 draggable group으로
+  - 리스트: 리스트 자체 순서 변경도 draggable로
+  - drop 시 앞/뒤 이웃 id를 계산해 order/move API 호출
+    (raw sequence 값은 클라에서 보내지 않음)
+
+진행 순서: Phase 1 -> 2 -> 3 -> 4

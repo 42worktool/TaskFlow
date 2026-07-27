@@ -5,6 +5,10 @@ defineProps<{
   card: Card
 }>()
 
+const emit = defineEmits<{
+  delete: [cardId: string]
+}>()
+
 function formatDate(iso: string | null) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -14,19 +18,19 @@ function formatDate(iso: string | null) {
 
 <template>
   <article class="task-card">
-    <p class="card-title">{{ card.title }}</p>
-    <div class="card-meta">
-      <span
-        v-if="card.label"
-        class="card-label"
-        :style="{
-          background: (card.label_color ?? '#6b7280') + '20',
-          color: card.label_color ?? '#6b7280',
-        }"
+    <div class="card-title-row">
+      <p class="card-title">{{ card.title }}</p>
+      <button
+        class="card-delete-btn"
+        type="button"
+        aria-label="카드 삭제"
+        @click.stop="emit('delete', card.id)"
       >
-        {{ card.label }}
-      </span>
-      <span class="card-date">{{ formatDate(card.deadline) }}</span>
+        ×
+      </button>
+    </div>
+    <div class="card-meta">
+      <span v-if="card.deadline" class="card-date">{{ formatDate(card.deadline) }}</span>
       <div class="card-assignee" />
     </div>
   </article>

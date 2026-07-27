@@ -1,5 +1,6 @@
 import { CookieOptions, Request, Response } from 'express';
 import { config } from '../../config';
+import { AppError, sendError } from '../../errors';
 import * as authService from './auth.service';
 
 export const OAUTH_STATE_COOKIE = 'ft_oauth_state';
@@ -37,24 +38,6 @@ function oauthErrorRedirect(code: string): string {
   const url = new URL('/signin', config.appOrigin);
   url.searchParams.set('oauth_error', code.toLowerCase());
   return url.toString();
-}
-
-function sendError(res: Response, error: unknown): void {
-  if (error instanceof authService.AuthError) {
-    res.status(error.statusCode).json({
-      status_code: error.statusCode,
-      error: error.code,
-      message: error.message,
-    });
-    return;
-  }
-
-  console.error('[auth] request failed', error instanceof Error ? error.message : error);
-  res.status(500).json({
-    status_code: 500,
-    error: 'AUTH_INTERNAL_ERROR',
-    message: 'Authentication could not be completed',
-  });
 }
 
 async function sendAuthenticatedUser(
@@ -138,8 +121,8 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
     res.redirect(new URL(result.returnTo, config.appOrigin).toString());
   } catch (error) {
     res.clearCookie(OAUTH_STATE_COOKIE, oauthCookieBaseOptions);
-    const code = error instanceof authService.AuthError ? error.code : 'oauth_failed';
-    if (!(error instanceof authService.AuthError)) {
+    const code = error instanceof AppError ? error.code : 'oauth_failed';
+    if (!(error instanceof AppError)) {
       console.error('[auth] Google callback failed', error instanceof Error ? error.message : error);
     }
     res.redirect(oauthErrorRedirect(code));
@@ -161,6 +144,7 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     const session = await authService.rotateSession(currentToken);
     res.cookie(REFRESH_TOKEN_COOKIE, session.refreshToken, refreshCookieOptions);
     res.json({
+      user: session.user,
       access_token: session.accessToken,
       token_type: 'Bearer',
       expires_in: config.accessTokenTtlSeconds,
@@ -186,7 +170,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
 
 export async function me(req: Request, res: Response): Promise<void> {
   try {
-    if (!req.auth) throw new authService.AuthError('UNAUTHORIZED', 401, 'Authentication required');
+    if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
     res.json(await authService.getCurrentUser(req.auth.userId));
   } catch (error) {
     sendError(res, error);
@@ -195,7 +179,7 @@ export async function me(req: Request, res: Response): Promise<void> {
 
 export async function updateAccount(req: Request, res: Response): Promise<void> {
   try {
-    if (!req.auth) throw new authService.AuthError('UNAUTHORIZED', 401, 'Authentication required');
+    if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
     res.json(await authService.updateCurrentUser(req.auth.userId, req.body?.name));
   } catch (error) {
     sendError(res, error);
@@ -204,7 +188,7 @@ export async function updateAccount(req: Request, res: Response): Promise<void> 
 
 export async function deleteAccount(req: Request, res: Response): Promise<void> {
   try {
-    if (!req.auth) throw new authService.AuthError('UNAUTHORIZED', 401, 'Authentication required');
+    if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
     await authService.deleteCurrentUser(req.auth.userId);
     res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions);
     res.status(204).send();

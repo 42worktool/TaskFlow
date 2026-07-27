@@ -3,6 +3,7 @@
 // ============================================================
 import { Router } from 'express'
 import * as ctrl from './workspace.controller'
+import * as listCtrl from '../list/list.controller'
 import { requireAuth } from '../../middleware/auth'
 
 export const workspaceRouter = Router()
@@ -16,3 +17,5 @@ workspaceRouter.post('/:workspaceId/members', requireAuth, ctrl.inviteMember)
 workspaceRouter.put('/:workspaceId/members/:userId', requireAuth, ctrl.changeMemberRole)
 workspaceRouter.delete('/:workspaceId/members/:userId', requireAuth, ctrl.removeMember)
 workspaceRouter.post('/invite/:token', requireAuth, ctrl.acceptInvite)
+workspaceRouter.get('/:workspaceId/lists', requireAuth, listCtrl.list)
+workspaceRouter.post('/:workspaceId/lists', requireAuth, listCtrl.create)

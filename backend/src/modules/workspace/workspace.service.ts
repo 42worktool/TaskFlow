@@ -8,6 +8,7 @@
 import jwt from 'jsonwebtoken'
 import { prisma } from '../../db'
 import { config } from '../../config'
+import { AppError, ForbiddenError, NotFoundError } from '../../errors'
 import type { Workspace, WorkspaceMember, User, Role } from '@prisma/client'
 
 const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -19,26 +20,34 @@ interface InvitePayload {
 }
 
 // ------------------------------------------------------------
-// Error classes — the controller maps these to HTTP status codes
+// Error classes — generic ones (ForbiddenError/NotFoundError) come from
+// the shared errors module; these two carry workspace-specific codes.
 // ------------------------------------------------------------
-export class ForbiddenError extends Error {
-  code = 'FORBIDDEN' as const
+export { ForbiddenError, NotFoundError }
+
+export class LastOwnerError extends AppError {
+  constructor() {
+    super('LAST_OWNER', 409, 'cannot remove the last owner')
+  }
 }
-export class NotFoundError extends Error {
-  code = 'NOT_FOUND' as const
+
+export class InviteTokenError extends AppError {
+  constructor() {
+    super('INVITE_TOKEN_INVALID', 400, 'invalid or expired invite token')
+  }
 }
 
 // ------------------------------------------------------------
 // Role helpers
 // ------------------------------------------------------------
-const ROLE_RANK: Record<Role, number> = {
+export const ROLE_RANK: Record<Role, number> = {
   VIEWER: 1,
   MEMBER: 2,
   ADMIN: 3,
   OWNER: 4,
 }
 
-async function getRole(wsId: string, userId: string): Promise<Role | null> {
+export async function getRole(wsId: string, userId: string): Promise<Role | null> {
   const m = await prisma.workspaceMember.findFirst({
     where: {
       workspace_id: wsId,
@@ -330,14 +339,6 @@ export async function removeMember(callerId: string, wsId: string, targetUserId:
       },
     })
   })
-}
-
-export class InviteTokenError extends Error {
-  code = 'INVITE_TOKEN_INVALID' as const
-}
-
-export class LastOwnerError extends Error {
-  code = 'LAST_OWNER' as const
 }
 
 /**

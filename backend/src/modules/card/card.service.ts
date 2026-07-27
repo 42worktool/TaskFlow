@@ -1,12 +1,19 @@
-import { AppError } from '../../errors';
-import { CardRecord, ListRecord } from '../../store';
-import { findUserById } from '../users/users.repository';
-import * as workspaceRepo from '../workspace/workspace.repository';
-import * as repo from './card.repository';
+// ============================================================
+// card.service.ts — Card (+ members, attachments, comments) business logic
+//
+// Mirrors workspace.service.ts conventions: Prisma singleton, soft delete
+// via deleted_at, role checks via workspace ROLE_RANK. Cards with
+// list_id === null are personal inbox cards; access to those is by
+// ownership (user_id), not workspace role.
+// ============================================================
+import { prisma } from '../../db'
+import type { Attachment, Card, Comment, List, Role } from '@prisma/client'
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../errors'
+import { ROLE_RANK, getRole } from '../workspace/workspace.service'
 
-// ─── Helpers ──────────────────────────────────────────────────
+// ─── DTOs ─────────────────────────────────────────────────────
 
-function toCardDto(card: CardRecord) {
+function toCardDto(card: Card) {
   return {
     id: card.id,
     list_id: card.list_id,
@@ -16,278 +23,367 @@ function toCardDto(card: CardRecord) {
     deadline: card.deadline,
     sequence: card.sequence,
     created_at: card.created_at,
-  };
+  }
 }
 
-function buildCardDetail(card: CardRecord) {
-  const members = repo.findCardMembers(card.id).map((m) => {
-    const user = findUserById(m.user_id)!;
-    return {
-      user_id: m.user_id,
-      name: user.name,
-      profile_image_url: user.profile_image_url
-    };
-  });
+async function buildCardDetail(card: Card) {
+  const [members, attachments] = await Promise.all([
+    prisma.cardMember.findMany({
+      where: { card_id: card.id, deleted_at: null },
+      include: { user: { select: { id: true, name: true, profile_image_url: true } } },
+    }),
+    prisma.attachment.findMany({
+      where: { card_id: card.id, deleted_at: null },
+      orderBy: { created_at: 'asc' },
+    }),
+  ])
 
-  const labels = repo.findCardLabels(card.id).map((cl) => {
-    const label = repo.findLabelById(cl.label_id)!;
-    return { label_id: label.id, label_name: label.label_name, label_color: label.label_color };
-  });
-
-  const attachments = repo.findAttachmentsByCardId(card.id);
-
-  return { ...toCardDto(card), members, labels, attachments };
+  return {
+    ...toCardDto(card),
+    members: members.map((m) => ({
+      user_id: m.user.id,
+      name: m.user.name,
+      profile_image_url: m.user.profile_image_url,
+    })),
+    attachments: attachments.map(toAttachmentDto),
+  }
 }
 
-function toCommentDto(commentId: string) {
-  const c = repo.findCommentById(commentId)!;
-  const user = findUserById(c.user_id)!;
+function toAttachmentDto(a: Attachment) {
+  return {
+    id: a.id,
+    card_id: a.card_id,
+    file_url: a.file_url,
+    file_name: a.file_name,
+    created_at: a.created_at,
+  }
+}
+
+function toCommentDto(c: Comment & { user: { id: string; name: string; profile_image_url: string | null } }) {
   return {
     id: c.id,
     card_id: c.card_id,
-    author: { user_id: c.user_id, name: user.name, profile_image_url: user.profile_image_url },
+    author: {
+      user_id: c.user.id,
+      name: c.user.name,
+      profile_image_url: c.user.profile_image_url,
+    },
     comment_str: c.comment_str,
     created_at: c.created_at,
     updated_at: c.updated_at,
-  };
+  }
 }
 
-function getCardOrThrow(cardId: string): CardRecord {
-  const card = repo.findCardById(cardId);
-  if (!card) throw new AppError(404, 'Card not found');
-  return card;
+// ─── Access helpers ───────────────────────────────────────────
+
+async function getCardOrThrow(cardId: string): Promise<Card> {
+  const card = await prisma.card.findFirst({ where: { id: cardId, deleted_at: null } })
+  if (!card) throw new NotFoundError()
+  return card
 }
 
-function getListOrThrow(listId: string): ListRecord {
-  const list = repo.findListById(listId);
-  if (!list) throw new AppError(404, 'List not found');
-  return list;
+async function getListOrThrow(listId: string): Promise<List> {
+  const list = await prisma.list.findFirst({ where: { id: listId, deleted_at: null } })
+  if (!list) throw new NotFoundError()
+  return list
 }
 
-function requireCardAccess(card: CardRecord, userId: string): void {
+/** Write access: inbox card owner, or MEMBER+ in the card's workspace. */
+async function requireCardWrite(card: Card, userId: string): Promise<void> {
+  await requireCardRole(card, userId, 'MEMBER')
+}
+
+async function requireCardRole(card: Card, userId: string, minRole?: Role): Promise<Role | null> {
   if (card.list_id === null) {
-    if (card.user_id !== userId) throw new AppError(403, 'Access denied');
-    return;
+    if (card.user_id !== userId) throw new ForbiddenError()
+    return null
   }
-  const list = getListOrThrow(card.list_id);
-  if (!workspaceRepo.findMember(list.workspace_id, userId)) {
-    throw new AppError(403, 'Not a member of this workspace');
-  }
+  const list = await getListOrThrow(card.list_id)
+  const role = await getRole(list.workspace_id, userId)
+  if (!role) throw new ForbiddenError()
+  if (minRole && ROLE_RANK[role] < ROLE_RANK[minRole]) throw new ForbiddenError()
+  return role
 }
 
-// Fractional-indexing midpoint for reorder/move operations
-function computeSequence(
-  siblings: CardRecord[],
-  beforeId?: string | null,
-  afterId?: string | null,
-): number {
-  const before = beforeId ? siblings.find((c) => c.id === beforeId) : null;
-  const after = afterId ? siblings.find((c) => c.id === afterId) : null;
-  if (!before && !after) return (siblings[siblings.length - 1]?.sequence ?? 0) + 1;
-  if (!before) return after!.sequence - 1;
-  if (!after) return before.sequence + 1;
-  return (before.sequence + after.sequence) / 2;
+// Fractional-indexing midpoint for reorder/move operations.
+function computeSequence(siblings: Card[], beforeId?: string | null, afterId?: string | null): number {
+  const before = beforeId ? siblings.find((c) => c.id === beforeId) : null
+  const after = afterId ? siblings.find((c) => c.id === afterId) : null
+  if (!before && !after) return (siblings[siblings.length - 1]?.sequence ?? 0) + 1
+  if (!before) return after!.sequence - 1
+  if (!after) return before.sequence + 1
+  return (before.sequence + after.sequence) / 2
 }
 
 // ─── Cards ────────────────────────────────────────────────────
 
-export function createCard(
+export async function createCard(
   userId: string,
   listId: string,
-  data: {
-    title: string;
-    description?: string | null;
-    start_at?: string | null;
-    deadline?: string | null;
-  },
+  data: { title: string; description?: string | null; start_at?: string | null; deadline?: string | null },
 ) {
-  if (userId === "") {
-    const list = getListOrThrow(listId);
-    if (!workspaceRepo.findMember(list.workspace_id, userId)) {
-      throw new AppError(403, 'Not a member of this workspace');
-    }
-    return toCardDto(repo.createCard({ list_id: listId, user_id: null, ...data }));
-  } else {
-    return toCardDto(repo.createCard({ user_id: userId, list_id: null, ...data }));
-  }
+  const list = await getListOrThrow(listId)
+  const role = await getRole(list.workspace_id, userId)
+  if (!role || ROLE_RANK[role] < ROLE_RANK.MEMBER) throw new ForbiddenError()
+
+  const agg = await prisma.card.aggregate({
+    where: { list_id: listId, deleted_at: null },
+    _max: { sequence: true },
+  })
+
+  const card = await prisma.card.create({
+    data: {
+      list_id: listId,
+      title: data.title,
+      description: data.description ?? '',
+      start_at: data.start_at ? new Date(data.start_at) : null,
+      deadline: data.deadline ? new Date(data.deadline) : null,
+      sequence: (agg._max.sequence ?? 0) + 1,
+      created_by: userId,
+      updated_by: userId,
+    },
+  })
+  return toCardDto(card)
 }
 
-export function getCard(userId: string, cardId: string) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
-  return buildCardDetail(card);
+export async function getCard(userId: string, cardId: string) {
+  const card = await getCardOrThrow(cardId)
+  await requireCardRole(card, userId)
+  return buildCardDetail(card)
 }
 
-export function updateCard(
+export async function updateCard(
   userId: string,
   cardId: string,
   data: { title?: string; description?: string | null },
 ) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
-  return toCardDto(repo.updateCard(cardId, data)!);
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
+
+  const updated = await prisma.card.update({
+    where: { id: cardId },
+    data: {
+      ...(data.title !== undefined ? { title: data.title } : {}),
+      ...('description' in data ? { description: data.description ?? '' } : {}),
+      updated_by: userId,
+    },
+  })
+  return toCardDto(updated)
 }
 
-export function deleteCard(userId: string, cardId: string) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
-  repo.deleteCard(cardId);
+export async function deleteCard(userId: string, cardId: string): Promise<void> {
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
+
+  await prisma.card.update({
+    where: { id: cardId },
+    data: { deleted_at: new Date(), deleted_by: userId, updated_by: userId },
+  })
 }
 
-export function reorderCard(
+export async function reorderCard(
   userId: string,
   cardId: string,
   data: { before_card_id?: string | null; after_card_id?: string | null },
 ) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
-  if (!card.list_id) throw new AppError(400, 'Cannot reorder inbox cards');
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
+  if (!card.list_id) throw new BadRequestError('Cannot reorder inbox cards')
 
-  const siblings = repo
-    .findCardsByListId(card.list_id)
-    .filter((c) => c.id !== cardId)
-    .sort((a, b) => a.sequence - b.sequence);
+  const siblings = await prisma.card.findMany({
+    where: { list_id: card.list_id, deleted_at: null, id: { not: cardId } },
+    orderBy: { sequence: 'asc' },
+  })
 
-  const newSeq = computeSequence(siblings, data.before_card_id, data.after_card_id);
-  return toCardDto(repo.updateCardSequence(cardId, newSeq)!);
+  const newSequence = computeSequence(siblings, data.before_card_id, data.after_card_id)
+  const updated = await prisma.card.update({
+    where: { id: cardId },
+    data: { sequence: newSequence, updated_by: userId },
+  })
+  return toCardDto(updated)
 }
 
-export function moveCard(
+export async function moveCard(
   userId: string,
   cardId: string,
-  data: {
-    list_id: string;
-    before_card_id?: string | null;
-    after_card_id?: string | null;
-  },
+  data: { list_id: string; before_card_id?: string | null; after_card_id?: string | null },
 ) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
 
-  const targetList = getListOrThrow(data.list_id);
-  if (!workspaceRepo.findMember(targetList.workspace_id, userId)) {
-    throw new AppError(403, 'Target list is in a workspace you are not a member of');
+  const targetList = await getListOrThrow(data.list_id)
+  const targetRole = await getRole(targetList.workspace_id, userId)
+  if (!targetRole || ROLE_RANK[targetRole] < ROLE_RANK.MEMBER) {
+    throw new ForbiddenError()
   }
 
-  repo.moveCard(cardId, data.list_id);
+  const siblings = await prisma.card.findMany({
+    where: { list_id: data.list_id, deleted_at: null, id: { not: cardId } },
+    orderBy: { sequence: 'asc' },
+  })
+  const newSequence = computeSequence(siblings, data.before_card_id, data.after_card_id)
 
-  const siblings = repo
-    .findCardsByListId(data.list_id)
-    .filter((c) => c.id !== cardId)
-    .sort((a, b) => a.sequence - b.sequence);
-
-  const newSeq = computeSequence(siblings, data.before_card_id, data.after_card_id);
-  return toCardDto(repo.updateCardSequence(cardId, newSeq)!);
+  const updated = await prisma.card.update({
+    where: { id: cardId },
+    data: { list_id: data.list_id, sequence: newSequence, updated_by: userId },
+  })
+  return toCardDto(updated)
 }
 
-export function updateCardDates(
+export async function updateCardDates(
   userId: string,
   cardId: string,
   data: { start_at?: string | null; deadline?: string | null },
 ) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
 
-  const newStart = 'start_at' in data ? data.start_at : card.start_at;
-  const newEnd = 'deadline' in data ? data.deadline : card.deadline;
+  const newStart = 'start_at' in data ? data.start_at : card.start_at?.toISOString() ?? null
+  const newEnd = 'deadline' in data ? data.deadline : card.deadline?.toISOString() ?? null
   if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
-    throw new AppError(400, 'start_at must be before or equal to deadline');
+    throw new BadRequestError('start_at must be before or equal to deadline')
   }
 
-  return toCardDto(repo.updateCardDates(cardId, data)!);
+  const updated = await prisma.card.update({
+    where: { id: cardId },
+    data: {
+      ...('start_at' in data ? { start_at: data.start_at ? new Date(data.start_at) : null } : {}),
+      ...('deadline' in data ? { deadline: data.deadline ? new Date(data.deadline) : null } : {}),
+      updated_by: userId,
+    },
+  })
+  return toCardDto(updated)
 }
 
-export function moveCardToInbox(userId: string, cardId: string) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
-  const updated = repo.moveCard(cardId, null)!;
-  updated.user_id = userId;
-  return toCardDto(updated);
+export async function moveCardToInbox(userId: string, cardId: string) {
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
+
+  const updated = await prisma.card.update({
+    where: { id: cardId },
+    data: { list_id: null, user_id: userId, updated_by: userId },
+  })
+  return toCardDto(updated)
 }
 
 // ─── Card Members ─────────────────────────────────────────────
 
-export function addCardMember(userId: string, cardId: string, targetUserId: string) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
+export async function addCardMember(userId: string, cardId: string, targetUserId: string) {
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
 
   if (card.list_id) {
-    const list = getListOrThrow(card.list_id);
-    if (!workspaceRepo.findMember(list.workspace_id, targetUserId)) {
-      throw new AppError(400, 'Target user is not a member of this workspace');
-    }
+    const list = await getListOrThrow(card.list_id)
+    const targetRole = await getRole(list.workspace_id, targetUserId)
+    if (!targetRole) throw new BadRequestError('Target user is not a member of this workspace')
   }
 
-  if (repo.findCardMember(cardId, targetUserId)) {
-    throw new AppError(409, 'User is already assigned to this card');
+  const existing = await prisma.cardMember.findUnique({
+    where: { card_id_user_id: { card_id: cardId, user_id: targetUserId } },
+  })
+  if (existing && !existing.deleted_at) {
+    throw new ConflictError('User is already assigned to this card')
   }
 
-  repo.addCardMember(cardId, targetUserId);
-  const user = findUserById(targetUserId);
-  if (!user) throw new AppError(404, 'User not found');
-  return { user_id: targetUserId, name: user.name, profile_image_url: user.profile_image_url };
+  if (existing) {
+    await prisma.cardMember.update({
+      where: { card_id_user_id: { card_id: cardId, user_id: targetUserId } },
+      data: { deleted_at: null, deleted_by: null, updated_by: userId },
+    })
+  } else {
+    await prisma.cardMember.create({
+      data: { card_id: cardId, user_id: targetUserId, created_by: userId, updated_by: userId },
+    })
+  }
+
+  const user = await prisma.user.findFirst({ where: { id: targetUserId, deleted_at: null } })
+  if (!user) throw new NotFoundError()
+  return { user_id: targetUserId, name: user.name, profile_image_url: user.profile_image_url }
 }
 
-export function removeCardMember(userId: string, cardId: string, targetUserId: string) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
-  if (!repo.findCardMember(cardId, targetUserId)) {
-    throw new AppError(404, 'Member not found on this card');
-  }
-  repo.removeCardMember(cardId, targetUserId);
+export async function removeCardMember(userId: string, cardId: string, targetUserId: string): Promise<void> {
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
+
+  const existing = await prisma.cardMember.findUnique({
+    where: { card_id_user_id: { card_id: cardId, user_id: targetUserId } },
+  })
+  if (!existing || existing.deleted_at) throw new NotFoundError()
+
+  await prisma.cardMember.update({
+    where: { card_id_user_id: { card_id: cardId, user_id: targetUserId } },
+    data: { deleted_at: new Date(), deleted_by: userId, updated_by: userId },
+  })
 }
 
 // ─── Attachments ──────────────────────────────────────────────
 
-export function addAttachment(
+export async function addAttachment(
   userId: string,
   cardId: string,
   data: { file_url: string; file_name: string },
 ) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
-  return repo.addAttachment({ card_id: cardId, ...data });
+  const card = await getCardOrThrow(cardId)
+  await requireCardWrite(card, userId)
+
+  const attachment = await prisma.attachment.create({
+    data: { card_id: cardId, file_url: data.file_url, file_name: data.file_name, created_by: userId, updated_by: userId },
+  })
+  return toAttachmentDto(attachment)
 }
 
-export function removeAttachment(userId: string, attachmentId: string) {
-  const attachment = repo.findAttachmentById(attachmentId);
-  if (!attachment) throw new AppError(404, 'Attachment not found');
-  const card = getCardOrThrow(attachment.card_id);
-  requireCardAccess(card, userId);
-  repo.removeAttachment(attachmentId);
+export async function removeAttachment(userId: string, attachmentId: string): Promise<void> {
+  const attachment = await prisma.attachment.findFirst({ where: { id: attachmentId, deleted_at: null } })
+  if (!attachment) throw new NotFoundError()
+  const card = await getCardOrThrow(attachment.card_id)
+  await requireCardWrite(card, userId)
+
+  await prisma.attachment.update({
+    where: { id: attachmentId },
+    data: { deleted_at: new Date(), deleted_by: userId, updated_by: userId },
+  })
 }
 
 // ─── Comments ─────────────────────────────────────────────────
 
-export function createComment(userId: string, cardId: string, data: { comment_str: string }) {
-  const card = getCardOrThrow(cardId);
-  requireCardAccess(card, userId);
-  repo.createComment({ card_id: cardId, user_id: userId, comment_str: data.comment_str });
-  return toCommentDto(repo.findCommentsByCardId(cardId).at(-1)!.id);
+export async function createComment(userId: string, cardId: string, data: { comment_str: string }) {
+  const card = await getCardOrThrow(cardId)
+  await requireCardRole(card, userId)
+
+  const comment = await prisma.comment.create({
+    data: { card_id: cardId, user_id: userId, comment_str: data.comment_str, created_by: userId, updated_by: userId },
+    include: { user: { select: { id: true, name: true, profile_image_url: true } } },
+  })
+  return toCommentDto(comment)
 }
 
-export function updateComment(userId: string, commentId: string, data: { comment_str: string }) {
-  const comment = repo.findCommentById(commentId);
-  if (!comment) throw new AppError(404, 'Comment not found');
-  if (comment.user_id !== userId) throw new AppError(403, 'Only the author can edit this comment');
-  repo.updateComment(commentId, data.comment_str);
-  return toCommentDto(commentId);
+export async function updateComment(userId: string, commentId: string, data: { comment_str: string }) {
+  const comment = await prisma.comment.findFirst({ where: { id: commentId, deleted_at: null } })
+  if (!comment) throw new NotFoundError()
+  if (comment.user_id !== userId) throw new ForbiddenError()
+
+  const updated = await prisma.comment.update({
+    where: { id: commentId },
+    data: { comment_str: data.comment_str, updated_by: userId },
+    include: { user: { select: { id: true, name: true, profile_image_url: true } } },
+  })
+  return toCommentDto(updated)
 }
 
-export function deleteComment(userId: string, commentId: string) {
-  const comment = repo.findCommentById(commentId);
-  if (!comment) throw new AppError(404, 'Comment not found');
+export async function deleteComment(userId: string, commentId: string): Promise<void> {
+  const comment = await prisma.comment.findFirst({ where: { id: commentId, deleted_at: null } })
+  if (!comment) throw new NotFoundError()
+
   if (comment.user_id !== userId) {
-    const card = getCardOrThrow(comment.card_id);
-    if (card.list_id) {
-      const list = getListOrThrow(card.list_id);
-      const member = workspaceRepo.findMember(list.workspace_id, userId);
-      if (!member || (member.role !== 'OWNER' && member.role !== 'ADMIN')) {
-        throw new AppError(403, 'Only the author or workspace ADMIN/OWNER can delete this comment');
-      }
-    } else {
-      throw new AppError(403, 'Only the author can delete this comment');
-    }
+    const card = await getCardOrThrow(comment.card_id)
+    if (!card.list_id) throw new ForbiddenError()
+    const list = await getListOrThrow(card.list_id)
+    const role = await getRole(list.workspace_id, userId)
+    if (!role || ROLE_RANK[role] < ROLE_RANK.ADMIN) throw new ForbiddenError()
   }
-  repo.deleteComment(commentId);
+
+  await prisma.comment.update({
+    where: { id: commentId },
+    data: { deleted_at: new Date(), deleted_by: userId, updated_by: userId },
+  })
 }

@@ -5,6 +5,7 @@ const KEY = 'mail:queue';
 
 let running = false;
 let done: (() => void) | null = null;
+let workerClient: Awaited<ReturnType<typeof getRedisClient>> | null = null;
 
 export async function enqueue(options: MailOptions): Promise<void> {
   const redis = await getRedisClient();
@@ -12,10 +13,16 @@ export async function enqueue(options: MailOptions): Promise<void> {
 }
 
 async function processJob(): Promise<void> {
+  // BRPOP blocks the connection it runs on for up to the timeout, so it
+  // needs its own dedicated connection — sharing the app's main client
+  // would queue every other Redis command behind each blocking poll.
   const redis = await getRedisClient();
+  workerClient = redis.duplicate();
+  await workerClient.connect();
+
   while (running) {
     try {
-      const result = await redis.brPop(KEY, 1);
+      const result = await workerClient.brPop(KEY, 1);
       if (!result) continue;
       const options = JSON.parse(result.element) as MailOptions;
       await sendMail(options);
@@ -25,6 +32,9 @@ async function processJob(): Promise<void> {
       }
     }
   }
+
+  await workerClient.quit();
+  workerClient = null;
   done?.();
 }
 
