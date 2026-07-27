@@ -50,11 +50,33 @@
   color: #374151;
 }
 
+.add-list-form {
+  display: flex;
+  gap: 6px;
+}
+
 .add-list-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 10px 12px;
   border: 1px solid #2563eb;
   border-radius: 10px;
   font-size: 13px;
   box-sizing: border-box;
+}
+
+.add-list-submit-btn {
+  flex-shrink: 0;
+  padding: 0 14px;
+  background: #2563eb;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+
+.add-list-submit-btn:hover {
+  background: #1d4ed8;
 }

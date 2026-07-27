@@ -85,15 +85,34 @@
 
 .add-card-form {
   margin-top: 4px;
+  display: flex;
+  gap: 6px;
 }
 
 .add-card-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 8px;
   border: 1px solid #2563eb;
   border-radius: 6px;
   font-size: 13px;
   box-sizing: border-box;
+}
+
+.add-card-submit-btn {
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+
+.add-card-submit-btn:hover {
+  background: #1d4ed8;
 }
 
 .add-card-btn {

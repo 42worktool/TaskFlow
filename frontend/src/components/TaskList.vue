@@ -110,6 +110,7 @@ const vFocus = {
         @keyup.esc="cancelAddCard"
         @blur="submitAddCard"
       />
+      <button type="submit" class="add-card-submit-btn">추가</button>
     </form>
     <button v-else class="add-card-btn" type="button" @click="showAddCard = true">
       + 카드 추가

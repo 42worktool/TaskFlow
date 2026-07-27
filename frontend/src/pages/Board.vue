@@ -16,6 +16,7 @@ const error = ref('')
 
 const showAddList = ref(false)
 const newListName = ref('')
+let isSubmittingList = false
 
 async function fetchLists() {
   const workspaceId = route.params.workspaceId as string
@@ -33,17 +34,21 @@ async function fetchLists() {
 watch(() => route.params.workspaceId, fetchLists, { immediate: true })
 
 async function submitAddList() {
+  if (isSubmittingList) return
   const name = newListName.value.trim()
   showAddList.value = false
   if (!name) return
+  isSubmittingList = true
   const workspaceId = route.params.workspaceId as string
   try {
     const created = await ListAPI.create(workspaceId, name)
     lists.value.push({ ...created, cards: [] })
   } catch (e) {
     error.value = e instanceof Error ? e.message : '리스트를 추가하지 못했습니다.'
+  } finally {
+    newListName.value = ''
+    isSubmittingList = false
   }
-  newListName.value = ''
 }
 
 function cancelAddList() {
@@ -155,6 +160,7 @@ async function onDeleteList(listId: string) {
               @keyup.esc="cancelAddList"
               @blur="submitAddList"
             />
+            <button type="submit" class="add-list-submit-btn">추가</button>
           </form>
           <button v-else class="add-list-btn" type="button" @click="showAddList = true">
             + 리스트 추가
