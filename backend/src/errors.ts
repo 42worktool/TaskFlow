@@ -63,6 +63,16 @@ export function sendError(res: Response, error: unknown): void {
     return;
   }
 
+  const httpStatus = getClientErrorStatus(error);
+  if (httpStatus !== null) {
+    res.status(httpStatus).json({
+      status_code: httpStatus,
+      error: httpStatus === 413 ? 'PAYLOAD_TOO_LARGE' : 'BAD_REQUEST',
+      message: httpStatus === 413 ? 'Request body is too large' : 'Invalid request',
+    });
+    return;
+  }
+
   console.error(error);
   res.status(500).json({
     status_code: 500,
@@ -71,6 +81,26 @@ export function sendError(res: Response, error: unknown): void {
   });
 }
 
-export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  sendError(res, error)
+function getClientErrorStatus(error: unknown): number | null {
+  if (typeof error !== 'object' || error === null) return null;
+
+  const candidate = error as { status?: unknown; statusCode?: unknown };
+  const status =
+    typeof candidate.status === 'number'
+      ? candidate.status
+      : typeof candidate.statusCode === 'number'
+        ? candidate.statusCode
+        : null;
+
+  return status !== null && Number.isInteger(status) && status >= 400 && status < 500
+    ? status
+    : null;
 }
+
+export const errorHandler: ErrorRequestHandler = (error, _req, res, next) => {
+  if (res.headersSent) {
+    next(error);
+    return;
+  }
+  sendError(res, error);
+};

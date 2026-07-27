@@ -37,6 +37,22 @@ type CommentWithUser = Comment & {
   user: { id: string; name: string; profile_image_url: string | null }
 }
 
+export interface CardLabelWithLabel {
+  label: {
+    id: string
+    label_name: string
+    label_color: string
+  }
+}
+
+export function toCardLabelDto(cardLabel: CardLabelWithLabel) {
+  return {
+    label_id: cardLabel.label.id,
+    label_name: cardLabel.label.label_name,
+    label_color: cardLabel.label.label_color,
+  }
+}
+
 export function toCommentDto(comment: CommentWithUser) {
   return {
     id: comment.id,
@@ -55,11 +71,13 @@ export function toCommentDto(comment: CommentWithUser) {
 export function toCardDetailDto(
   card: Card,
   members: Parameters<typeof toCardMemberDto>[0][],
+  labels: CardLabelWithLabel[],
   attachments: Attachment[],
 ) {
   return {
     ...toCardDto(card),
     members: members.map(toCardMemberDto),
+    labels: labels.map(toCardLabelDto),
     attachments: attachments.map(toAttachmentDto),
   }
 }

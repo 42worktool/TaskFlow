@@ -95,7 +95,11 @@ export async function deleteList(input: { actorId: string; listId: string }): Pr
   await prisma.$transaction([
     prisma.card.updateMany({
       where: { list_id: input.listId, deleted_at: null },
-      data: { list_id: null, ...updatedBy(input.actorId) },
+      data: {
+        list_id: null,
+        user_id: input.actorId,
+        ...updatedBy(input.actorId),
+      },
     }),
     prisma.list.update({
       where: { id: input.listId },

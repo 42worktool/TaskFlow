@@ -22,10 +22,23 @@ import {
 // ─── DTOs ─────────────────────────────────────────────────────
 
 async function buildCardDetail(card: Card) {
-  const [members, attachments] = await Promise.all([
+  const [members, labels, attachments] = await Promise.all([
     prisma.cardMember.findMany({
       where: { card_id: card.id, deleted_at: null },
       include: { user: { select: { id: true, name: true, profile_image_url: true } } },
+    }),
+    prisma.cardLabel.findMany({
+      where: {
+        card_id: card.id,
+        deleted_at: null,
+        label: { deleted_at: null },
+      },
+      orderBy: { created_at: 'asc' },
+      include: {
+        label: {
+          select: { id: true, label_name: true, label_color: true },
+        },
+      },
     }),
     prisma.attachment.findMany({
       where: { card_id: card.id, deleted_at: null },
@@ -33,7 +46,7 @@ async function buildCardDetail(card: Card) {
     }),
   ])
 
-  return toCardDetailDto(card, members, attachments)
+  return toCardDetailDto(card, members, labels, attachments)
 }
 
 // ─── Access helpers ───────────────────────────────────────────
@@ -184,6 +197,12 @@ export async function moveCard(
   await requireCardWrite(card, input.actorId)
 
   const targetList = await getListOrThrow(input.targetListId)
+  if (card.list_id !== null) {
+    const sourceList = await getListOrThrow(card.list_id)
+    if (sourceList.workspace_id !== targetList.workspace_id) {
+      throw new BadRequestError('Cards cannot be moved between workspaces')
+    }
+  }
   const targetRole = await getRole(targetList.workspace_id, input.actorId)
   if (!targetRole || ROLE_RANK[targetRole] < ROLE_RANK.MEMBER) {
     throw new ForbiddenError()
