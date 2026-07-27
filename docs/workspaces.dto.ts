@@ -74,10 +74,7 @@ export interface InviteMemberRequest {
   email: string;
   role?: Role;   // 미지정 시 MEMBER 기본 권장
 }
-export interface InviteMemberResponse {
-  token: string;
-  invite_url: string;
-}
+export type InviteMemberResponse = WorkspaceMemberDto;
 
 // ------------------------------------------------------------
 // PUT /workspaces/{workspace_id}/members/{user_id}  → 200

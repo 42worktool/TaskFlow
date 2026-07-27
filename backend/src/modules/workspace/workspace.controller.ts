@@ -51,16 +51,13 @@ export const remove: RequestHandler = async (req, res) => {
 
 export const inviteMember: RequestHandler = async (req, res) => {
   const data = inviteWorkspaceMemberSchema.parse(req.body)
-  const invite = await svc.inviteWorkspaceMember({
+  await svc.inviteWorkspaceMember({
     userId: req.user!.id,
     workspaceId: req.params.workspaceId as string,
     email: data.email,
     role: data.role,
   })
-  res.status(201).json({
-    token: invite.token,
-    invite_url: invite.inviteUrl,
-  })
+  res.status(201).json({ ok: true })
 }
 
 export const acceptInvite: RequestHandler = async (req, res) => {

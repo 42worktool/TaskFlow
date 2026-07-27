@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { type TestContext } from 'node:test'
 import type { Card, List } from '@prisma/client'
-import { setRequiredEnvironment, stubMethod } from '../../test/helpers'
 
 const USER_ID = '00000000-0000-4000-8000-000000000001'
 const CARD_ID = '00000000-0000-4000-8000-000000000002'
@@ -9,6 +8,40 @@ const SOURCE_LIST_ID = '00000000-0000-4000-8000-000000000003'
 const TARGET_LIST_ID = '00000000-0000-4000-8000-000000000004'
 const SOURCE_WORKSPACE_ID = '00000000-0000-4000-8000-000000000005'
 const TARGET_WORKSPACE_ID = '00000000-0000-4000-8000-000000000006'
+
+function setRequiredEnvironment(): void {
+  Object.assign(process.env, {
+    APP_ORIGIN: 'http://localhost:5173',
+    JWT_ACCESS_SECRET: 'test-secret-that-is-at-least-32-characters',
+    GOOGLE_CLIENT_ID: 'test-client',
+    GOOGLE_CLIENT_SECRET: 'test-secret',
+    GOOGLE_REDIRECT_URI: 'http://localhost:3000/api/auth/oauth/callback/google',
+    REDIS_URL: 'redis://localhost:6379',
+    SMTP_HOST: 'localhost',
+    SMTP_USER: 'test',
+    SMTP_PASS: 'test',
+    SMTP_FROM: 'test@example.com',
+  })
+}
+
+function stubMethod(
+  t: TestContext,
+  target: object,
+  name: string,
+  implementation: (...args: any[]) => any,
+): void {
+  const descriptor = Object.getOwnPropertyDescriptor(target, name)
+  Object.defineProperty(target, name, {
+    configurable: true,
+    enumerable: descriptor?.enumerable ?? true,
+    writable: true,
+    value: implementation,
+  })
+  t.after(() => {
+    if (descriptor) Object.defineProperty(target, name, descriptor)
+    else Reflect.deleteProperty(target, name)
+  })
+}
 
 function card(overrides: Partial<Card> = {}): Card {
   const now = new Date('2026-07-27T00:00:00.000Z')

@@ -1,10 +1,43 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
-import { setRequiredEnvironment, stubMethod } from '../../test/helpers'
+import test, { type TestContext } from 'node:test'
 
 const USER_ID = '00000000-0000-4000-8000-000000000001'
 const LIST_ID = '00000000-0000-4000-8000-000000000002'
 const WORKSPACE_ID = '00000000-0000-4000-8000-000000000003'
+
+function setRequiredEnvironment(): void {
+  Object.assign(process.env, {
+    APP_ORIGIN: 'http://localhost:5173',
+    JWT_ACCESS_SECRET: 'test-secret-that-is-at-least-32-characters',
+    GOOGLE_CLIENT_ID: 'test-client',
+    GOOGLE_CLIENT_SECRET: 'test-secret',
+    GOOGLE_REDIRECT_URI: 'http://localhost:3000/api/auth/oauth/callback/google',
+    REDIS_URL: 'redis://localhost:6379',
+    SMTP_HOST: 'localhost',
+    SMTP_USER: 'test',
+    SMTP_PASS: 'test',
+    SMTP_FROM: 'test@example.com',
+  })
+}
+
+function stubMethod(
+  t: TestContext,
+  target: object,
+  name: string,
+  implementation: (...args: any[]) => any,
+): void {
+  const descriptor = Object.getOwnPropertyDescriptor(target, name)
+  Object.defineProperty(target, name, {
+    configurable: true,
+    enumerable: descriptor?.enumerable ?? true,
+    writable: true,
+    value: implementation,
+  })
+  t.after(() => {
+    if (descriptor) Object.defineProperty(target, name, descriptor)
+    else Reflect.deleteProperty(target, name)
+  })
+}
 
 test('deleteList transfers cards to the deleting member inbox', async (t) => {
   setRequiredEnvironment()

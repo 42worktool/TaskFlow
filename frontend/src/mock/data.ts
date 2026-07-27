@@ -1,4 +1,11 @@
-import type { Card, Notification } from '../types'
+import type { List, Card, Notification } from '../types'
+
+export const lists: List[] = [
+  { id: 'list-1', workspace_id: 'ws-1', name: '할 일', sequence: 1 },
+  { id: 'list-2', workspace_id: 'ws-1', name: '진행 중', sequence: 2 },
+  { id: 'list-3', workspace_id: 'ws-1', name: '검토 중', sequence: 3 },
+  { id: 'list-4', workspace_id: 'ws-1', name: '완료', sequence: 4 },
+]
 
 export const cards: Card[] = [
   {
