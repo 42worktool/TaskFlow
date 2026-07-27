@@ -10,24 +10,44 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
+.card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .card-title {
   font-size: 14px;
   color: #111827;
-  margin-bottom: 10px;
   font-weight: 500;
+}
+
+.card-delete-btn {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  visibility: hidden;
+}
+
+.task-card:hover .card-delete-btn {
+  visibility: visible;
+}
+
+.card-delete-btn:hover {
+  color: #ef4444;
 }
 
 .card-meta {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.card-label {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .card-date {

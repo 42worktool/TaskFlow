@@ -52,6 +52,16 @@ export interface Card {
   label_color?: string
 }
 
+export interface ListWithCards extends List {
+  cards: Card[]
+}
+
+/** Payload shape emitted by vuedraggable's `change` event. */
+export interface DraggableChange {
+  added?: { element: { id: string }; newIndex: number }
+  moved?: { element: { id: string }; newIndex: number }
+}
+
 export interface Notification {
   id: UUID
   text: string

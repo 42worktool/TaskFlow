@@ -14,12 +14,33 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  cursor: grab;
 }
 
 .list-name {
   font-size: 14px;
   font-weight: 600;
   color: #374151;
+  cursor: text;
+}
+
+.list-name-input {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
+  padding: 2px 4px;
+  min-width: 0;
+  flex: 1;
+  margin-right: 8px;
+}
+
+.list-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .list-count {
@@ -34,6 +55,19 @@
   color: #fff;
 }
 
+.list-delete-btn {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.list-delete-btn:hover {
+  color: #ef4444;
+}
+
 .card-list {
   list-style: none;
   display: flex;
@@ -42,6 +76,24 @@
   overflow-y: auto;
   flex: 1;
   margin-bottom: 8px;
+  min-height: 8px;
+}
+
+.card-ghost {
+  opacity: 0.4;
+}
+
+.add-card-form {
+  margin-top: 4px;
+}
+
+.add-card-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
 }
 
 .add-card-btn {
