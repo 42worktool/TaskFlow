@@ -35,6 +35,7 @@ export interface UserPublic {
   name: string;
   profile_image_url: string | null;
   created_at: string;
+  auth_provider: 'password' | 'google';
 }
 
 interface OAuthStateRecord {
@@ -163,6 +164,7 @@ function publicUser(user: User): UserPublic {
     name: user.name,
     profile_image_url: user.profile_image_url,
     created_at: user.created_at.toISOString(),
+    auth_provider: user.password_hash === null ? 'google' : 'password',
   };
 }
 

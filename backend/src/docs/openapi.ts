@@ -1,6 +1,6 @@
 const userSchema = {
   type: 'object',
-  required: ['id', 'email', 'name', 'profile_image_url', 'created_at'],
+  required: ['id', 'email', 'name', 'profile_image_url', 'created_at', 'auth_provider'],
   properties: {
     id: { type: 'string', format: 'uuid' },
     email: { type: 'string', format: 'email', example: 'user@example.com' },
@@ -12,6 +12,11 @@ const userSchema = {
       example: null,
     },
     created_at: { type: 'string', format: 'date-time' },
+    auth_provider: {
+      type: 'string',
+      enum: ['password', 'google'],
+      description: '이 계정에서 사용하는 로그인 방식',
+    },
   },
 } as const;
 

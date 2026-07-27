@@ -6,6 +6,7 @@ interface AuthUser {
   name: string
   profile_image_url: string | null
   created_at: string
+  auth_provider: 'password' | 'google'
 }
 
 interface RefreshResponse {

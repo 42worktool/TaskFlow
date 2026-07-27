@@ -5,6 +5,9 @@ export const WorkspaceAPI = {
   list: () =>
     apiRequest<{ my: Workspace[]; public: Workspace[] }>('/api/workspaces'),
 
+  get: (id: string) =>
+    apiRequest<Workspace>(`/api/workspaces/${id}`),
+
   create: (name: string, isPublic = false) =>
     apiRequest<Workspace>('/api/workspaces', {
       method: 'POST',
