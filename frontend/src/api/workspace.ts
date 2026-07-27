@@ -24,7 +24,7 @@ export const WorkspaceAPI = {
     apiRequest<{ ok: true }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
 
   inviteMember: async (workspaceId: string, email: string, role: 'ADMIN' | 'MEMBER' | 'VIEWER') =>
-    apiRequest<{ ok: true }>(`/api/workspaces/${workspaceId}/members`, {
+    apiRequest<{ token: string; invite_url: string }>(`/api/workspaces/${workspaceId}/members`, {
       method: 'POST',
       json: { email, role },
     }),

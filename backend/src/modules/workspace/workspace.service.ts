@@ -5,7 +5,6 @@
 // Authorization checks are done here; the controller only handles
 // HTTP concerns (parsing, validation, status codes).
 // ============================================================
-import jwt from 'jsonwebtoken'
 import { prisma } from '../../db'
 import { config } from '../../config'
 import { AppError, ForbiddenError, NotFoundError } from '../../errors'
@@ -14,15 +13,11 @@ import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit
 import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
+import {
+  createWorkspaceInvite,
+  readWorkspaceInvite,
+} from '../../lib/workspace-invite'
 import { toWorkspaceDto, workspaceInclude } from './workspace.dto'
-
-const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
-
-interface InvitePayload {
-  workspace_id: string
-  role: Role
-  email: string
-}
 
 // ------------------------------------------------------------
 // Workspace-specific application errors.
@@ -312,55 +307,56 @@ export async function removeMember(input: {
   })
 }
 
-/**
- * Generate a signed invite token. The caller sends this link by email.
- */
-function generateInviteToken(workspaceId: string, role: Role, email: string): string {
-  return jwt.sign({ workspace_id: workspaceId, role, email }, config.jwtAccessSecret, {
-    expiresIn: INVITE_TTL_SECONDS,
-  })
-}
-
 export async function inviteWorkspaceMember(input: {
   userId: string
   workspaceId: string
   email: string
   role: Exclude<Role, 'OWNER'>
-}): Promise<void> {
+}): Promise<{ token: string; inviteUrl: string }> {
   const workspace = await getWorkspace({
     userId: input.userId,
     workspaceId: input.workspaceId,
   })
   await requireRole(input.workspaceId, input.userId, 'ADMIN')
+  await checkMailRateLimit(input.email)
 
-  const token = generateInviteToken(
-    input.workspaceId,
-    input.role,
-    input.email,
-  )
+  const token = await createWorkspaceInvite({
+    workspaceId: input.workspaceId,
+    email: input.email.trim().toLowerCase(),
+    role: input.role,
+    invitedByUserId: input.userId,
+  })
   const inviteUrl = `${config.appOrigin}/invite/${token}`
 
-  await checkMailRateLimit(input.email)
   await enqueue({
     to: input.email,
     ...inviteEmail(workspace.name, inviteUrl),
   })
+
+  return { token, inviteUrl }
 }
 
 /**
- * Accept an invite: verify the token and add the user as a member.
+ * Accept a one-time Redis-backed invite and add the user as a member.
  * Returns the workspace DTO on success.
  */
 export async function acceptInvite(input: { userId: string; token: string }) {
-  let payload: InvitePayload
-  try {
-    payload = jwt.verify(input.token, config.jwtAccessSecret) as InvitePayload
-  } catch {
+  const pendingInvite = await readWorkspaceInvite(input.token)
+  if (!pendingInvite) throw new InviteTokenError()
+
+  const user = await prisma.user.findUnique({
+    where: { id: input.userId },
+    select: { email: true },
+  })
+  if (user?.email.trim().toLowerCase() !== pendingInvite.email) {
     throw new InviteTokenError()
   }
 
+  const invite = await readWorkspaceInvite(input.token, { consume: true })
+  if (!invite) throw new InviteTokenError()
+
   const ws = await prisma.workspace.findFirst({
-    where: { id: payload.workspace_id, deleted_at: null },
+    where: { id: invite.workspaceId, deleted_at: null },
     include: workspaceInclude,
   })
 
@@ -369,7 +365,7 @@ export async function acceptInvite(input: { userId: string; token: string }) {
   const existing = await prisma.workspaceMember.findUnique({
     where: {
       workspace_id_user_id: {
-        workspace_id: payload.workspace_id,
+        workspace_id: invite.workspaceId,
         user_id: input.userId,
       },
     },
@@ -383,25 +379,25 @@ export async function acceptInvite(input: { userId: string; token: string }) {
     await prisma.workspaceMember.update({
       where: {
         workspace_id_user_id: {
-          workspace_id: payload.workspace_id,
+          workspace_id: invite.workspaceId,
           user_id: input.userId,
         },
       },
-      data: { role: payload.role, ...restoredBy(input.userId) },
+      data: { role: invite.role, ...restoredBy(input.userId) },
     })
   } else {
     await prisma.workspaceMember.create({
       data: {
-        workspace_id: payload.workspace_id,
+        workspace_id: invite.workspaceId,
         user_id: input.userId,
-        role: payload.role,
+        role: invite.role,
         ...createdBy(input.userId),
       },
     })
   }
 
   const updated = await prisma.workspace.findFirst({
-    where: { id: payload.workspace_id, deleted_at: null },
+    where: { id: invite.workspaceId, deleted_at: null },
     include: workspaceInclude,
   })
 

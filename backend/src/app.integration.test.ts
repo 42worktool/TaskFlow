@@ -3,6 +3,7 @@ import { request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import test, { after, before } from 'node:test';
+import { setRequiredEnvironment } from './test/helpers';
 
 interface HttpResult {
   status: number;
@@ -11,21 +12,6 @@ interface HttpResult {
 
 let server: Server;
 let port: number;
-
-function setRequiredEnvironment(): void {
-  Object.assign(process.env, {
-    APP_ORIGIN: 'http://localhost:5173',
-    JWT_ACCESS_SECRET: 'test-secret-that-is-at-least-32-characters',
-    GOOGLE_CLIENT_ID: 'test-client',
-    GOOGLE_CLIENT_SECRET: 'test-secret',
-    GOOGLE_REDIRECT_URI: 'http://localhost:3000/api/auth/oauth/callback/google',
-    REDIS_URL: 'redis://localhost:6379',
-    SMTP_HOST: 'localhost',
-    SMTP_USER: 'test',
-    SMTP_PASS: 'test',
-    SMTP_FROM: 'test@example.com',
-  });
-}
 
 function send(
   path: string,
