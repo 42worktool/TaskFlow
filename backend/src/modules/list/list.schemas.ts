@@ -13,6 +13,3 @@ export const listReorderSchema = z
     (value) => value.before_list_id !== undefined || value.after_list_id !== undefined,
     { message: 'either before_list_id or after_list_id is required' },
   )
-
-export type ListNameBody = z.infer<typeof listNameSchema>
-export type ListReorderBody = z.infer<typeof listReorderSchema>

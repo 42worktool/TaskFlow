@@ -8,12 +8,6 @@ export const CardAPI = {
       json: data,
     }),
 
-  update: (cardId: string, data: { title?: string; description?: string | null }) =>
-    apiRequest<Card>(`/api/cards/${cardId}`, {
-      method: 'PUT',
-      json: data,
-    }),
-
   remove: (cardId: string) => apiRequest<void>(`/api/cards/${cardId}`, { method: 'DELETE' }),
 
   reorder: (cardId: string, neighbor: { before_card_id?: string | null; after_card_id?: string | null }) =>
@@ -30,7 +24,4 @@ export const CardAPI = {
       method: 'PUT',
       json: data,
     }),
-
-  moveToInbox: (cardId: string) =>
-    apiRequest<Card>(`/api/cards/${cardId}/inbox`, { method: 'PUT' }),
 }

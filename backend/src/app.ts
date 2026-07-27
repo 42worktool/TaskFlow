@@ -3,10 +3,7 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { openApiDocument } from './docs/openapi';
 import { authRouter, googleCallback } from './modules/auth';
-import { usersRouter } from './modules/users';
 import { workspaceRouter } from './modules/workspace';
-import { calendarRouter } from './modules/calendar';
-import { inboxRouter } from './modules/inbox';
 import { listRouter } from './modules/list';
 import { cardRouter, commentRouter } from './modules/card';
 import { errorHandler } from './errors';
@@ -37,10 +34,7 @@ app.use(
 app.get('/oauth/google', googleCallback);
 
 app.use('/api/auth', authRouter);
-app.use('/api/users', usersRouter);
 app.use('/api/workspaces', workspaceRouter);
-app.use('/api/calendar', calendarRouter);
-app.use('/api/inbox', inboxRouter);
 app.use('/api/lists', listRouter);
 app.use('/api/cards', cardRouter);
 app.use('/api/comments', commentRouter);

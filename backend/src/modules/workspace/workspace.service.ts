@@ -25,18 +25,15 @@ interface InvitePayload {
 }
 
 // ------------------------------------------------------------
-// Error classes — generic ones (ForbiddenError/NotFoundError) come from
-// the shared errors module; these two carry workspace-specific codes.
+// Workspace-specific application errors.
 // ------------------------------------------------------------
-export { ForbiddenError, NotFoundError }
-
-export class LastOwnerError extends AppError {
+class LastOwnerError extends AppError {
   constructor() {
     super('LAST_OWNER', 409, 'cannot remove the last owner')
   }
 }
 
-export class InviteTokenError extends AppError {
+class InviteTokenError extends AppError {
   constructor() {
     super('INVITE_TOKEN_INVALID', 400, 'invalid or expired invite token')
   }
@@ -318,7 +315,7 @@ export async function removeMember(input: {
 /**
  * Generate a signed invite token. The caller sends this link by email.
  */
-export function generateInviteToken(workspaceId: string, role: Role, email: string): string {
+function generateInviteToken(workspaceId: string, role: Role, email: string): string {
   return jwt.sign({ workspace_id: workspaceId, role, email }, config.jwtAccessSecret, {
     expiresIn: INVITE_TTL_SECONDS,
   })

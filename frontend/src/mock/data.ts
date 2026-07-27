@@ -1,13 +1,5 @@
 import type { Workspace, WorkspaceMember, List, Card, Notification } from '../types'
 
-export const currentUser = {
-  id: 'user-1',
-  name: '김연준',
-  email: 'yeonjunky@gmail.com',
-  avatar: '김',
-  avatar_color: '#2563EB',
-}
-
 const _membersA: WorkspaceMember[] = [
   { user_id: 'user-1', role: 'OWNER',  user: { id: 'user-1', name: '김연준', email: 'yeonjunky@gmail.com', profile_image_url: null } },
   { user_id: 'user-2', role: 'ADMIN',  user: { id: 'user-2', name: '이지우', email: 'jiwoo@example.com',   profile_image_url: null } },

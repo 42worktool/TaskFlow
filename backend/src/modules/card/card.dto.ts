@@ -37,7 +37,7 @@ type CommentWithUser = Comment & {
   user: { id: string; name: string; profile_image_url: string | null }
 }
 
-export interface CardLabelWithLabel {
+interface CardLabelWithLabel {
   label: {
     id: string
     label_name: string

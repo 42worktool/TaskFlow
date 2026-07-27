@@ -3,8 +3,8 @@ import { config } from '../../config';
 import { AppError, sendError } from '../../errors';
 import * as authService from './auth.service';
 
-export const OAUTH_STATE_COOKIE = 'ft_oauth_state';
-export const REFRESH_TOKEN_COOKIE = 'ft_refresh_token';
+const OAUTH_STATE_COOKIE = 'ft_oauth_state';
+const REFRESH_TOKEN_COOKIE = 'ft_refresh_token';
 
 const oauthCookieBaseOptions: CookieOptions = {
   httpOnly: true,

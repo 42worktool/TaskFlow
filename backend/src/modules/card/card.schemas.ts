@@ -49,11 +49,3 @@ export const addAttachmentSchema = z.object({
 export const commentSchema = z.object({
   comment_str: z.string().min(1).max(2000),
 })
-
-export type CreateCardBody = z.infer<typeof createCardSchema>
-export type UpdateCardBody = z.infer<typeof updateCardSchema>
-export type CardNeighborBody = z.infer<typeof cardNeighborSchema>
-export type MoveCardBody = z.infer<typeof moveCardSchema>
-export type CardDatesBody = z.infer<typeof cardDatesSchema>
-export type AddAttachmentBody = z.infer<typeof addAttachmentSchema>
-export type CommentBody = z.infer<typeof commentSchema>

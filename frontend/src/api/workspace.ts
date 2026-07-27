@@ -5,8 +5,6 @@ export const WorkspaceAPI = {
   list: () =>
     apiRequest<{ my: Workspace[]; public: Workspace[] }>('/api/workspaces'),
 
-  get: (id: string) => apiRequest<Workspace>(`/api/workspaces/${id}`),
-
   create: (name: string, isPublic = false) =>
     apiRequest<Workspace>('/api/workspaces', {
       method: 'POST',
@@ -31,16 +29,6 @@ export const WorkspaceAPI = {
   acceptInvite: async (token: string) =>
     apiRequest<Workspace>(`/api/workspaces/invite/${token}`, {
       method: 'POST',
-    }),
-
-  changeMemberRole: async (
-    workspaceId: string,
-    userId: string,
-    role: 'ADMIN' | 'MEMBER' | 'VIEWER',
-  ) =>
-    apiRequest<Workspace>(`/api/workspaces/${workspaceId}/members/${userId}`, {
-      method: 'PUT',
-      json: { role },
     }),
 
   removeMember: async (workspaceId: string, userId: string) =>

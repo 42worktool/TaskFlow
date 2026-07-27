@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-export interface AuthUser {
+interface AuthUser {
   id: string
   email: string
   name: string
@@ -149,7 +149,7 @@ export async function signupWithPassword(
   )
 }
 
-export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   await initializeAuth()
 
   const makeRequest = () => {

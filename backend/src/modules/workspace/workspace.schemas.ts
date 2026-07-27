@@ -24,7 +24,3 @@ export const inviteWorkspaceMemberSchema = z.object({
 export const changeWorkspaceRoleSchema = z.object({
   role: workspaceRoleSchema,
 })
-
-export type CreateWorkspaceBody = z.infer<typeof createWorkspaceSchema>
-export type UpdateWorkspaceBody = z.infer<typeof updateWorkspaceSchema>
-export type InviteWorkspaceMemberBody = z.infer<typeof inviteWorkspaceMemberSchema>

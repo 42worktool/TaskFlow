@@ -16,7 +16,7 @@ export const workspaceInclude = {
   },
 } as const
 
-export type WorkspaceWithMembers = Workspace & {
+type WorkspaceWithMembers = Workspace & {
   members: (WorkspaceMember & {
     user: Pick<User, 'id' | 'name' | 'email' | 'profile_image_url'>
   })[]
