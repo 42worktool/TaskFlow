@@ -6,7 +6,7 @@
 // { status_code, error, message } response shape in one place instead of
 // each controller re-implementing its own instanceof chain.
 // ============================================================
-import type { Response } from 'express';
+import type { ErrorRequestHandler, Response } from 'express';
 import { ZodError } from 'zod';
 
 export class AppError extends Error {
@@ -69,4 +69,8 @@ export function sendError(res: Response, error: unknown): void {
     error: 'INTERNAL_ERROR',
     message: 'Internal server error',
   });
+}
+
+export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+  sendError(res, error)
 }

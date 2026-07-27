@@ -7,6 +7,7 @@ import TaskList from '../components/TaskList.vue'
 import { ListAPI } from '../api/list'
 import { CardAPI } from '../api/card'
 import type { DraggableChange, ListWithCards } from '../types'
+import { neighborIds } from '../utils/ordering'
 
 const route = useRoute()
 
@@ -59,9 +60,11 @@ function cancelAddList() {
 function onListChange(event: DraggableChange) {
   if (!event.moved) return
   const { element, newIndex } = event.moved
-  const before = lists.value[newIndex - 1]?.id ?? null
-  const after = lists.value[newIndex + 1]?.id ?? null
-  ListAPI.reorder(element.id, { before_list_id: before, after_list_id: after }).catch(fetchLists)
+  const { beforeId, afterId } = neighborIds(lists.value, newIndex)
+  ListAPI.reorder(element.id, {
+    before_list_id: beforeId,
+    after_list_id: afterId,
+  }).catch(fetchLists)
 }
 
 function onCardChange(listId: string, event: DraggableChange) {
@@ -70,14 +73,19 @@ function onCardChange(listId: string, event: DraggableChange) {
 
   if (event.added) {
     const { element, newIndex } = event.added
-    const before = list.cards[newIndex - 1]?.id ?? null
-    const after = list.cards[newIndex + 1]?.id ?? null
-    CardAPI.move(element.id, { list_id: listId, before_card_id: before, after_card_id: after }).catch(fetchLists)
+    const { beforeId, afterId } = neighborIds(list.cards, newIndex)
+    CardAPI.move(element.id, {
+      list_id: listId,
+      before_card_id: beforeId,
+      after_card_id: afterId,
+    }).catch(fetchLists)
   } else if (event.moved) {
     const { element, newIndex } = event.moved
-    const before = list.cards[newIndex - 1]?.id ?? null
-    const after = list.cards[newIndex + 1]?.id ?? null
-    CardAPI.reorder(element.id, { before_card_id: before, after_card_id: after }).catch(fetchLists)
+    const { beforeId, afterId } = neighborIds(list.cards, newIndex)
+    CardAPI.reorder(element.id, {
+      before_card_id: beforeId,
+      after_card_id: afterId,
+    }).catch(fetchLists)
   }
 }
 

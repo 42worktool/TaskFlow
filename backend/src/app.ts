@@ -9,6 +9,7 @@ import { calendarRouter } from './modules/calendar';
 import { inboxRouter } from './modules/inbox';
 import { listRouter } from './modules/list';
 import { cardRouter, commentRouter } from './modules/card';
+import { errorHandler } from './errors';
 
 const app = express();
 
@@ -43,5 +44,6 @@ app.use('/api/inbox', inboxRouter);
 app.use('/api/lists', listRouter);
 app.use('/api/cards', cardRouter);
 app.use('/api/comments', commentRouter);
+app.use(errorHandler);
 
 export default app;

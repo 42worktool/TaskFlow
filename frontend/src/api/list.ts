@@ -8,15 +8,13 @@ export const ListAPI = {
   create: (workspaceId: string, name: string) =>
     apiRequest<List>(`/api/workspaces/${workspaceId}/lists`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      json: { name },
     }),
 
   rename: (listId: string, name: string) =>
     apiRequest<List>(`/api/lists/${listId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      json: { name },
     }),
 
   remove: (listId: string) => apiRequest<void>(`/api/lists/${listId}`, { method: 'DELETE' }),
@@ -24,7 +22,6 @@ export const ListAPI = {
   reorder: (listId: string, neighbor: { before_list_id?: string | null; after_list_id?: string | null }) =>
     apiRequest<List>(`/api/lists/${listId}/order`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(neighbor),
+      json: neighbor,
     }),
 }

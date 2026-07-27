@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import AppHeader from '../components/AppHeader.vue'
 import InboxDrawer from '../components/InboxDrawer.vue'
-import NotificationMenu from '../components/NotificationMenu.vue'
-import ProfileMenu from '../components/ProfileMenu.vue'
-import SearchInput from '../components/SearchInput.vue'
 import { cards, lists, myWorkspaces, openWorkspaces } from '../mock/data'
 import { workspaceColor } from '../types'
 
@@ -46,15 +44,7 @@ const hasResults = computed(() => workspaceResults.value.length > 0 || cardResul
 
 <template>
   <div class="search-shell">
-    <header class="search-header">
-      <RouterLink to="/workspaces" class="logo">TaskFlow</RouterLink>
-      <SearchInput :initial-query="query" />
-      <div class="header-actions">
-        <NotificationMenu />
-        <button class="inbox-btn" type="button" @click="showInbox = true">인박스</button>
-        <ProfileMenu />
-      </div>
-    </header>
+    <AppHeader :initial-query="query" @open-inbox="showInbox = true" />
 
     <main class="search-page">
       <div class="search-heading">

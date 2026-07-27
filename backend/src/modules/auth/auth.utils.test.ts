@@ -2,12 +2,23 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   hashPassword,
+  accountName,
   isValidEmail,
   normalizeEmail,
   safeEqual,
   safeReturnTo,
   verifyPassword,
 } from './auth.utils';
+import { AppError } from '../../errors';
+
+test('accountName trims valid names and rejects invalid values consistently', () => {
+  assert.equal(accountName('  Task Flow  '), 'Task Flow');
+  assert.throws(() => accountName('x'), (error) => {
+    assert.ok(error instanceof AppError);
+    assert.equal(error.code, 'INVALID_NAME');
+    return true;
+  });
+});
 
 test('normalizeEmail trims and lowercases an address', () => {
   assert.equal(normalizeEmail('  User@Example.COM '), 'user@example.com');

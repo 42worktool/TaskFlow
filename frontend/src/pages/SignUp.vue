@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '../layouts/AuthLayout.vue'
 import AppLogo from '../components/AppLogo.vue'
+import AuthInput from '../components/AuthInput.vue'
 import { signupWithPassword } from '../services/auth'
 
 const route = useRoute()
@@ -47,65 +48,57 @@ async function signup() {
   <AuthLayout>
     <AppLogo tagline="새 계정 만들기" />
 
-    <form class="form" @submit.prevent="signup">
-      <input
+    <form class="auth-form" @submit.prevent="signup">
+      <AuthInput
         v-model="name"
         type="text"
         name="name"
         autocomplete="name"
         placeholder="이름"
-        class="form-input"
-        minlength="2"
-        maxlength="80"
-        required
+        :minlength="2"
+        :maxlength="80"
         :disabled="submitting"
       />
-      <input
+      <AuthInput
         v-model="email"
         type="email"
         name="email"
         autocomplete="email"
         placeholder="이메일 주소"
-        class="form-input"
-        required
         :disabled="submitting"
       />
-      <input
+      <AuthInput
         v-model="password"
         type="password"
         name="password"
         autocomplete="new-password"
         placeholder="비밀번호 (8자 이상)"
-        class="form-input"
-        minlength="8"
-        maxlength="128"
-        required
+        :minlength="8"
+        :maxlength="128"
         :disabled="submitting"
       />
-      <input
+      <AuthInput
         v-model="passwordConfirm"
         type="password"
         name="password-confirm"
         autocomplete="new-password"
         placeholder="비밀번호 확인"
-        class="form-input"
-        minlength="8"
-        maxlength="128"
-        required
+        :minlength="8"
+        :maxlength="128"
         :disabled="submitting"
       />
-      <p v-if="passwordError" class="error-msg">{{ passwordError }}</p>
-      <p v-if="formError" class="error-msg" role="alert">{{ formError }}</p>
+      <p v-if="passwordError" class="auth-error">{{ passwordError }}</p>
+      <p v-if="formError" class="auth-error" role="alert">{{ formError }}</p>
       <p class="legal-consent">
         회원가입하면 <RouterLink to="/terms">서비스 이용약관</RouterLink> 및
         <RouterLink to="/privacy">개인정보처리방침</RouterLink>에 동의하게 됩니다.
       </p>
-      <button type="submit" class="submit-btn" :disabled="submitting">
+      <button type="submit" class="auth-submit" :disabled="submitting">
         {{ submitting ? '가입 중…' : '회원가입' }}
       </button>
     </form>
 
-    <p class="login-link">
+    <p class="auth-switch-link">
       이미 계정이 있으신가요?
       <RouterLink :to="signinLocation">로그인 →</RouterLink>
     </p>
@@ -113,3 +106,4 @@ async function signup() {
 </template>
 
 <style scoped src="../styles/sign-up.css"></style>
+<style scoped src="../styles/auth-form.css"></style>

@@ -1,12 +1,9 @@
-<template>
-  <div class="legal-page-shell">
-    <header class="legal-page-header">
-      <RouterLink to="/signin" class="legal-page-logo">TaskFlow</RouterLink>
-    </header>
-    <main class="legal-document">
-      <h1>개인정보처리방침</h1>
-      <p class="effective-date">시행일: 2026년 7월 22일</p>
+<script setup lang="ts">
+import LegalDocumentLayout from '../layouts/LegalDocumentLayout.vue'
+</script>
 
+<template>
+  <LegalDocumentLayout title="개인정보처리방침">
       <p>
         TaskFlow는 학습 및 시연을 위한 프로젝트입니다. 서비스는 Google 로그인을 제공하기 위해
         필요한 최소한의 개인정보만 처리합니다.
@@ -41,8 +38,5 @@
 
       <h2>6. 변경</h2>
       <p>처리 내용이 변경되면 이 페이지의 시행일과 내용을 갱신합니다.</p>
-    </main>
-  </div>
+  </LegalDocumentLayout>
 </template>
-
-<style scoped src="../styles/legal-page.css"></style>

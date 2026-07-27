@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '../layouts/AuthLayout.vue'
 import AppLogo from '../components/AppLogo.vue'
+import AuthInput from '../components/AuthInput.vue'
 import { loginWithPassword, startGoogleLogin } from '../services/auth'
 
 const route = useRoute()
@@ -78,36 +79,32 @@ async function loginWithEmail() {
 
     <div class="divider">또는</div>
 
-    <form class="email-form" @submit.prevent="loginWithEmail">
-      <input
+    <form class="auth-form" @submit.prevent="loginWithEmail">
+      <AuthInput
         v-model="email"
         type="email"
         name="email"
         autocomplete="email"
         placeholder="이메일 주소"
-        class="form-input"
-        required
         :disabled="submitting"
       />
-      <input
+      <AuthInput
         v-model="password"
         type="password"
         name="password"
         autocomplete="current-password"
         placeholder="비밀번호"
-        class="form-input"
-        required
         :disabled="submitting"
       />
       <p v-if="formError" class="auth-message auth-message--error" role="alert">
         {{ formError }}
       </p>
-      <button type="submit" class="login-btn" :disabled="submitting">
+      <button type="submit" class="auth-submit" :disabled="submitting">
         {{ submitting ? '로그인 중…' : '이메일로 로그인' }}
       </button>
     </form>
 
-    <p class="signup-link">
+    <p class="auth-switch-link">
       계정이 없으신가요?
       <RouterLink :to="signupLocation">회원가입 →</RouterLink>
     </p>
@@ -115,3 +112,4 @@ async function loginWithEmail() {
 </template>
 
 <style scoped src="../styles/sign-in.css"></style>
+<style scoped src="../styles/auth-form.css"></style>

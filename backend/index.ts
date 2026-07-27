@@ -1,6 +1,6 @@
 import app from "./src/app";
 import { config } from './src/config';
-import { prisma } from './src/lib/prisma';
+import { prisma } from './src/db';
 import { closeRedis } from './src/lib/redis';
 import { startMailWorker, stopMailWorker } from './src/lib/mail-queue';
 

@@ -10,15 +10,13 @@ export const WorkspaceAPI = {
   create: (name: string, isPublic = false) =>
     apiRequest<Workspace>('/api/workspaces', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, is_public: isPublic }),
+      json: { name, is_public: isPublic },
     }),
 
   update: (id: string, patch: { name?: string; is_public?: boolean }) =>
     apiRequest<Workspace>(`/api/workspaces/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
+      json: patch,
     }),
 
   remove: (id: string) =>
@@ -27,8 +25,7 @@ export const WorkspaceAPI = {
   inviteMember: async (workspaceId: string, email: string, role: 'ADMIN' | 'MEMBER' | 'VIEWER') =>
     apiRequest<{ ok: true }>(`/api/workspaces/${workspaceId}/members`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, role }),
+      json: { email, role },
     }),
 
   acceptInvite: async (token: string) =>
@@ -43,8 +40,7 @@ export const WorkspaceAPI = {
   ) =>
     apiRequest<Workspace>(`/api/workspaces/${workspaceId}/members/${userId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role }),
+      json: { role },
     }),
 
   removeMember: async (workspaceId: string, userId: string) =>

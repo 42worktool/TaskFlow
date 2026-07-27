@@ -1,0 +1,59 @@
+import { z } from 'zod'
+
+const isoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'invalid date')
+
+export const createCardSchema = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).nullable().optional(),
+  start_at: isoDate.nullable().optional(),
+  deadline: isoDate.nullable().optional(),
+})
+
+export const updateCardSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(5000).nullable().optional(),
+})
+
+export const cardNeighborSchema = z
+  .object({
+    before_card_id: z.string().uuid().nullable().optional(),
+    after_card_id: z.string().uuid().nullable().optional(),
+  })
+  .refine(
+    (value) => value.before_card_id !== undefined || value.after_card_id !== undefined,
+    { message: 'either before_card_id or after_card_id is required' },
+  )
+
+export const moveCardSchema = z.object({
+  list_id: z.string().uuid(),
+  before_card_id: z.string().uuid().nullable().optional(),
+  after_card_id: z.string().uuid().nullable().optional(),
+})
+
+export const cardDatesSchema = z
+  .object({
+    start_at: isoDate.nullable().optional(),
+    deadline: isoDate.nullable().optional(),
+  })
+  .refine((value) => value.start_at !== undefined || value.deadline !== undefined, {
+    message: 'either start_at or deadline is required',
+  })
+
+export const addCardMemberSchema = z.object({ user_id: z.string().uuid() })
+
+export const addAttachmentSchema = z.object({
+  file_url: z.string().url(),
+  file_name: z.string().min(1).max(255),
+})
+
+export const commentSchema = z.object({
+  comment_str: z.string().min(1).max(2000),
+})
+
+export type CreateCardBody = z.infer<typeof createCardSchema>
+export type UpdateCardBody = z.infer<typeof updateCardSchema>
+export type CardNeighborBody = z.infer<typeof cardNeighborSchema>
+export type MoveCardBody = z.infer<typeof moveCardSchema>
+export type CardDatesBody = z.infer<typeof cardDatesSchema>
+export type AddAttachmentBody = z.infer<typeof addAttachmentSchema>
+export type CommentBody = z.infer<typeof commentSchema>

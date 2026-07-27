@@ -1,73 +1,50 @@
-// ============================================================
-// list.controller.ts — HTTP layer for list CRUD
-// ============================================================
-import type { Request, Response } from 'express'
-import { z } from 'zod'
-import { sendError } from '../../errors'
+import type { RequestHandler } from 'express'
 import * as svc from './list.service'
+import { listNameSchema, listReorderSchema } from './list.schemas'
 
-const nameSchema = z.object({
-  name: z.string().min(1).max(100),
-})
-
-const reorderSchema = z
-  .object({
-    before_list_id: z.string().uuid().nullable().optional(),
-    after_list_id: z.string().uuid().nullable().optional(),
+export const list: RequestHandler = async (req, res) => {
+  const lists = await svc.listLists({
+    actorId: req.user!.id,
+    workspaceId: req.params.workspaceId as string,
   })
-  .refine((v) => v.before_list_id !== undefined || v.after_list_id !== undefined, {
-    message: 'either before_list_id or after_list_id is required',
+  res.status(200).json(lists)
+}
+
+export const create: RequestHandler = async (req, res) => {
+  const body = listNameSchema.parse(req.body)
+  const list = await svc.createList({
+    actorId: req.user!.id,
+    workspaceId: req.params.workspaceId as string,
+    name: body.name,
   })
-
-/** GET /workspaces/:workspaceId/lists */
-export async function list(req: Request, res: Response) {
-  try {
-    const data = await svc.listLists(req.user!.id, req.params.workspaceId as string)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+  res.status(201).json(list)
 }
 
-/** POST /workspaces/:workspaceId/lists */
-export async function create(req: Request, res: Response) {
-  try {
-    const body = nameSchema.parse(req.body)
-    const data = await svc.createList(req.user!.id, req.params.workspaceId as string, body.name)
-    res.status(201).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const update: RequestHandler = async (req, res) => {
+  const body = listNameSchema.parse(req.body)
+  const list = await svc.updateList({
+    actorId: req.user!.id,
+    listId: req.params.list_id as string,
+    name: body.name,
+  })
+  res.status(200).json(list)
 }
 
-/** PUT /lists/:list_id */
-export async function update(req: Request, res: Response) {
-  try {
-    const body = nameSchema.parse(req.body)
-    const data = await svc.updateList(req.user!.id, req.params.list_id as string, body.name)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const remove: RequestHandler = async (req, res) => {
+  await svc.deleteList({
+    actorId: req.user!.id,
+    listId: req.params.list_id as string,
+  })
+  res.status(204).send()
 }
 
-/** DELETE /lists/:list_id */
-export async function remove(req: Request, res: Response) {
-  try {
-    await svc.deleteList(req.user!.id, req.params.list_id as string)
-    res.status(204).send()
-  } catch (e) {
-    sendError(res, e)
-  }
-}
-
-/** PUT /lists/:list_id/order */
-export async function reorder(req: Request, res: Response) {
-  try {
-    const body = reorderSchema.parse(req.body)
-    const data = await svc.reorderList(req.user!.id, req.params.list_id as string, body)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const reorder: RequestHandler = async (req, res) => {
+  const data = listReorderSchema.parse(req.body)
+  const list = await svc.reorderList({
+    actorId: req.user!.id,
+    listId: req.params.list_id as string,
+    beforeListId: data.before_list_id,
+    afterListId: data.after_list_id,
+  })
+  res.status(200).json(list)
 }

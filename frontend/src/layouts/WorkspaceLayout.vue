@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import AppHeader from '../components/AppHeader.vue'
 import InboxDrawer from '../components/InboxDrawer.vue'
-import NotificationMenu from '../components/NotificationMenu.vue'
-import ProfileMenu from '../components/ProfileMenu.vue'
-import SearchInput from '../components/SearchInput.vue'
 import ShareModal from '../components/ShareModal.vue'
 import { myWorkspaces, openWorkspaces, workspaceMembers } from '../mock/data'
 
@@ -25,22 +23,11 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
 <template>
   <div class="app-shell">
     <!-- Header -->
-    <header class="app-header">
-      <RouterLink to="/workspaces" class="logo">TaskFlow</RouterLink>
-      <span class="workspace-name">{{ workspace.name }}</span>
-      <div class="header-right">
-        <SearchInput />
-        <div class="header-actions">
-          <NotificationMenu />
-          <button v-if="!isBoardRoute" class="header-btn" type="button" @click="showInbox = true">
-            인박스
-          </button>
-        </div>
-        <div class="profile-slot">
-          <ProfileMenu />
-        </div>
-      </div>
-    </header>
+    <AppHeader
+      :workspace-name="workspace.name"
+      :show-inbox="!isBoardRoute"
+      @open-inbox="showInbox = true"
+    />
 
     <div class="content-area">
       <!-- Sidebar -->
