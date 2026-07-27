@@ -1,16 +1,9 @@
 .modal-overlay {
-  position: fixed;
-  inset: 0;
   background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 1000;
 }
 
 .modal {
-  background: #fff;
-  border-radius: 12px;
   width: 480px;
   max-height: 90vh;
   overflow-y: auto;
@@ -21,16 +14,12 @@
 }
 
 .modal-header {
-  display: flex;
-  justify-content: space-between;
   align-items: flex-start;
   padding-bottom: 16px;
   border-bottom: 1px solid #e5e7eb;
 }
 
 .modal-title {
-  font-size: 18px;
-  font-weight: 700;
   color: #111827;
 }
 
@@ -41,11 +30,7 @@
 }
 
 .close-btn {
-  background: none;
-  border: none;
   font-size: 16px;
-  color: #6b7280;
-  cursor: pointer;
   padding: 4px;
 }
 
@@ -100,31 +85,6 @@
 
 .send-btn:hover {
   background: #1d4ed8;
-}
-
-.link-row {
-  display: flex;
-  gap: 8px;
-}
-
-.link-input {
-  flex: 1;
-  padding: 10px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #6b7280;
-  background: #f9fafb;
-}
-
-.copy-btn {
-  padding: 10px 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #374151;
-  background: #f9fafb;
-  cursor: pointer;
 }
 
 .member-list {

@@ -26,7 +26,7 @@ async function saveProfile() {
 
 async function removeAccount() {
   const confirmed = window.confirm(
-    '계정과 연결된 Google 로그인 정보가 모두 삭제됩니다. 계속하시겠습니까?',
+    '계정과 연결된 로그인 정보가 모두 삭제됩니다. 계속하시겠습니까?',
   )
   if (!confirmed) return
 
@@ -49,7 +49,7 @@ async function removeAccount() {
 
     <main class="account-card">
       <h1>계정 설정</h1>
-      <p class="account-description">Google 계정으로 로그인한 내 정보를 관리합니다.</p>
+      <p class="account-description">로그인 계정과 내 정보를 관리합니다.</p>
 
       <div class="identity-row">
         <img
@@ -64,7 +64,13 @@ async function removeAccount() {
         </div>
         <div>
           <strong>{{ authState.user?.email }}</strong>
-          <p>Google OAuth 연결됨</p>
+          <p>
+            {{
+              authState.user?.auth_provider === 'google'
+                ? 'Google OAuth 연결됨'
+                : '이메일 로그인 사용 중'
+            }}
+          </p>
         </div>
       </div>
 

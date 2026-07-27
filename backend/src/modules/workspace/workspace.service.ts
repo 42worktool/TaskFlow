@@ -9,7 +9,12 @@ import jwt from 'jsonwebtoken'
 import { prisma } from '../../db'
 import { config } from '../../config'
 import { AppError, ForbiddenError, NotFoundError } from '../../errors'
-import type { Workspace, WorkspaceMember, User, Role } from '@prisma/client'
+import type { Prisma, WorkspaceMember, Role } from '@prisma/client'
+import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
+import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
+import { enqueue } from '../../lib/mail-queue'
+import { inviteEmail } from '../../lib/mail-templates'
+import { toWorkspaceDto, workspaceInclude } from './workspace.dto'
 
 const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 
@@ -20,18 +25,15 @@ interface InvitePayload {
 }
 
 // ------------------------------------------------------------
-// Error classes — generic ones (ForbiddenError/NotFoundError) come from
-// the shared errors module; these two carry workspace-specific codes.
+// Workspace-specific application errors.
 // ------------------------------------------------------------
-export { ForbiddenError, NotFoundError }
-
-export class LastOwnerError extends AppError {
+class LastOwnerError extends AppError {
   constructor() {
     super('LAST_OWNER', 409, 'cannot remove the last owner')
   }
 }
 
-export class InviteTokenError extends AppError {
+class InviteTokenError extends AppError {
   constructor() {
     super('INVITE_TOKEN_INVALID', 400, 'invalid or expired invite token')
   }
@@ -67,31 +69,34 @@ export async function requireRole(wsId: string, userId: string, minRole: Role): 
   }
 }
 
-// ------------------------------------------------------------
-// Response shape used by every function that returns a workspace
-// ------------------------------------------------------------
-const workspaceInclude = {
-  members: {
-    where: {
-      deleted_at: null,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          profile_image_url: true,
-        },
-      },
-    },
-  },
-} as const
+async function requireManagedWorkspace(
+  tx: Prisma.TransactionClient,
+  wsId: string,
+  callerId: string,
+  minRole: Role,
+) {
+  const workspace = await tx.workspace.findFirst({
+    where: { id: wsId, deleted_at: null },
+    include: { members: { where: { deleted_at: null } } },
+  })
+  if (!workspace) throw new NotFoundError()
 
-type WorkspaceWithMembers = Workspace & {
-  members: (WorkspaceMember & {
-    user: Pick<User, 'id' | 'name' | 'email' | 'profile_image_url'>
-  })[]
+  const callerRole = workspace.members.find((member) => member.user_id === callerId)?.role
+  if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK[minRole]) {
+    throw new ForbiddenError()
+  }
+  return workspace
+}
+
+function requireRemovableOwner(
+  members: WorkspaceMember[],
+  targetMembership: WorkspaceMember,
+  newRole?: Role,
+): void {
+  if (targetMembership.role !== 'OWNER' || newRole === 'OWNER') return
+  if (members.filter((member) => member.role === 'OWNER').length <= 1) {
+    throw new LastOwnerError()
+  }
 }
 
 // ============================================================
@@ -104,12 +109,12 @@ type WorkspaceWithMembers = Workspace & {
  *   my    — workspaces where the user is a member (private + public)
  *   public — public workspaces the user has NOT joined
  */
-export async function listWorkspaces(userId: string) {
+export async function listWorkspaces(input: { userId: string }) {
   const [my, public_] = await Promise.all([
     prisma.workspace.findMany({
       where: {
         deleted_at: null,
-        members: { some: { user_id: userId, deleted_at: null } },
+        members: { some: { user_id: input.userId, deleted_at: null } },
       },
       include: workspaceInclude,
       orderBy: { created_at: 'desc' },
@@ -118,7 +123,7 @@ export async function listWorkspaces(userId: string) {
       where: {
         deleted_at: null,
         is_public: true,
-        members: { none: { user_id: userId, deleted_at: null } },
+        members: { none: { user_id: input.userId, deleted_at: null } },
       },
       include: workspaceInclude,
       orderBy: { created_at: 'desc' },
@@ -126,8 +131,8 @@ export async function listWorkspaces(userId: string) {
   ])
 
   return {
-    my: my.map(toDTO),
-    public: public_.map(toDTO),
+    my: my.map(toWorkspaceDto),
+    public: public_.map(toWorkspaceDto),
   }
 }
 
@@ -135,37 +140,39 @@ export async function listWorkspaces(userId: string) {
  * Get a single workspace by ID.
  * Accessible if the user is a member OR the workspace is public.
  */
-export async function getWorkspace(userId: string, wsId: string) {
+export async function getWorkspace(input: { userId: string; workspaceId: string }) {
   const ws = await prisma.workspace.findFirst({
-    where: { id: wsId, deleted_at: null },
+    where: { id: input.workspaceId, deleted_at: null },
     include: workspaceInclude,
   })
 
   if (!ws) throw new NotFoundError()
 
-  const isMember = ws.members.some((m) => m.user_id === userId)
+  const isMember = ws.members.some((member) => member.user_id === input.userId)
   if (!isMember && !ws.is_public) throw new ForbiddenError()
 
-  return toDTO(ws)
+  return toWorkspaceDto(ws)
 }
 
 /**
  * Create a workspace and register the creator as OWNER in a single transaction.
  */
-export async function createWorkspace(userId: string, name: string, isPublic: boolean) {
+export async function createWorkspace(input: {
+  userId: string
+  name: string
+  isPublic: boolean
+}) {
   const ws = await prisma.$transaction(async (tx) => {
     const created = await tx.workspace.create({
       data: {
-        name,
-        is_public: isPublic,
-        created_by: userId,
-        updated_by: userId,
+        name: input.name,
+        is_public: input.isPublic,
+        ...createdBy(input.userId),
         members: {
           create: {
-            user_id: userId,
+            user_id: input.userId,
             role: 'OWNER',
-            created_by: userId,
-            updated_by: userId,
+            ...createdBy(input.userId),
           },
         },
       },
@@ -174,43 +181,34 @@ export async function createWorkspace(userId: string, name: string, isPublic: bo
     return created
   })
 
-  return toDTO(ws)
+  return toWorkspaceDto(ws)
 }
 
 /**
  * Partial update (name / is_public). Requires ADMIN or above.
  */
 export async function updateWorkspace(
-  userId: string,
-  wsId: string,
-  data: { name?: string; is_public?: boolean },
+  input: {
+    userId: string
+    workspaceId: string
+    name?: string
+    isPublic?: boolean
+  },
 ) {
   return prisma.$transaction(async (tx) => {
-    const ws = await tx.workspace.findFirst({
-      where: { id: wsId, deleted_at: null },
-      include: {
-        members: {
-          where: { deleted_at: null },
-        },
-      },
-    })
-    if (!ws) throw new NotFoundError()
-
-    const callerRole = ws.members.find((m) => m.user_id === userId)?.role
-    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
-      throw new ForbiddenError()
-    }
+    await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
 
     const updated = await tx.workspace.update({
-      where: { id: wsId },
+      where: { id: input.workspaceId },
       data: {
-        ...data,
-        updated_by: userId,
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...('isPublic' in input ? { is_public: input.isPublic } : {}),
+        ...updatedBy(input.userId),
       },
       include: workspaceInclude,
     })
 
-    return toDTO(updated)
+    return toWorkspaceDto(updated)
   })
 }
 
@@ -218,30 +216,13 @@ export async function updateWorkspace(
  * Soft-delete a workspace. Child rows stay intact for auditability and are
  * hidden by active-workspace filters. Requires OWNER.
  */
-export async function deleteWorkspace(userId: string, wsId: string) {
+export async function deleteWorkspace(input: { userId: string; workspaceId: string }) {
   return prisma.$transaction(async (tx) => {
-    const ws = await tx.workspace.findFirst({
-      where: { id: wsId, deleted_at: null },
-      include: {
-        members: {
-          where: { deleted_at: null },
-        },
-      },
-    })
-    if (!ws) throw new NotFoundError()
-
-    const callerRole = ws.members.find((m) => m.user_id === userId)?.role
-    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.OWNER) {
-      throw new ForbiddenError()
-    }
+    await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'OWNER')
 
     await tx.workspace.update({
-      where: { id: wsId },
-      data: {
-        updated_by: userId,
-        deleted_at: new Date(),
-        deleted_by: userId,
-      },
+      where: { id: input.workspaceId },
+      data: softDeletedBy(input.userId),
     })
   })
 }
@@ -251,51 +232,47 @@ export async function deleteWorkspace(userId: string, wsId: string) {
  * Prevents demoting the sole OWNER (would leave the workspace with 0 owners).
  */
 export async function changeMemberRole(
-  callerId: string,
-  wsId: string,
-  targetUserId: string,
-  newRole: Role,
+  input: {
+    userId: string
+    workspaceId: string
+    targetUserId: string
+    role: Role
+  },
 ) {
   return prisma.$transaction(async (tx) => {
-    const ws = await tx.workspace.findFirst({
-      where: { id: wsId, deleted_at: null },
-      include: {
-        members: {
-          where: { deleted_at: null },
-        },
-      },
-    })
-    if (!ws) throw new NotFoundError()
+    const ws = await requireManagedWorkspace(
+      tx,
+      input.workspaceId,
+      input.userId,
+      'ADMIN',
+    )
 
-    const callerRole = ws.members.find((m) => m.user_id === callerId)?.role
-    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
-      throw new ForbiddenError()
-    }
-
-    const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
+    const targetMembership = ws.members.find(
+      (member) => member.user_id === input.targetUserId,
+    )
     if (!targetMembership) throw new NotFoundError()
 
-    if (targetMembership.role === 'OWNER' && newRole !== 'OWNER') {
-      const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
-      if (ownerCount <= 1) throw new LastOwnerError()
-    }
+    requireRemovableOwner(ws.members, targetMembership, input.role)
 
     await tx.workspaceMember.update({
       where: {
-        workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+        workspace_id_user_id: {
+          workspace_id: input.workspaceId,
+          user_id: input.targetUserId,
+        },
       },
       data: {
-        role: newRole,
-        updated_by: callerId,
+        role: input.role,
+        ...updatedBy(input.userId),
       },
     })
 
     const updated = await tx.workspace.findFirst({
-      where: { id: wsId, deleted_at: null },
+      where: { id: input.workspaceId, deleted_at: null },
       include: workspaceInclude,
     })
 
-    return toDTO(updated!)
+    return toWorkspaceDto(updated!)
   })
 }
 
@@ -303,40 +280,34 @@ export async function changeMemberRole(
  * Remove a member from the workspace. Caller must be ADMIN+.
  * Prevents removing the sole OWNER.
  */
-export async function removeMember(callerId: string, wsId: string, targetUserId: string) {
+export async function removeMember(input: {
+  userId: string
+  workspaceId: string
+  targetUserId: string
+}) {
   return prisma.$transaction(async (tx) => {
-    const ws = await tx.workspace.findFirst({
-      where: { id: wsId, deleted_at: null },
-      include: {
-        members: {
-          where: { deleted_at: null },
-        },
-      },
-    })
-    if (!ws) throw new NotFoundError()
+    const ws = await requireManagedWorkspace(
+      tx,
+      input.workspaceId,
+      input.userId,
+      'ADMIN',
+    )
 
-    const callerRole = ws.members.find((m) => m.user_id === callerId)?.role
-    if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK.ADMIN) {
-      throw new ForbiddenError()
-    }
-
-    const targetMembership = ws.members.find((m) => m.user_id === targetUserId)
+    const targetMembership = ws.members.find(
+      (member) => member.user_id === input.targetUserId,
+    )
     if (!targetMembership) throw new NotFoundError()
 
-    if (targetMembership.role === 'OWNER') {
-      const ownerCount = ws.members.filter((m) => m.role === 'OWNER').length
-      if (ownerCount <= 1) throw new LastOwnerError()
-    }
+    requireRemovableOwner(ws.members, targetMembership)
 
     await tx.workspaceMember.update({
       where: {
-        workspace_id_user_id: { workspace_id: wsId, user_id: targetUserId },
+        workspace_id_user_id: {
+          workspace_id: input.workspaceId,
+          user_id: input.targetUserId,
+        },
       },
-      data: {
-        updated_by: callerId,
-        deleted_at: new Date(),
-        deleted_by: callerId,
-      },
+      data: softDeletedBy(input.userId),
     })
   })
 }
@@ -344,9 +315,35 @@ export async function removeMember(callerId: string, wsId: string, targetUserId:
 /**
  * Generate a signed invite token. The caller sends this link by email.
  */
-export function generateInviteToken(workspaceId: string, role: Role, email: string): string {
+function generateInviteToken(workspaceId: string, role: Role, email: string): string {
   return jwt.sign({ workspace_id: workspaceId, role, email }, config.jwtAccessSecret, {
     expiresIn: INVITE_TTL_SECONDS,
+  })
+}
+
+export async function inviteWorkspaceMember(input: {
+  userId: string
+  workspaceId: string
+  email: string
+  role: Exclude<Role, 'OWNER'>
+}): Promise<void> {
+  const workspace = await getWorkspace({
+    userId: input.userId,
+    workspaceId: input.workspaceId,
+  })
+  await requireRole(input.workspaceId, input.userId, 'ADMIN')
+
+  const token = generateInviteToken(
+    input.workspaceId,
+    input.role,
+    input.email,
+  )
+  const inviteUrl = `${config.appOrigin}/invite/${token}`
+
+  await checkMailRateLimit(input.email)
+  await enqueue({
+    to: input.email,
+    ...inviteEmail(workspace.name, inviteUrl),
   })
 }
 
@@ -354,10 +351,10 @@ export function generateInviteToken(workspaceId: string, role: Role, email: stri
  * Accept an invite: verify the token and add the user as a member.
  * Returns the workspace DTO on success.
  */
-export async function acceptInvite(userId: string, token: string) {
+export async function acceptInvite(input: { userId: string; token: string }) {
   let payload: InvitePayload
   try {
-    payload = jwt.verify(token, config.jwtAccessSecret) as InvitePayload
+    payload = jwt.verify(input.token, config.jwtAccessSecret) as InvitePayload
   } catch {
     throw new InviteTokenError()
   }
@@ -373,13 +370,13 @@ export async function acceptInvite(userId: string, token: string) {
     where: {
       workspace_id_user_id: {
         workspace_id: payload.workspace_id,
-        user_id: userId,
+        user_id: input.userId,
       },
     },
   })
 
   if (existing?.deleted_at === null) {
-    return toDTO(ws)
+    return toWorkspaceDto(ws)
   }
 
   if (existing) {
@@ -387,24 +384,18 @@ export async function acceptInvite(userId: string, token: string) {
       where: {
         workspace_id_user_id: {
           workspace_id: payload.workspace_id,
-          user_id: userId,
+          user_id: input.userId,
         },
       },
-      data: {
-        role: payload.role,
-        updated_by: userId,
-        deleted_at: null,
-        deleted_by: null,
-      },
+      data: { role: payload.role, ...restoredBy(input.userId) },
     })
   } else {
     await prisma.workspaceMember.create({
       data: {
         workspace_id: payload.workspace_id,
-        user_id: userId,
+        user_id: input.userId,
         role: payload.role,
-        created_by: userId,
-        updated_by: userId,
+        ...createdBy(input.userId),
       },
     })
   }
@@ -414,28 +405,5 @@ export async function acceptInvite(userId: string, token: string) {
     include: workspaceInclude,
   })
 
-  return toDTO(updated!)
-}
-
-// ============================================================
-// DTO conversion — Prisma (camelCase) → API response (snake_case)
-// ============================================================
-function toDTO(ws: WorkspaceWithMembers) {
-  return {
-    id: ws.id,
-    name: ws.name,
-    is_public: ws.is_public,
-    created_at: ws.created_at.toISOString(),
-    updated_at: ws.updated_at.toISOString(),
-    members: ws.members.map((m) => ({
-      user_id: m.user_id,
-      role: m.role,
-      user: {
-        id: m.user.id,
-        name: m.user.name,
-        email: m.user.email,
-        profile_image_url: m.user.profile_image_url,
-      },
-    })),
-  }
+  return toWorkspaceDto(updated!)
 }

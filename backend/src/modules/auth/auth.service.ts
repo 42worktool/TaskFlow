@@ -4,10 +4,11 @@ import { OAuth2Client } from 'google-auth-library';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { config } from '../../config';
 import { AppError } from '../../errors';
-import { prisma } from '../../lib/prisma';
+import { prisma } from '../../db';
 import { getRedisClient } from '../../lib/redis';
 import {
   hashPassword,
+  accountName,
   isValidEmail,
   normalizeEmail,
   safeEqual,
@@ -34,6 +35,7 @@ export interface UserPublic {
   name: string;
   profile_image_url: string | null;
   created_at: string;
+  auth_provider: 'password' | 'google';
 }
 
 interface OAuthStateRecord {
@@ -56,18 +58,6 @@ function registrationEmail(value: unknown): string {
     throw new AppError('INVALID_EMAIL', 400, 'A valid email address is required');
   }
   return email;
-}
-
-function registrationName(value: unknown): string {
-  if (typeof value !== 'string') {
-    throw new AppError('INVALID_NAME', 400, 'Name is required');
-  }
-
-  const name = value.trim();
-  if (name.length < 2 || name.length > 80) {
-    throw new AppError('INVALID_NAME', 400, 'Name must be between 2 and 80 characters');
-  }
-  return name;
 }
 
 function registrationPassword(value: unknown): string {
@@ -109,7 +99,7 @@ export async function registerWithPassword(input: {
   email: unknown;
   password: unknown;
 }): Promise<UserPublic> {
-  const name = registrationName(input.name);
+  const name = accountName(input.name);
   const email = registrationEmail(input.email);
   const password = registrationPassword(input.password);
 
@@ -174,6 +164,7 @@ function publicUser(user: User): UserPublic {
     name: user.name,
     profile_image_url: user.profile_image_url,
     created_at: user.created_at.toISOString(),
+    auth_provider: user.password_hash === null ? 'google' : 'password',
   };
 }
 
@@ -428,14 +419,7 @@ export async function getCurrentUser(userId: string): Promise<UserPublic> {
 }
 
 export async function updateCurrentUser(userId: string, nameValue: unknown): Promise<UserPublic> {
-  if (typeof nameValue !== 'string') {
-    throw new AppError('INVALID_NAME', 400, 'Name is required');
-  }
-
-  const name = nameValue.trim();
-  if (name.length < 2 || name.length > 80) {
-    throw new AppError('INVALID_NAME', 400, 'Name must be between 2 and 80 characters');
-  }
+  const name = accountName(nameValue);
 
   const user = await prisma.user.update({
     where: { id: userId },

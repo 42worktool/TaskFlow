@@ -1,225 +1,160 @@
-// ============================================================
-// card.controller.ts — HTTP layer for cards, members, attachments, comments
-// ============================================================
-import type { Request, Response } from 'express'
-import { z } from 'zod'
-import { sendError } from '../../errors'
+import type { RequestHandler } from 'express'
 import * as svc from './card.service'
+import {
+  addAttachmentSchema,
+  addCardMemberSchema,
+  cardDatesSchema,
+  cardNeighborSchema,
+  commentSchema,
+  createCardSchema,
+  moveCardSchema,
+  updateCardSchema,
+} from './card.validation'
 
-const isoDate = z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'invalid date')
-
-const createCardSchema = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().max(5000).nullable().optional(),
-  start_at: isoDate.nullable().optional(),
-  deadline: isoDate.nullable().optional(),
-})
-
-const updateCardSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  description: z.string().max(5000).nullable().optional(),
-})
-
-const neighborSchema = z
-  .object({
-    before_card_id: z.string().uuid().nullable().optional(),
-    after_card_id: z.string().uuid().nullable().optional(),
+export const create: RequestHandler = async (req, res) => {
+  const data = createCardSchema.parse(req.body)
+  const card = await svc.createCard({
+    userId: req.user!.id,
+    listId: req.params.list_id as string,
+    title: data.title,
+    description: data.description,
+    startAt: data.start_at,
+    deadline: data.deadline,
   })
-  .refine((v) => v.before_card_id !== undefined || v.after_card_id !== undefined, {
-    message: 'either before_card_id or after_card_id is required',
+  res.status(201).json(card)
+}
+
+export const getOne: RequestHandler = async (req, res) => {
+  const card = await svc.getCard({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
   })
+  res.status(200).json(card)
+}
 
-const moveCardSchema = z.object({
-  list_id: z.string().uuid(),
-  before_card_id: z.string().uuid().nullable().optional(),
-  after_card_id: z.string().uuid().nullable().optional(),
-})
-
-const datesSchema = z
-  .object({
-    start_at: isoDate.nullable().optional(),
-    deadline: isoDate.nullable().optional(),
+export const update: RequestHandler = async (req, res) => {
+  const data = updateCardSchema.parse(req.body)
+  const card = await svc.updateCard({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    ...(data.title !== undefined ? { title: data.title } : {}),
+    ...('description' in data ? { description: data.description } : {}),
   })
-  .refine((v) => v.start_at !== undefined || v.deadline !== undefined, {
-    message: 'either start_at or deadline is required',
+  res.status(200).json(card)
+}
+
+export const remove: RequestHandler = async (req, res) => {
+  await svc.deleteCard({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
   })
-
-const addMemberSchema = z.object({
-  user_id: z.string().uuid(),
-})
-
-const addAttachmentSchema = z.object({
-  file_url: z.string().url(),
-  file_name: z.string().min(1).max(255),
-})
-
-const commentSchema = z.object({
-  comment_str: z.string().min(1).max(2000),
-})
-
-// ─── Cards ────────────────────────────────────────────────────
-
-/** POST /lists/:list_id/cards */
-export async function create(req: Request, res: Response) {
-  try {
-    const body = createCardSchema.parse(req.body)
-    const data = await svc.createCard(req.user!.id, req.params.list_id as string, body)
-    res.status(201).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+  res.status(204).send()
 }
 
-/** GET /cards/:card_id */
-export async function getOne(req: Request, res: Response) {
-  try {
-    const data = await svc.getCard(req.user!.id, req.params.card_id as string)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const reorder: RequestHandler = async (req, res) => {
+  const data = cardNeighborSchema.parse(req.body)
+  const card = await svc.reorderCard({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    beforeCardId: data.before_card_id,
+    afterCardId: data.after_card_id,
+  })
+  res.status(200).json(card)
 }
 
-/** PUT /cards/:card_id */
-export async function update(req: Request, res: Response) {
-  try {
-    const body = updateCardSchema.parse(req.body)
-    const data = await svc.updateCard(req.user!.id, req.params.card_id as string, body)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const move: RequestHandler = async (req, res) => {
+  const data = moveCardSchema.parse(req.body)
+  const card = await svc.moveCard({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    targetListId: data.list_id,
+    beforeCardId: data.before_card_id,
+    afterCardId: data.after_card_id,
+  })
+  res.status(200).json(card)
 }
 
-/** DELETE /cards/:card_id */
-export async function remove(req: Request, res: Response) {
-  try {
-    await svc.deleteCard(req.user!.id, req.params.card_id as string)
-    res.status(204).send()
-  } catch (e) {
-    sendError(res, e)
-  }
+export const updateDates: RequestHandler = async (req, res) => {
+  const data = cardDatesSchema.parse(req.body)
+  const card = await svc.updateCardDates({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    ...('start_at' in data ? { startAt: data.start_at } : {}),
+    ...('deadline' in data ? { deadline: data.deadline } : {}),
+  })
+  res.status(200).json(card)
 }
 
-/** PUT /cards/:card_id/order */
-export async function reorder(req: Request, res: Response) {
-  try {
-    const body = neighborSchema.parse(req.body)
-    const data = await svc.reorderCard(req.user!.id, req.params.card_id as string, body)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const moveToInbox: RequestHandler = async (req, res) => {
+  const card = await svc.moveCardToInbox({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+  })
+  res.status(200).json(card)
 }
 
-/** PUT /cards/:card_id/move */
-export async function move(req: Request, res: Response) {
-  try {
-    const body = moveCardSchema.parse(req.body)
-    const data = await svc.moveCard(req.user!.id, req.params.card_id as string, body)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const addMember: RequestHandler = async (req, res) => {
+  const body = addCardMemberSchema.parse(req.body)
+  const member = await svc.addCardMember({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    targetUserId: body.user_id,
+  })
+  res.status(201).json(member)
 }
 
-/** PATCH /cards/:card_id/dates */
-export async function updateDates(req: Request, res: Response) {
-  try {
-    const body = datesSchema.parse(req.body)
-    const data = await svc.updateCardDates(req.user!.id, req.params.card_id as string, body)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const removeMember: RequestHandler = async (req, res) => {
+  await svc.removeCardMember({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    targetUserId: req.params.user_id as string,
+  })
+  res.status(204).send()
 }
 
-/** PUT /cards/:card_id/inbox */
-export async function moveToInbox(req: Request, res: Response) {
-  try {
-    const data = await svc.moveCardToInbox(req.user!.id, req.params.card_id as string)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const addAttachment: RequestHandler = async (req, res) => {
+  const data = addAttachmentSchema.parse(req.body)
+  const attachment = await svc.addAttachment({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    fileUrl: data.file_url,
+    fileName: data.file_name,
+  })
+  res.status(201).json(attachment)
 }
 
-// ─── Card Members ─────────────────────────────────────────────
-
-/** POST /cards/:card_id/members */
-export async function addMember(req: Request, res: Response) {
-  try {
-    const body = addMemberSchema.parse(req.body)
-    const data = await svc.addCardMember(req.user!.id, req.params.card_id as string, body.user_id)
-    res.status(201).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const removeAttachment: RequestHandler = async (req, res) => {
+  await svc.removeAttachment({
+    userId: req.user!.id,
+    attachmentId: req.params.attachment_id as string,
+  })
+  res.status(204).send()
 }
 
-/** DELETE /cards/:card_id/members/:user_id */
-export async function removeMember(req: Request, res: Response) {
-  try {
-    await svc.removeCardMember(req.user!.id, req.params.card_id as string, req.params.user_id as string)
-    res.status(204).send()
-  } catch (e) {
-    sendError(res, e)
-  }
+export const createComment: RequestHandler = async (req, res) => {
+  const data = commentSchema.parse(req.body)
+  const comment = await svc.createComment({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    comment: data.comment_str,
+  })
+  res.status(201).json(comment)
 }
 
-// ─── Attachments ──────────────────────────────────────────────
-
-/** POST /cards/:card_id/attachments */
-export async function addAttachment(req: Request, res: Response) {
-  try {
-    const body = addAttachmentSchema.parse(req.body)
-    const data = await svc.addAttachment(req.user!.id, req.params.card_id as string, body)
-    res.status(201).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
+export const updateComment: RequestHandler = async (req, res) => {
+  const data = commentSchema.parse(req.body)
+  const comment = await svc.updateComment({
+    userId: req.user!.id,
+    commentId: req.params.comment_id as string,
+    comment: data.comment_str,
+  })
+  res.status(200).json(comment)
 }
 
-/** DELETE /cards/attachments/:attachment_id */
-export async function removeAttachment(req: Request, res: Response) {
-  try {
-    await svc.removeAttachment(req.user!.id, req.params.attachment_id as string)
-    res.status(204).send()
-  } catch (e) {
-    sendError(res, e)
-  }
-}
-
-// ─── Comments ─────────────────────────────────────────────────
-
-/** POST /cards/:card_id/comments */
-export async function createComment(req: Request, res: Response) {
-  try {
-    const body = commentSchema.parse(req.body)
-    const data = await svc.createComment(req.user!.id, req.params.card_id as string, body)
-    res.status(201).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
-}
-
-/** PATCH /comments/:comment_id */
-export async function updateComment(req: Request, res: Response) {
-  try {
-    const body = commentSchema.parse(req.body)
-    const data = await svc.updateComment(req.user!.id, req.params.comment_id as string, body)
-    res.status(200).json(data)
-  } catch (e) {
-    sendError(res, e)
-  }
-}
-
-/** DELETE /comments/:comment_id */
-export async function deleteComment(req: Request, res: Response) {
-  try {
-    await svc.deleteComment(req.user!.id, req.params.comment_id as string)
-    res.status(204).send()
-  } catch (e) {
-    sendError(res, e)
-  }
+export const deleteComment: RequestHandler = async (req, res) => {
+  await svc.deleteComment({
+    userId: req.user!.id,
+    commentId: req.params.comment_id as string,
+  })
+  res.status(204).send()
 }

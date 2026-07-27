@@ -1,6 +1,6 @@
-export type UUID = string
-export type ISODateString = string
-export type Role = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'
+type UUID = string
+type ISODateString = string
+type Role = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'
 
 export interface WorkspaceMember {
   user_id: UUID

@@ -1,11 +1,12 @@
 import { reactive } from 'vue'
 
-export interface AuthUser {
+interface AuthUser {
   id: string
   email: string
   name: string
   profile_image_url: string | null
   created_at: string
+  auth_provider: 'password' | 'google'
 }
 
 interface RefreshResponse {
@@ -13,6 +14,11 @@ interface RefreshResponse {
   access_token: string
   token_type: 'Bearer'
   expires_in: number
+}
+
+interface ApiRequestInit extends Omit<RequestInit, 'body'> {
+  body?: BodyInit | null
+  json?: unknown
 }
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -57,6 +63,22 @@ function applyAuthenticatedSession(session: RefreshResponse): AuthUser {
   authState.accessToken = session.access_token
   authState.initialized = true
   return session.user
+}
+
+async function requestPasswordSession(
+  path: '/api/auth/login' | '/api/auth/signup',
+  payload: Record<string, string>,
+  fallback: string,
+): Promise<AuthUser> {
+  const response = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) throw await authRequestError(response, fallback)
+  return applyAuthenticatedSession((await response.json()) as RefreshResponse)
 }
 
 async function requestRefresh(): Promise<boolean> {
@@ -113,18 +135,7 @@ export function startGoogleLogin(returnTo = '/workspaces'): void {
 }
 
 export async function loginWithPassword(email: string, password: string): Promise<AuthUser> {
-  const response = await fetch('/api/auth/login', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-
-  if (!response.ok) {
-    throw await authRequestError(response, '로그인하지 못했습니다.')
-  }
-
-  return applyAuthenticatedSession((await response.json()) as RefreshResponse)
+  return requestPasswordSession('/api/auth/login', { email, password }, '로그인하지 못했습니다.')
 }
 
 export async function signupWithPassword(
@@ -132,21 +143,14 @@ export async function signupWithPassword(
   email: string,
   password: string,
 ): Promise<AuthUser> {
-  const response = await fetch('/api/auth/signup', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ name, email, password }),
-  })
-
-  if (!response.ok) {
-    throw await authRequestError(response, '회원가입을 완료하지 못했습니다.')
-  }
-
-  return applyAuthenticatedSession((await response.json()) as RefreshResponse)
+  return requestPasswordSession(
+    '/api/auth/signup',
+    { name, email, password },
+    '회원가입을 완료하지 못했습니다.',
+  )
 }
 
-export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   await initializeAuth()
 
   const makeRequest = () => {
@@ -164,9 +168,17 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
 
 export async function apiRequest<T>(
   input: RequestInfo | URL,
-  init: RequestInit = {},
+  init: ApiRequestInit = {},
 ): Promise<T> {
-  const response = await authFetch(input, init)
+  const { json, ...requestInit } = init
+  if (json !== undefined) {
+    const headers = new Headers(requestInit.headers)
+    headers.set('Content-Type', 'application/json')
+    requestInit.headers = headers
+    requestInit.body = JSON.stringify(json)
+  }
+
+  const response = await authFetch(input, requestInit)
 
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { message?: string } | null

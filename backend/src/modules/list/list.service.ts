@@ -6,33 +6,11 @@
 // soft delete via deleted_at, role checks via workspace ROLE_RANK.
 // ============================================================
 import { prisma } from '../../db'
-import type { Card, List } from '@prisma/client'
 import { ForbiddenError, NotFoundError } from '../../errors'
 import { getRole, requireRole } from '../workspace/workspace.service'
-
-function toDTO(list: List) {
-  return {
-    id: list.id,
-    workspace_id: list.workspace_id,
-    name: list.name,
-    sequence: list.sequence,
-  }
-}
-
-// Minimal card summary for the board's initial load. Full detail
-// (members/labels/attachments) is only returned by GET /cards/{card_id}.
-function toCardSummaryDTO(card: Card) {
-  return {
-    id: card.id,
-    list_id: card.list_id,
-    title: card.title,
-    description: card.description,
-    start_at: card.start_at,
-    deadline: card.deadline,
-    sequence: card.sequence,
-    created_at: card.created_at,
-  }
-}
+import { createdBy, softDeletedBy, updatedBy } from '../../lib/audit'
+import { computeSequence } from '../../lib/ordering'
+import { toBoardListDto, toListDto } from './list.dto'
 
 async function assertReadAccess(userId: string, workspaceId: string): Promise<void> {
   const ws = await prisma.workspace.findFirst({ where: { id: workspaceId, deleted_at: null } })
@@ -42,25 +20,15 @@ async function assertReadAccess(userId: string, workspaceId: string): Promise<vo
   if (!role) throw new ForbiddenError()
 }
 
-// Fractional-indexing midpoint for reorder operations.
-function computeSequence(siblings: List[], beforeId?: string | null, afterId?: string | null): number {
-  const before = beforeId ? siblings.find((l) => l.id === beforeId) : null
-  const after = afterId ? siblings.find((l) => l.id === afterId) : null
-  if (!before && !after) return (siblings[siblings.length - 1]?.sequence ?? 0) + 1
-  if (!before) return after!.sequence - 1
-  if (!after) return before.sequence + 1
-  return (before.sequence + after.sequence) / 2
-}
-
 /**
  * List all lists in a workspace, with their cards, for the board's initial render.
  * Member of the workspace OR a public workspace.
  */
-export async function listLists(userId: string, workspaceId: string) {
-  await assertReadAccess(userId, workspaceId)
+export async function listLists(input: { userId: string; workspaceId: string }) {
+  await assertReadAccess(input.userId, input.workspaceId)
 
   const lists = await prisma.list.findMany({
-    where: { workspace_id: workspaceId, deleted_at: null },
+    where: { workspace_id: input.workspaceId, deleted_at: null },
     orderBy: { sequence: 'asc' },
     include: {
       cards: {
@@ -70,48 +38,48 @@ export async function listLists(userId: string, workspaceId: string) {
     },
   })
 
-  return lists.map((l) => ({
-    ...toDTO(l),
-    cards: l.cards.map(toCardSummaryDTO),
-  }))
+  return lists.map(toBoardListDto)
 }
 
 /**
  * Create a list at the end of the workspace's board. Requires MEMBER+.
  */
-export async function createList(userId: string, workspaceId: string, name: string) {
-  await requireRole(workspaceId, userId, 'MEMBER')
+export async function createList(input: {
+  userId: string
+  workspaceId: string
+  name: string
+}) {
+  await requireRole(input.workspaceId, input.userId, 'MEMBER')
 
   const agg = await prisma.list.aggregate({
-    where: { workspace_id: workspaceId, deleted_at: null },
+    where: { workspace_id: input.workspaceId, deleted_at: null },
     _max: { sequence: true },
   })
 
   const list = await prisma.list.create({
     data: {
-      workspace_id: workspaceId,
-      name,
+      workspace_id: input.workspaceId,
+      name: input.name,
       sequence: (agg._max.sequence ?? 0) + 1,
-      created_by: userId,
-      updated_by: userId,
+      ...createdBy(input.userId),
     },
   })
-  return toDTO(list)
+  return toListDto(list)
 }
 
 /**
  * Rename a list. Requires MEMBER+.
  */
-export async function updateList(userId: string, listId: string, name: string) {
-  const list = await prisma.list.findFirst({ where: { id: listId, deleted_at: null } })
+export async function updateList(input: { userId: string; listId: string; name: string }) {
+  const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, userId, 'MEMBER')
+  await requireRole(list.workspace_id, input.userId, 'MEMBER')
 
   const updated = await prisma.list.update({
-    where: { id: listId },
-    data: { name, updated_by: userId },
+    where: { id: input.listId },
+    data: { name: input.name, ...updatedBy(input.userId) },
   })
-  return toDTO(updated)
+  return toListDto(updated)
 }
 
 /**
@@ -119,19 +87,23 @@ export async function updateList(userId: string, listId: string, name: string) {
  * onDelete: SetNull relation semantics we replicate manually since this is
  * a soft delete, not a hard delete). Requires MEMBER+.
  */
-export async function deleteList(userId: string, listId: string): Promise<void> {
-  const list = await prisma.list.findFirst({ where: { id: listId, deleted_at: null } })
+export async function deleteList(input: { userId: string; listId: string }): Promise<void> {
+  const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, userId, 'MEMBER')
+  await requireRole(list.workspace_id, input.userId, 'MEMBER')
 
   await prisma.$transaction([
     prisma.card.updateMany({
-      where: { list_id: listId, deleted_at: null },
-      data: { list_id: null, updated_by: userId },
+      where: { list_id: input.listId, deleted_at: null },
+      data: {
+        list_id: null,
+        user_id: input.userId,
+        ...updatedBy(input.userId),
+      },
     }),
     prisma.list.update({
-      where: { id: listId },
-      data: { deleted_at: new Date(), deleted_by: userId, updated_by: userId },
+      where: { id: input.listId },
+      data: softDeletedBy(input.userId),
     }),
   ])
 }
@@ -141,23 +113,30 @@ export async function deleteList(userId: string, listId: string): Promise<void> 
  * Requires MEMBER+.
  */
 export async function reorderList(
-  userId: string,
-  listId: string,
-  data: { before_list_id?: string | null; after_list_id?: string | null },
+  input: {
+    userId: string
+    listId: string
+    beforeListId?: string | null
+    afterListId?: string | null
+  },
 ) {
-  const list = await prisma.list.findFirst({ where: { id: listId, deleted_at: null } })
+  const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, userId, 'MEMBER')
+  await requireRole(list.workspace_id, input.userId, 'MEMBER')
 
   const siblings = await prisma.list.findMany({
-    where: { workspace_id: list.workspace_id, deleted_at: null, id: { not: listId } },
+    where: { workspace_id: list.workspace_id, deleted_at: null, id: { not: input.listId } },
     orderBy: { sequence: 'asc' },
   })
 
-  const newSequence = computeSequence(siblings, data.before_list_id, data.after_list_id)
+  const newSequence = computeSequence(
+    siblings,
+    input.beforeListId,
+    input.afterListId,
+  )
   const updated = await prisma.list.update({
-    where: { id: listId },
-    data: { sequence: newSequence, updated_by: userId },
+    where: { id: input.listId },
+    data: { sequence: newSequence, ...updatedBy(input.userId) },
   })
-  return toDTO(updated)
+  return toListDto(updated)
 }

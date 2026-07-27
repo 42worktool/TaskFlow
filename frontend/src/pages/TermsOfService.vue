@@ -1,12 +1,9 @@
-<template>
-  <div class="legal-page-shell">
-    <header class="legal-page-header">
-      <RouterLink to="/signin" class="legal-page-logo">TaskFlow</RouterLink>
-    </header>
-    <main class="legal-document">
-      <h1>이용약관</h1>
-      <p class="effective-date">시행일: 2026년 7월 22일</p>
+<script setup lang="ts">
+import LegalDocumentLayout from '../layouts/LegalDocumentLayout.vue'
+</script>
 
+<template>
+  <LegalDocumentLayout title="이용약관">
       <h2>1. 서비스 목적</h2>
       <p>TaskFlow는 학습 및 기능 시연을 위한 협업 도구 프로젝트입니다.</p>
 
@@ -37,8 +34,5 @@
         서비스는 학습 목적으로 현재 상태 그대로 제공됩니다. 법령이 허용하는 범위에서 서비스의
         중단, 데이터 손실 또는 이용으로 발생한 간접 손해를 보증하지 않습니다.
       </p>
-    </main>
-  </div>
+  </LegalDocumentLayout>
 </template>
-
-<style scoped src="../styles/legal-page.css"></style>

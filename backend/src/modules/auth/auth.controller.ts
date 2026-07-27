@@ -1,10 +1,10 @@
-import { CookieOptions, Request, Response } from 'express';
+import type { CookieOptions, RequestHandler, Response } from 'express';
 import { config } from '../../config';
 import { AppError, sendError } from '../../errors';
 import * as authService from './auth.service';
 
-export const OAUTH_STATE_COOKIE = 'ft_oauth_state';
-export const REFRESH_TOKEN_COOKIE = 'ft_refresh_token';
+const OAUTH_STATE_COOKIE = 'ft_oauth_state';
+const REFRESH_TOKEN_COOKIE = 'ft_refresh_token';
 
 const oauthCookieBaseOptions: CookieOptions = {
   httpOnly: true,
@@ -56,43 +56,31 @@ async function sendAuthenticatedUser(
   });
 }
 
-export async function signup(req: Request, res: Response): Promise<void> {
-  try {
-    const user = await authService.registerWithPassword({
-      name: req.body?.name,
-      email: req.body?.email,
-      password: req.body?.password,
-    });
-    await sendAuthenticatedUser(res, user, 201);
-  } catch (error) {
-    sendError(res, error);
-  }
-}
+export const signup: RequestHandler = async (req, res) => {
+  const user = await authService.registerWithPassword({
+    name: req.body?.name,
+    email: req.body?.email,
+    password: req.body?.password,
+  });
+  await sendAuthenticatedUser(res, user, 201);
+};
 
-export async function login(req: Request, res: Response): Promise<void> {
-  try {
-    const user = await authService.authenticateWithPassword({
-      email: req.body?.email,
-      password: req.body?.password,
-      clientKey: req.ip || req.socket.remoteAddress || 'unknown',
-    });
-    await sendAuthenticatedUser(res, user, 200);
-  } catch (error) {
-    sendError(res, error);
-  }
-}
+export const login: RequestHandler = async (req, res) => {
+  const user = await authService.authenticateWithPassword({
+    email: req.body?.email,
+    password: req.body?.password,
+    clientKey: req.ip || req.socket.remoteAddress || 'unknown',
+  });
+  await sendAuthenticatedUser(res, user, 200);
+};
 
-export async function beginGoogle(req: Request, res: Response): Promise<void> {
-  try {
-    const { authorizationUrl, state } = await authService.beginGoogleOAuth(req.query.return_to);
-    res.cookie(OAUTH_STATE_COOKIE, state, oauthCookieOptions);
-    res.redirect(authorizationUrl);
-  } catch (error) {
-    sendError(res, error);
-  }
-}
+export const beginGoogle: RequestHandler = async (req, res) => {
+  const { authorizationUrl, state } = await authService.beginGoogleOAuth(req.query.return_to);
+  res.cookie(OAUTH_STATE_COOKIE, state, oauthCookieOptions);
+  res.redirect(authorizationUrl);
+};
 
-export async function googleCallback(req: Request, res: Response): Promise<void> {
+export const googleCallback: RequestHandler = async (req, res) => {
   const providerError = queryString(req.query.error);
   if (providerError) {
     res.clearCookie(OAUTH_STATE_COOKIE, oauthCookieBaseOptions);
@@ -127,9 +115,9 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
     }
     res.redirect(oauthErrorRedirect(code));
   }
-}
+};
 
-export async function refresh(req: Request, res: Response): Promise<void> {
+export const refresh: RequestHandler = async (req, res) => {
   const currentToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (typeof currentToken !== 'string') {
     res.status(401).json({
@@ -153,9 +141,9 @@ export async function refresh(req: Request, res: Response): Promise<void> {
     res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions);
     sendError(res, error);
   }
-}
+};
 
-export async function logout(req: Request, res: Response): Promise<void> {
+export const logout: RequestHandler = async (req, res) => {
   const token = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (typeof token === 'string') {
     try {
@@ -166,33 +154,21 @@ export async function logout(req: Request, res: Response): Promise<void> {
   }
   res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions);
   res.status(204).send();
-}
+};
 
-export async function me(req: Request, res: Response): Promise<void> {
-  try {
-    if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
-    res.json(await authService.getCurrentUser(req.auth.userId));
-  } catch (error) {
-    sendError(res, error);
-  }
-}
+export const me: RequestHandler = async (req, res) => {
+  if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
+  res.json(await authService.getCurrentUser(req.auth.userId));
+};
 
-export async function updateAccount(req: Request, res: Response): Promise<void> {
-  try {
-    if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
-    res.json(await authService.updateCurrentUser(req.auth.userId, req.body?.name));
-  } catch (error) {
-    sendError(res, error);
-  }
-}
+export const updateAccount: RequestHandler = async (req, res) => {
+  if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
+  res.json(await authService.updateCurrentUser(req.auth.userId, req.body?.name));
+};
 
-export async function deleteAccount(req: Request, res: Response): Promise<void> {
-  try {
-    if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
-    await authService.deleteCurrentUser(req.auth.userId);
-    res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions);
-    res.status(204).send();
-  } catch (error) {
-    sendError(res, error);
-  }
-}
+export const deleteAccount: RequestHandler = async (req, res) => {
+  if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
+  await authService.deleteCurrentUser(req.auth.userId);
+  res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions);
+  res.status(204).send();
+};

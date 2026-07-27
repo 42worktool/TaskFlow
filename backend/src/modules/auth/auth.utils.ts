@@ -1,4 +1,5 @@
 import { randomBytes, scrypt, timingSafeEqual } from 'crypto';
+import { AppError } from '../../errors';
 
 const PASSWORD_HASH_PREFIX = 'scrypt-v1';
 const PASSWORD_SALT_BYTES = 16;
@@ -9,6 +10,18 @@ const SCRYPT_OPTIONS = {
   p: 1,
   maxmem: 64 * 1024 * 1024,
 };
+
+export function accountName(value: unknown): string {
+  if (typeof value !== 'string') {
+    throw new AppError('INVALID_NAME', 400, 'Name is required');
+  }
+
+  const name = value.trim();
+  if (name.length < 2 || name.length > 80) {
+    throw new AppError('INVALID_NAME', 400, 'Name must be between 2 and 80 characters');
+  }
+  return name;
+}
 
 function derivePasswordKey(password: string, salt: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {

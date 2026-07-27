@@ -8,7 +8,7 @@ function key(email: string): string {
   return `mail:ratelimit:${email}`;
 }
 
-export class MailRateLimitError extends AppError {
+class MailRateLimitError extends AppError {
   constructor() {
     super('MAIL_RATE_LIMITED', 429, 'too many email invitations to this address');
   }

@@ -3,51 +3,6 @@
   background: #f3f4f6;
 }
 
-.search-header {
-  height: 52px;
-  background: #1a3a6b;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  gap: 16px;
-}
-
-.logo {
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff;
-  text-decoration: none;
-  margin-right: 8px;
-  white-space: nowrap;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-  min-width: 0;
-}
-
-.inbox-btn {
-  padding: 7px 14px;
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
-}
-
-.inbox-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.profile-slot {
-  flex-shrink: 0;
-}
-
 .search-page {
   max-width: 960px;
   margin: 0 auto;

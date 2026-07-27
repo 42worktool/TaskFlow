@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import AppHeader from '../components/AppHeader.vue'
 import InboxDrawer from '../components/InboxDrawer.vue'
 import LegalFooter from '../components/LegalFooter.vue'
-import NotificationMenu from '../components/NotificationMenu.vue'
-import ProfileMenu from '../components/ProfileMenu.vue'
-import SearchInput from '../components/SearchInput.vue'
-import CreateWorkspaceModal from '../components/CreateWorkspaceModal.vue'
-import EditWorkspaceModal from '../components/EditWorkspaceModal.vue'
+import WorkspaceFormModal from '../components/WorkspaceFormModal.vue'
 import { WorkspaceAPI } from '../api/workspace'
 import { workspaceColor } from '../types'
 import type { Workspace } from '../types'
@@ -19,6 +16,22 @@ const openWorkspaces = ref<Workspace[]>([])
 
 const editing = ref<Workspace | null>(null)
 const menuOpen = ref<string | null>(null)
+const workspaceSections = computed(() => [
+  {
+    key: 'mine',
+    title: '내 프로젝트',
+    description: '소속된 비공개 프로젝트',
+    workspaces: myWorkspaces.value,
+    editable: true,
+  },
+  {
+    key: 'public',
+    title: '공개 프로젝트',
+    description: '누구나 참여할 수 있는 오픈 프로젝트',
+    workspaces: openWorkspaces.value,
+    editable: false,
+  },
+])
 
 async function refreshList() {
   const data = await WorkspaceAPI.list()
@@ -26,11 +39,11 @@ async function refreshList() {
   openWorkspaces.value = data.public
 }
 
-function onCreated(ws: Workspace) {
-  myWorkspaces.value.unshift(ws)
-}
-
-function onUpdated(ws: Workspace) {
+function onSaved(ws: Workspace) {
+  if (!editing.value) {
+    myWorkspaces.value.unshift(ws)
+    return
+  }
   const idx = myWorkspaces.value.findIndex((w) => w.id === ws.id)
   if (idx !== -1) myWorkspaces.value[idx] = ws
   const idx2 = openWorkspaces.value.findIndex((w) => w.id === ws.id)
@@ -64,26 +77,22 @@ onMounted(refreshList)
 <template>
   <div class="home-shell" @click="menuOpen = null">
     <!-- Header -->
-    <header class="home-header">
-      <RouterLink to="/workspaces" class="logo">TaskFlow</RouterLink>
-      <SearchInput />
-      <div class="header-actions">
-        <NotificationMenu />
-        <button class="inbox-btn" type="button" @click="showInbox = true">인박스</button>
-        <ProfileMenu />
-      </div>
-    </header>
+    <AppHeader @open-inbox="showInbox = true" />
 
     <div class="home-body">
       <!-- Content -->
       <main class="home-content">
-        <!-- 내 프로젝트 -->
-        <section class="project-section">
-          <h2 class="section-title">내 프로젝트</h2>
-          <p class="section-desc">소속된 비공개 프로젝트</p>
+        <section
+          v-for="section in workspaceSections"
+          v-show="section.editable || section.workspaces.length"
+          :key="section.key"
+          class="project-section"
+        >
+          <h2 class="section-title">{{ section.title }}</h2>
+          <p class="section-desc">{{ section.description }}</p>
           <div class="project-grid">
             <div
-              v-for="ws in myWorkspaces"
+              v-for="ws in section.workspaces"
               :key="ws.id"
               class="project-card-wrapper"
             >
@@ -104,42 +113,33 @@ onMounted(refreshList)
                   </div>
                 </div>
               </RouterLink>
-              <button class="card-menu-btn" type="button" @click.stop="toggleMenu(ws.id)">⋯</button>
-              <div v-if="menuOpen === ws.id" class="card-menu-dropdown" @click.stop>
+              <button
+                v-if="section.editable"
+                class="card-menu-btn"
+                type="button"
+                @click.stop="toggleMenu(ws.id)"
+              >
+                ⋯
+              </button>
+              <div
+                v-if="section.editable && menuOpen === ws.id"
+                class="card-menu-dropdown"
+                @click.stop
+              >
                 <button class="card-menu-item" type="button" @click="startEdit(ws)">수정</button>
                 <button class="card-menu-item card-menu-item--danger" type="button" @click="removeWorkspace(ws)">삭제</button>
               </div>
             </div>
-            <div class="project-card project-card--new" @click="showCreate = true">
+            <div
+              v-if="section.editable"
+              class="project-card project-card--new"
+              @click="showCreate = true"
+            >
               <div class="new-card-inner">
                 <span class="new-icon">+</span>
                 <span class="new-label">새 프로젝트 추가</span>
               </div>
             </div>
-          </div>
-        </section>
-
-        <!-- 공개 프로젝트 -->
-        <section v-if="openWorkspaces.length" class="project-section">
-          <h2 class="section-title">공개 프로젝트</h2>
-          <p class="section-desc">누구나 참여할 수 있는 오픈 프로젝트</p>
-          <div class="project-grid">
-            <RouterLink
-              v-for="ws in openWorkspaces"
-              :key="ws.id"
-              :to="`/workspaces/${ws.id}/board`"
-              class="project-card"
-            >
-              <div class="card-color-bar" :style="{ background: workspaceColor(ws.id) }" />
-              <div class="card-body">
-                <h3 class="card-name">{{ ws.name }}</h3>
-                <span class="card-badge card-badge--public">공개</span>
-                <div class="card-footer">
-                  <span class="card-members">멤버 {{ ws.members.length }}명</span>
-                  <span class="card-arrow">→</span>
-                </div>
-              </div>
-            </RouterLink>
           </div>
         </section>
       </main>
@@ -150,16 +150,16 @@ onMounted(refreshList)
     </div>
 
     <InboxDrawer :open="showInbox" @close="showInbox = false" />
-    <CreateWorkspaceModal
+    <WorkspaceFormModal
       v-if="showCreate"
       @close="showCreate = false"
-      @created="onCreated"
+      @saved="onSaved"
     />
-    <EditWorkspaceModal
+    <WorkspaceFormModal
       v-if="editing"
       :workspace="editing"
       @close="editing = null"
-      @updated="onUpdated"
+      @saved="onSaved"
     />
   </div>
 </template>

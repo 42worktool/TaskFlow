@@ -1,46 +1,57 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import AppHeader from '../components/AppHeader.vue'
 import InboxDrawer from '../components/InboxDrawer.vue'
-import NotificationMenu from '../components/NotificationMenu.vue'
-import ProfileMenu from '../components/ProfileMenu.vue'
-import SearchInput from '../components/SearchInput.vue'
 import ShareModal from '../components/ShareModal.vue'
-import { myWorkspaces, openWorkspaces, workspaceMembers } from '../mock/data'
+import { WorkspaceAPI } from '../api/workspace'
+import type { Workspace } from '../types'
 
 const route = useRoute()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
-const allWorkspaces = [...myWorkspaces, ...openWorkspaces]
-const workspace = computed(
-  () => allWorkspaces.find((w) => w.id === workspaceId.value) ?? myWorkspaces[0],
-)
+const workspace = ref<Workspace | null>(null)
+const loadError = ref('')
 const isBoardRoute = computed(() => route.path.endsWith('/board'))
 
 const showShareModal = ref(false)
 const showInbox = ref(false)
 
 const memberColors = ['#2563EB', '#10B981', '#7C3AED']
+
+watch(
+  workspaceId,
+  async (id, _previousId, onCleanup) => {
+    workspace.value = null
+    loadError.value = ''
+    if (!id) return
+
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
+
+    try {
+      const loaded = await WorkspaceAPI.get(id)
+      if (!cancelled) workspace.value = loaded
+    } catch (caught) {
+      if (!cancelled) {
+        loadError.value =
+          caught instanceof Error ? caught.message : '워크스페이스를 불러오지 못했습니다.'
+      }
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
-  <div class="app-shell">
+  <div v-if="workspace" class="app-shell">
     <!-- Header -->
-    <header class="app-header">
-      <RouterLink to="/workspaces" class="logo">TaskFlow</RouterLink>
-      <span class="workspace-name">{{ workspace.name }}</span>
-      <div class="header-right">
-        <SearchInput />
-        <div class="header-actions">
-          <NotificationMenu />
-          <button v-if="!isBoardRoute" class="header-btn" type="button" @click="showInbox = true">
-            인박스
-          </button>
-        </div>
-        <div class="profile-slot">
-          <ProfileMenu />
-        </div>
-      </div>
-    </header>
+    <AppHeader
+      :workspace-name="workspace.name"
+      :show-inbox="!isBoardRoute"
+      @open-inbox="showInbox = true"
+    />
 
     <div class="content-area">
       <!-- Sidebar -->
@@ -79,7 +90,7 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
         <div class="sidebar-team">
           <p class="team-label">팀원</p>
           <ul class="team-list">
-            <li v-for="(m, i) in workspaceMembers" :key="m.user_id" class="team-member">
+            <li v-for="(m, i) in workspace.members" :key="m.user_id" class="team-member">
               <div
                 class="team-avatar"
                 :style="{ background: memberColors[i % memberColors.length] }"
@@ -113,6 +124,12 @@ const memberColors = ['#2563EB', '#10B981', '#7C3AED']
       @close="showShareModal = false"
     />
     <InboxDrawer :open="showInbox" @close="showInbox = false" />
+  </div>
+  <div v-else class="app-shell">
+    <AppHeader />
+    <main class="workspace-load-state" :role="loadError ? 'alert' : 'status'">
+      {{ loadError || '워크스페이스를 불러오는 중…' }}
+    </main>
   </div>
 </template>
 
