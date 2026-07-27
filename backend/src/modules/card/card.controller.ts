@@ -9,7 +9,7 @@ import {
   createCardSchema,
   moveCardSchema,
   updateCardSchema,
-} from './card.schemas'
+} from './card.validation'
 
 export const create: RequestHandler = async (req, res) => {
   const data = createCardSchema.parse(req.body)

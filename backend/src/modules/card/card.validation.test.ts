@@ -5,9 +5,9 @@ import {
   cardNeighborSchema,
   commentSchema,
   createCardSchema,
-} from './card.schemas'
+} from './card.validation'
 
-test('card schemas accept valid create, ordering, date, and comment bodies', () => {
+test('card validation accepts valid create, ordering, date, and comment bodies', () => {
   assert.equal(createCardSchema.parse({ title: 'Card' }).title, 'Card')
   assert.equal(
     cardNeighborSchema.parse({ before_card_id: null }).before_card_id,
@@ -20,7 +20,7 @@ test('card schemas accept valid create, ordering, date, and comment bodies', () 
   assert.equal(commentSchema.parse({ comment_str: 'Hello' }).comment_str, 'Hello')
 })
 
-test('card schemas reject empty updates and invalid values', () => {
+test('card validation rejects empty updates and invalid values', () => {
   assert.throws(() => createCardSchema.parse({ title: '' }))
   assert.throws(() => cardNeighborSchema.parse({}))
   assert.throws(() => cardDatesSchema.parse({}))

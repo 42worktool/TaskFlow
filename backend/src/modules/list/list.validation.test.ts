@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { listNameSchema, listReorderSchema } from './list.schemas'
+import { listNameSchema, listReorderSchema } from './list.validation'
 
-test('list schemas enforce names and at least one ordering neighbor', () => {
+test('list validation enforces names and at least one ordering neighbor', () => {
   assert.equal(listNameSchema.parse({ name: 'Todo' }).name, 'Todo')
   assert.throws(() => listNameSchema.parse({ name: '' }))
   assert.equal(

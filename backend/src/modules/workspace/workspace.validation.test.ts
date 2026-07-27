@@ -4,7 +4,7 @@ import {
   createWorkspaceSchema,
   inviteWorkspaceMemberSchema,
   updateWorkspaceSchema,
-} from './workspace.schemas'
+} from './workspace.validation'
 
 test('workspace creation defaults visibility to private', () => {
   assert.deepEqual(createWorkspaceSchema.parse({ name: 'Workspace' }), {
@@ -13,7 +13,7 @@ test('workspace creation defaults visibility to private', () => {
   })
 })
 
-test('workspace schemas enforce partial updates and invitation roles', () => {
+test('workspace validation enforces partial updates and invitation roles', () => {
   assert.throws(() => updateWorkspaceSchema.parse({}))
   assert.equal(updateWorkspaceSchema.parse({ is_public: true }).is_public, true)
   assert.equal(

@@ -5,7 +5,7 @@ import {
   createWorkspaceSchema,
   inviteWorkspaceMemberSchema,
   updateWorkspaceSchema,
-} from './workspace.schemas'
+} from './workspace.validation'
 
 export const list: RequestHandler = async (req, res) => {
   const workspaces = await svc.listWorkspaces({ actorId: req.user!.id })
