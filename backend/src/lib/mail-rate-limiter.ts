@@ -1,4 +1,5 @@
 import { getRedisClient } from './redis';
+import { AppError } from '../errors';
 
 const RATE_LIMIT = 5;
 const WINDOW_SECONDS = 3600;
@@ -7,8 +8,10 @@ function key(email: string): string {
   return `mail:ratelimit:${email}`;
 }
 
-export class MailRateLimitError extends Error {
-  code = 'MAIL_RATE_LIMITED' as const;
+export class MailRateLimitError extends AppError {
+  constructor() {
+    super('MAIL_RATE_LIMITED', 429, 'too many email invitations to this address');
+  }
 }
 
 export async function checkMailRateLimit(email: string): Promise<void> {

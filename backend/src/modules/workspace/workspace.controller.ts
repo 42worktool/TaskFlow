@@ -8,8 +8,9 @@
 import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { config } from '../../config'
+import { sendError } from '../../errors'
 import * as svc from './workspace.service'
-import { checkMailRateLimit, MailRateLimitError } from '../../lib/mail-rate-limiter'
+import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { inviteEmail } from '../../lib/mail-templates'
 import { enqueue } from '../../lib/mail-queue'
 
@@ -49,7 +50,7 @@ export async function list(req: Request, res: Response) {
     const data = await svc.listWorkspaces(req.user!.id)
     res.status(200).json(data)
   } catch (e) {
-    handleError(res, e)
+    sendError(res, e)
   }
 }
 
@@ -60,7 +61,7 @@ export async function create(req: Request, res: Response) {
     const data = await svc.createWorkspace(req.user!.id, body.name, body.is_public)
     res.status(201).json(data)
   } catch (e) {
-    handleError(res, e)
+    sendError(res, e)
   }
 }
 
@@ -70,7 +71,7 @@ export async function getOne(req: Request, res: Response) {
     const data = await svc.getWorkspace(req.user!.id, req.params.workspaceId as string)
     res.status(200).json(data)
   } catch (e) {
-    handleError(res, e)
+    sendError(res, e)
   }
 }
 
@@ -81,7 +82,7 @@ export async function update(req: Request, res: Response) {
     const data = await svc.updateWorkspace(req.user!.id, req.params.workspaceId as string, body)
     res.status(200).json(data)
   } catch (e) {
-    handleError(res, e)
+    sendError(res, e)
   }
 }
 
@@ -91,7 +92,7 @@ export async function remove(req: Request, res: Response) {
     await svc.deleteWorkspace(req.user!.id, req.params.workspaceId as string)
     res.status(200).json({ ok: true })
   } catch (e) {
-    handleError(res, e)
+    sendError(res, e)
   }
 }
 
@@ -115,11 +116,7 @@ export async function inviteMember(req: Request, res: Response) {
 
     res.status(201).json({ ok: true })
   } catch (e) {
-    if (e instanceof MailRateLimitError) {
-      res.status(429).json({ error: 'too many email invitations to this address' })
-      return
-    }
-    handleError(res, e)
+    sendError(res, e)
   }
 }
 
@@ -129,7 +126,7 @@ export async function acceptInvite(req: Request, res: Response) {
     const data = await svc.acceptInvite(req.user!.id, req.params.token as string)
     res.status(200).json(data)
   } catch (e) {
-    handleError(res, e)
+    sendError(res, e)
   }
 }
 
@@ -145,7 +142,7 @@ export async function changeMemberRole(req: Request, res: Response) {
     )
     res.status(200).json(data)
   } catch (e) {
-    handleError(res, e)
+    sendError(res, e)
   }
 }
 
@@ -159,33 +156,6 @@ export async function removeMember(req: Request, res: Response) {
     )
     res.status(200).json({ ok: true })
   } catch (e) {
-    handleError(res, e)
+    sendError(res, e)
   }
-}
-
-// ------------------------------------------------------------
-// Error mapping (service errors → HTTP status)
-// ------------------------------------------------------------
-function handleError(res: Response, e: unknown) {
-  if (e instanceof svc.NotFoundError) {
-    res.status(404).json({ error: 'workspace not found' })
-    return
-  }
-  if (e instanceof svc.ForbiddenError) {
-    res.status(403).json({ error: 'forbidden' })
-    return
-  }
-  if (e instanceof svc.LastOwnerError) {
-    res.status(409).json({ error: 'cannot remove the last owner' })
-    return
-  }
-  if (e instanceof svc.InviteTokenError) {
-    res.status(400).json({ error: 'invalid or expired invite token' })
-    return
-  }
-  if (e instanceof z.ZodError) {
-    res.status(400).json({ error: e.issues[0].message })
-    return
-  }
-  res.status(500).json({ error: 'server error' })
 }

@@ -7,6 +7,8 @@ import { usersRouter } from './modules/users';
 import { workspaceRouter } from './modules/workspace';
 import { calendarRouter } from './modules/calendar';
 import { inboxRouter } from './modules/inbox';
+import { listRouter } from './modules/list';
+import { cardRouter, commentRouter } from './modules/card';
 
 const app = express();
 
@@ -38,5 +40,8 @@ app.use('/api/users', usersRouter);
 app.use('/api/workspaces', workspaceRouter);
 app.use('/api/calendar', calendarRouter);
 app.use('/api/inbox', inboxRouter);
+app.use('/api/lists', listRouter);
+app.use('/api/cards', cardRouter);
+app.use('/api/comments', commentRouter);
 
 export default app;

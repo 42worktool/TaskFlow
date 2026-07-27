@@ -3,6 +3,7 @@ import { Prisma, User } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { config } from '../../config';
+import { AppError } from '../../errors';
 import { prisma } from '../../lib/prisma';
 import { getRedisClient } from '../../lib/redis';
 import {
@@ -45,44 +46,33 @@ interface RefreshSessionRecord {
   createdAt: string;
 }
 
-export class AuthError extends Error {
-  constructor(
-    public readonly code: string,
-    public readonly statusCode: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'AuthError';
-  }
-}
-
 function registrationEmail(value: unknown): string {
   if (typeof value !== 'string') {
-    throw new AuthError('INVALID_EMAIL', 400, 'A valid email address is required');
+    throw new AppError('INVALID_EMAIL', 400, 'A valid email address is required');
   }
 
   const email = normalizeEmail(value);
   if (!isValidEmail(email)) {
-    throw new AuthError('INVALID_EMAIL', 400, 'A valid email address is required');
+    throw new AppError('INVALID_EMAIL', 400, 'A valid email address is required');
   }
   return email;
 }
 
 function registrationName(value: unknown): string {
   if (typeof value !== 'string') {
-    throw new AuthError('INVALID_NAME', 400, 'Name is required');
+    throw new AppError('INVALID_NAME', 400, 'Name is required');
   }
 
   const name = value.trim();
   if (name.length < 2 || name.length > 80) {
-    throw new AuthError('INVALID_NAME', 400, 'Name must be between 2 and 80 characters');
+    throw new AppError('INVALID_NAME', 400, 'Name must be between 2 and 80 characters');
   }
   return name;
 }
 
 function registrationPassword(value: unknown): string {
   if (typeof value !== 'string' || value.length < 8 || value.length > 128) {
-    throw new AuthError(
+    throw new AppError(
       'INVALID_PASSWORD',
       400,
       'Password must be between 8 and 128 characters',
@@ -100,7 +90,7 @@ async function assertLoginAllowed(key: string): Promise<void> {
   const redis = await getRedisClient();
   const attempts = Number(await redis.get(key)) || 0;
   if (attempts >= LOGIN_ATTEMPT_LIMIT) {
-    throw new AuthError(
+    throw new AppError(
       'LOGIN_RATE_LIMITED',
       429,
       'Too many failed login attempts. Try again later.',
@@ -128,7 +118,7 @@ export async function registerWithPassword(input: {
     select: { id: true },
   });
   if (existingUser) {
-    throw new AuthError('EMAIL_ALREADY_REGISTERED', 409, 'This email is already registered');
+    throw new AppError('EMAIL_ALREADY_REGISTERED', 409, 'This email is already registered');
   }
 
   const passwordHash = await hashPassword(password);
@@ -143,7 +133,7 @@ export async function registerWithPassword(input: {
     return publicUser(user);
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new AuthError('EMAIL_ALREADY_REGISTERED', 409, 'This email is already registered');
+      throw new AppError('EMAIL_ALREADY_REGISTERED', 409, 'This email is already registered');
     }
     throw error;
   }
@@ -169,7 +159,7 @@ export async function authenticateWithPassword(input: {
 
   if (!user || !passwordMatches) {
     await recordFailedLogin(attemptKey);
-    throw new AuthError('INVALID_CREDENTIALS', 401, 'Email or password is incorrect');
+    throw new AppError('INVALID_CREDENTIALS', 401, 'Email or password is incorrect');
   }
 
   const redis = await getRedisClient();
@@ -251,19 +241,19 @@ async function consumeOAuthState(
   cookieState: string | undefined,
 ): Promise<OAuthStateRecord> {
   if (!safeEqual(queryState, cookieState)) {
-    throw new AuthError('INVALID_OAUTH_STATE', 401, 'OAuth state did not match');
+    throw new AppError('INVALID_OAUTH_STATE', 401, 'OAuth state did not match');
   }
 
   const redis = await getRedisClient();
   const raw = await redis.getDel(stateKey(queryState));
   if (!raw) {
-    throw new AuthError('EXPIRED_OAUTH_STATE', 401, 'OAuth state expired or was already used');
+    throw new AppError('EXPIRED_OAUTH_STATE', 401, 'OAuth state expired or was already used');
   }
 
   try {
     return JSON.parse(raw) as OAuthStateRecord;
   } catch {
-    throw new AuthError('INVALID_OAUTH_STATE', 401, 'Stored OAuth state was invalid');
+    throw new AppError('INVALID_OAUTH_STATE', 401, 'Stored OAuth state was invalid');
   }
 }
 
@@ -293,7 +283,7 @@ async function findOrCreateGoogleUser(payload: {
 
     if (existingUser) {
       if (!config.autoLinkVerifiedEmail) {
-        throw new AuthError(
+        throw new AppError(
           'ACCOUNT_LINK_REQUIRED',
           409,
           'An account already exists for this email. Sign in with the existing method first.',
@@ -336,7 +326,7 @@ export async function completeGoogleOAuth(input: {
   const tokenResponse = await googleClient.getToken(input.code);
   const idToken = tokenResponse.tokens.id_token;
   if (!idToken) {
-    throw new AuthError('MISSING_ID_TOKEN', 401, 'Google did not return an ID token');
+    throw new AppError('MISSING_ID_TOKEN', 401, 'Google did not return an ID token');
   }
 
   const ticket = await googleClient.verifyIdToken({
@@ -346,14 +336,14 @@ export async function completeGoogleOAuth(input: {
   const payload = ticket.getPayload();
 
   if (!payload?.sub || !payload.email || payload.email_verified !== true) {
-    throw new AuthError(
+    throw new AppError(
       'INVALID_GOOGLE_IDENTITY',
       401,
       'Google account identity was incomplete or unverified',
     );
   }
   if (!safeEqual(payload.nonce, stateRecord.nonce)) {
-    throw new AuthError('INVALID_OAUTH_NONCE', 401, 'OAuth nonce did not match');
+    throw new AppError('INVALID_OAUTH_NONCE', 401, 'OAuth nonce did not match');
   }
 
   const user = await findOrCreateGoogleUser({
@@ -396,19 +386,19 @@ export async function rotateSession(refreshToken: string): Promise<{
   const oldSessionKey = refreshKey(refreshToken);
   const raw = await redis.getDel(oldSessionKey);
   if (!raw) {
-    throw new AuthError('INVALID_REFRESH_TOKEN', 401, 'Refresh token is invalid or expired');
+    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh token is invalid or expired');
   }
 
   let session: RefreshSessionRecord;
   try {
     session = JSON.parse(raw) as RefreshSessionRecord;
   } catch {
-    throw new AuthError('INVALID_REFRESH_TOKEN', 401, 'Refresh session was invalid');
+    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh session was invalid');
   }
 
   const user = await prisma.user.findUnique({ where: { id: session.userId } });
   if (!user) {
-    throw new AuthError('INVALID_REFRESH_TOKEN', 401, 'Refresh session user no longer exists');
+    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh session user no longer exists');
   }
 
   await redis.sRem(userSessionsKey(user.id), oldSessionKey);
@@ -431,18 +421,18 @@ export async function revokeSession(refreshToken: string): Promise<void> {
 
 export async function getCurrentUser(userId: string): Promise<UserPublic> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new AuthError('USER_NOT_FOUND', 404, 'User no longer exists');
+  if (!user) throw new AppError('USER_NOT_FOUND', 404, 'User no longer exists');
   return publicUser(user);
 }
 
 export async function updateCurrentUser(userId: string, nameValue: unknown): Promise<UserPublic> {
   if (typeof nameValue !== 'string') {
-    throw new AuthError('INVALID_NAME', 400, 'Name is required');
+    throw new AppError('INVALID_NAME', 400, 'Name is required');
   }
 
   const name = nameValue.trim();
   if (name.length < 2 || name.length > 80) {
-    throw new AuthError('INVALID_NAME', 400, 'Name must be between 2 and 80 characters');
+    throw new AppError('INVALID_NAME', 400, 'Name must be between 2 and 80 characters');
   }
 
   const user = await prisma.user.update({
