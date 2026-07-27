@@ -46,21 +46,4 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
-.accept-invite {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  font-size: 1.125rem;
-}
-.error {
-  color: #ef4444;
-  margin-bottom: 1rem;
-}
-.home-link {
-  color: #2563eb;
-  text-decoration: underline;
-}
-</style>
+<style scoped src="../styles/accept-invite.css"></style>

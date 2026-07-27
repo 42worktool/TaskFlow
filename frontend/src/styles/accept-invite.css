@@ -1,0 +1,13 @@
+@reference "tailwindcss";
+
+.accept-invite {
+  @apply flex min-h-screen flex-col items-center justify-center text-lg;
+}
+
+.error {
+  @apply mb-4 text-red-500;
+}
+
+.home-link {
+  @apply text-blue-600 underline;
+}

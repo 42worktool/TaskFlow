@@ -35,29 +35,4 @@ const model = defineModel<string>({ required: true })
   />
 </template>
 
-<style scoped>
-.form-input {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #111827;
-  background: #f9fafb;
-}
-
-.form-input::placeholder {
-  color: #9ca3af;
-}
-
-.form-input:focus {
-  border-color: #2563eb;
-  background: #fff;
-  outline: none;
-}
-
-.form-input:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-}
-</style>
+<style scoped src="../styles/auth-input.css"></style>

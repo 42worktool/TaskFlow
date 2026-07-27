@@ -13,9 +13,11 @@ test('inviteEmail returns correct structure with no to field', () => {
   assert.ok(!('to' in result));
 });
 
-test('inviteEmail escapes HTML-safe workspace names', () => {
-  const result = inviteEmail('<script>alert("xss")</script>', '/invite/token');
+test('inviteEmail escapes unsafe HTML values', () => {
+  const result = inviteEmail('<script>alert("xss")</script>', '"/invite/token?x=1&y=2');
 
   assert.ok(result.subject.includes('<script>'));
-  assert.ok(result.html.includes('<script>'));
+  assert.ok(!result.html.includes('<script>'));
+  assert.ok(result.html.includes('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'));
+  assert.ok(result.html.includes('&quot;/invite/token?x=1&amp;y=2'));
 });
