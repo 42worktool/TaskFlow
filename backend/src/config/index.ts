@@ -1,6 +1,10 @@
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 const DEFAULT_OAUTH_STATE_TTL_SECONDS = 10 * 60;
+const DEFAULT_WS_AUTH_TIMEOUT_MS = 10_000;
+const DEFAULT_WS_HEARTBEAT_INTERVAL_MS = 30_000;
+const DEFAULT_WS_MAX_PAYLOAD_BYTES = 64 * 1024;
+const DEFAULT_WS_MAX_MESSAGES_PER_MINUTE = 120;
 
 export const DEV_USER_ID = '00000000-0000-4000-8000-000000000001';
 
@@ -87,5 +91,18 @@ export const config = {
     user: required('SMTP_USER'),
     pass: required('SMTP_PASS'),
     from: required('SMTP_FROM'),
+  },
+  websocket: {
+    path: '/ws',
+    authTimeoutMs: positiveInteger('WS_AUTH_TIMEOUT_MS', DEFAULT_WS_AUTH_TIMEOUT_MS),
+    heartbeatIntervalMs: positiveInteger(
+      'WS_HEARTBEAT_INTERVAL_MS',
+      DEFAULT_WS_HEARTBEAT_INTERVAL_MS,
+    ),
+    maxPayloadBytes: positiveInteger('WS_MAX_PAYLOAD_BYTES', DEFAULT_WS_MAX_PAYLOAD_BYTES),
+    maxMessagesPerMinute: positiveInteger(
+      'WS_MAX_MESSAGES_PER_MINUTE',
+      DEFAULT_WS_MAX_MESSAGES_PER_MINUTE,
+    ),
   },
 } as const;

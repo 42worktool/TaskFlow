@@ -106,6 +106,12 @@ export async function initializeAuth(): Promise<void> {
   }
 }
 
+export async function getAccessToken(forceRefresh = false): Promise<string | null> {
+  await initializeAuth()
+  if (forceRefresh && !(await requestRefresh())) return null
+  return authState.accessToken
+}
+
 export function startGoogleLogin(returnTo = '/workspaces'): void {
   const url = new URL('/api/auth/oauth/google', window.location.origin)
   url.searchParams.set('return_to', returnTo)

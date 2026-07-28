@@ -28,6 +28,7 @@
     "src/modules/inbox/**/*.ts",
     "src/modules/list/**/*.ts",
     "src/modules/card/**/*.ts",
+    "src/realtime/**/*.ts",
     "src/types/**/*.d.ts",
     "prisma/seed.ts"
   ],
