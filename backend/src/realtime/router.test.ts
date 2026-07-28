@@ -66,6 +66,28 @@ describe('RealtimeRouter', () => {
     );
   });
 
+  it('does not let a stale unsubscribe remove a newer registration', async () => {
+    const router = new RealtimeRouter();
+    const unregisterFirst = router.register(
+      'example.replaceable',
+      z.object({}),
+      () => 'first',
+    );
+    unregisterFirst();
+    router.register(
+      'example.replaceable',
+      z.object({}),
+      () => 'second',
+    );
+
+    unregisterFirst();
+
+    assert.equal(
+      await router.dispatch('example.replaceable', {}, context),
+      'second',
+    );
+  });
+
   it('requires namespaced event names at registration time', () => {
     const router = new RealtimeRouter();
 

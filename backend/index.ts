@@ -16,19 +16,40 @@ server.listen(config.port, () => {
 
 let shuttingDown = false;
 
+function closeHttpServer(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
 async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`Received ${signal}, shutting down`);
 
-  server.close();
-  await Promise.allSettled([
+  const drainingResults = await Promise.allSettled([
+    closeHttpServer(),
     realtime.close(),
     stopMailWorker(),
+  ]);
+  for (const result of drainingResults) {
+    if (result.status === 'rejected') {
+      console.error('Failed to drain a backend service during shutdown', result.reason);
+    }
+  }
+
+  const dependencyResults = await Promise.allSettled([
     prisma.$disconnect(),
     closeRedis(),
   ]);
-  server.closeAllConnections();
+  for (const result of dependencyResults) {
+    if (result.status === 'rejected') {
+      console.error('Failed to close a backend dependency during shutdown', result.reason);
+    }
+  }
   process.exit(0);
 }
 

@@ -1,15 +1,25 @@
 import { z } from 'zod';
 import { config } from '../config';
-import { verifyAccessToken } from '../modules/auth/auth.service';
+import { verifyAccessTokenPrincipal } from '../modules/auth/auth.service';
 import { RealtimeServer } from './server';
 
+export { RealtimeServer };
 export { RealtimeError } from './router';
 export type { RealtimeHandlerContext } from './router';
+export { REALTIME_CLOSE_CODE, REALTIME_PROTOCOL_VERSION } from './protocol';
+export type { RealtimeAuthRefreshResult, RealtimeReadyData } from './protocol';
+export type {
+  PublishOptions,
+  RealtimeConnectionDisconnectedInfo,
+  RealtimeConnectionInfo,
+  RealtimeConnectionLifecycleListener,
+  RealtimeServerOptions,
+} from './server';
 
 export const realtime = new RealtimeServer({
   ...config.websocket,
   allowedOrigin: config.appOrigin,
-  authenticateAccessToken: verifyAccessToken,
+  authenticateAccessToken: verifyAccessTokenPrincipal,
 });
 
 realtime.register(

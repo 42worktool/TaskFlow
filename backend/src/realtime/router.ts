@@ -42,9 +42,12 @@ export class RealtimeRouter {
       throw new Error(`A realtime handler is already registered for "${event}"`);
     }
 
-    this.handlers.set(event, { schema, handle: handler } as RegisteredHandler);
+    const registeredHandler = { schema, handle: handler } as RegisteredHandler;
+    this.handlers.set(event, registeredHandler);
     return () => {
-      this.handlers.delete(event);
+      if (this.handlers.get(event) === registeredHandler) {
+        this.handlers.delete(event);
+      }
     };
   }
 

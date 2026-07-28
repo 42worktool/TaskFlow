@@ -36,6 +36,11 @@ export interface UserPublic {
   created_at: string;
 }
 
+export interface AccessTokenPrincipal {
+  userId: string;
+  expiresAt: number;
+}
+
 interface OAuthStateRecord {
   nonce: string;
   returnTo: string;
@@ -199,7 +204,7 @@ function signAccessToken(userId: string): string {
   });
 }
 
-export function verifyAccessToken(token: string): string {
+export function verifyAccessTokenPrincipal(token: string): AccessTokenPrincipal {
   const payload = jwt.verify(token, config.jwtAccessSecret, {
     algorithms: ['HS256'],
     issuer: config.jwtIssuer,
@@ -207,7 +212,17 @@ export function verifyAccessToken(token: string): string {
   }) as JwtPayload;
 
   if (!payload.sub) throw new Error('Access token subject is missing');
-  return payload.sub;
+  if (typeof payload.exp !== 'number') {
+    throw new Error('Access token expiration is missing');
+  }
+  return {
+    userId: payload.sub,
+    expiresAt: payload.exp * 1_000,
+  };
+}
+
+export function verifyAccessToken(token: string): string {
+  return verifyAccessTokenPrincipal(token).userId;
 }
 
 export async function beginGoogleOAuth(returnToValue: unknown): Promise<{
