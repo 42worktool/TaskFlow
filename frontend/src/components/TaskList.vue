@@ -4,9 +4,17 @@ import draggable from 'vuedraggable'
 import TaskCard from './TaskCard.vue'
 import type { Card, DraggableChange, ListWithCards } from '../types'
 
-const props = defineProps<{
-  list: ListWithCards
-}>()
+const props = withDefaults(
+  defineProps<{
+    list: ListWithCards
+    canEdit?: boolean
+    canOpenDetails?: boolean
+  }>(),
+  {
+    canEdit: false,
+    canOpenDetails: false,
+  },
+)
 
 const emit = defineEmits<{
   'card-change': [listId: string, event: DraggableChange]
@@ -29,6 +37,7 @@ const showAddCard = ref(false)
 const newCardTitle = ref('')
 
 function submitAddCard() {
+  if (!props.canEdit) return
   const title = newCardTitle.value.trim()
   showAddCard.value = false
   if (!title) return
@@ -45,7 +54,7 @@ const renaming = ref(false)
 const renameValue = ref(props.list.name)
 
 function submitRename() {
-  if (!renaming.value) return
+  if (!props.canEdit || !renaming.value) return
   const name = renameValue.value.trim()
   renaming.value = false
   if (!name || name === props.list.name) {
@@ -60,13 +69,17 @@ function cancelRename() {
   renaming.value = false
 }
 
+function startRename() {
+  if (props.canEdit) renaming.value = true
+}
+
 const vFocus = {
   mounted: (el: HTMLInputElement) => el.focus(),
 }
 </script>
 
 <template>
-  <section class="task-list">
+  <section class="task-list" :class="{ 'task-list--readonly': !canEdit }">
     <div class="list-header">
       <input
         v-if="renaming"
@@ -78,12 +91,18 @@ const vFocus = {
         @blur="submitRename"
         v-focus
       />
-      <span v-else class="list-name" @click="renaming = true">{{ list.name }}</span>
+      <span v-else class="list-name" @click="startRename">{{ list.name }}</span>
       <div class="list-header-actions">
         <span class="list-count" :style="{ background: badgeColors[list.name] ?? '#6b7280' }">
           {{ list.cards.length }}
         </span>
-        <button class="list-delete-btn" type="button" aria-label="리스트 삭제" @click="emit('delete-list', list.id)">
+        <button
+          v-if="canEdit"
+          class="list-delete-btn"
+          type="button"
+          aria-label="리스트 삭제"
+          @click="emit('delete-list', list.id)"
+        >
           ×
         </button>
       </div>
@@ -93,6 +112,7 @@ const vFocus = {
       v-model="list.cards"
       item-key="id"
       group="board-cards"
+      :disabled="!canEdit"
       class="card-list"
       ghost-class="card-ghost"
       @change="(e: DraggableChange) => emit('card-change', list.id, e)"
@@ -100,7 +120,9 @@ const vFocus = {
       <template #item="{ element: card }">
         <TaskCard
           :card="card"
-          show-inbox-action
+          :openable="canOpenDetails"
+          :show-delete-action="canEdit"
+          :show-inbox-action="canEdit"
           @open="emit('open-card', card)"
           @delete="emit('delete-card', card.id)"
           @move-to-inbox="emit('move-card-to-inbox', card.id)"
@@ -108,7 +130,11 @@ const vFocus = {
       </template>
     </draggable>
 
-    <form v-if="showAddCard" class="add-card-form" @submit.prevent="submitAddCard">
+    <form
+      v-if="canEdit && showAddCard"
+      class="add-card-form"
+      @submit.prevent="submitAddCard"
+    >
       <input
         v-model="newCardTitle"
         type="text"
@@ -120,7 +146,12 @@ const vFocus = {
       />
       <button type="submit" class="add-card-submit-btn">추가</button>
     </form>
-    <button v-else class="add-card-btn" type="button" @click="showAddCard = true">
+    <button
+      v-else-if="canEdit"
+      class="add-card-btn"
+      type="button"
+      @click="showAddCard = true"
+    >
       + 카드 추가
     </button>
   </section>

@@ -67,8 +67,8 @@ async function handleRemoveMember(userId: string) {
     <div class="modal">
       <div class="modal-header">
         <div>
-          <h2 class="modal-title">팀원 초대</h2>
-          <p class="modal-subtitle">{{ workspaceName }} · 공유 설정</p>
+          <h2 class="modal-title">팀원 관리</h2>
+          <p class="modal-subtitle">{{ workspaceName }} · 초대 및 구성원</p>
         </div>
         <button class="close-btn" @click="$emit('close')">✕</button>
       </div>

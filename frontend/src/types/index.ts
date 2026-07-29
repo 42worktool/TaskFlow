@@ -1,10 +1,10 @@
 type UUID = string
 type ISODateString = string
-type Role = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'
+export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'
 
 export interface WorkspaceMember {
   user_id: UUID
-  role: Role
+  role: WorkspaceRole
   user: {
     id: UUID
     name: string

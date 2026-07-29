@@ -24,10 +24,14 @@
   color: #111827;
   font-weight: 500;
   text-align: left;
+}
+
+.card-title--openable {
   cursor: pointer;
 }
 
-.card-title:hover {
+.card-title--openable:hover,
+.card-title--openable:focus-visible {
   color: #2563eb;
 }
 

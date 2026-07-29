@@ -6,8 +6,13 @@ import InboxDrawer from '../components/InboxDrawer.vue'
 import LegalFooter from '../components/LegalFooter.vue'
 import WorkspaceFormModal from '../components/WorkspaceFormModal.vue'
 import { WorkspaceAPI } from '../api/workspace'
+import { authState } from '../services/auth'
 import { workspaceColor } from '../types'
 import type { Workspace } from '../types'
+import {
+  hasWorkspaceRole,
+  workspaceRoleFor,
+} from '../utils/workspacePermissions'
 
 const showInbox = ref(false)
 const showCreate = ref(false)
@@ -54,12 +59,29 @@ function toggleMenu(wsId: string) {
   menuOpen.value = menuOpen.value === wsId ? null : wsId
 }
 
+function canEditWorkspace(ws: Workspace): boolean {
+  return hasWorkspaceRole(
+    workspaceRoleFor(ws, authState.user?.id),
+    'ADMIN',
+  )
+}
+
+function canDeleteWorkspace(ws: Workspace): boolean {
+  return workspaceRoleFor(ws, authState.user?.id) === 'OWNER'
+}
+
+function hasWorkspaceMenu(ws: Workspace): boolean {
+  return canEditWorkspace(ws) || canDeleteWorkspace(ws)
+}
+
 function startEdit(ws: Workspace) {
+  if (!canEditWorkspace(ws)) return
   menuOpen.value = null
   editing.value = ws
 }
 
 async function removeWorkspace(ws: Workspace) {
+  if (!canDeleteWorkspace(ws)) return
   menuOpen.value = null
   if (!confirm(`"${ws.name}" 프로젝트를 삭제하시겠습니까?`)) return
   try {
@@ -114,7 +136,7 @@ onMounted(refreshList)
                 </div>
               </RouterLink>
               <button
-                v-if="section.editable"
+                v-if="hasWorkspaceMenu(ws)"
                 class="card-menu-btn"
                 type="button"
                 @click.stop="toggleMenu(ws.id)"
@@ -122,12 +144,26 @@ onMounted(refreshList)
                 ⋯
               </button>
               <div
-                v-if="section.editable && menuOpen === ws.id"
+                v-if="hasWorkspaceMenu(ws) && menuOpen === ws.id"
                 class="card-menu-dropdown"
                 @click.stop
               >
-                <button class="card-menu-item" type="button" @click="startEdit(ws)">수정</button>
-                <button class="card-menu-item card-menu-item--danger" type="button" @click="removeWorkspace(ws)">삭제</button>
+                <button
+                  v-if="canEditWorkspace(ws)"
+                  class="card-menu-item"
+                  type="button"
+                  @click="startEdit(ws)"
+                >
+                  수정
+                </button>
+                <button
+                  v-if="canDeleteWorkspace(ws)"
+                  class="card-menu-item card-menu-item--danger"
+                  type="button"
+                  @click="removeWorkspace(ws)"
+                >
+                  삭제
+                </button>
               </div>
             </div>
             <div

@@ -8,7 +8,10 @@ import {
   toIsoDate,
 } from '../utils/cardDates'
 
-const props = defineProps<{ cardId: string }>()
+const props = defineProps<{
+  cardId: string
+  editable: boolean
+}>()
 const emit = defineEmits<{
   close: []
   saved: [card: Card]
@@ -82,7 +85,7 @@ async function reloadAfterFailedSave(
 }
 
 async function submit(): Promise<void> {
-  if (saving.value) return
+  if (!props.editable || saving.value) return
   const cardId = props.cardId
   const trimmedTitle = title.value.trim()
   const nextDescription = description.value
@@ -189,8 +192,9 @@ onUnmounted(() => {
               v-model="title"
               type="text"
               maxlength="200"
+              :readonly="!editable"
               :disabled="saving"
-              autofocus
+              :autofocus="editable"
             />
           </label>
 
@@ -200,6 +204,7 @@ onUnmounted(() => {
               v-model="description"
               rows="5"
               maxlength="5000"
+              :readonly="!editable"
               :disabled="saving"
               placeholder="카드에 필요한 내용을 기록하세요."
             />
@@ -212,7 +217,7 @@ onUnmounted(() => {
                 v-model="startDate"
                 type="date"
                 :max="deadline || undefined"
-                :disabled="saving"
+                :disabled="saving || !editable"
               />
             </label>
             <label class="card-detail-field">
@@ -221,7 +226,7 @@ onUnmounted(() => {
                 v-model="deadline"
                 type="date"
                 :min="startDate || undefined"
-                :disabled="saving"
+                :disabled="saving || !editable"
               />
             </label>
           </div>
@@ -264,9 +269,10 @@ onUnmounted(() => {
               :disabled="saving"
               @click="close"
             >
-              취소
+              {{ editable ? '취소' : '닫기' }}
             </button>
             <button
+              v-if="editable"
               type="submit"
               class="card-detail-btn card-detail-btn--primary"
               :disabled="saving || !title.trim()"

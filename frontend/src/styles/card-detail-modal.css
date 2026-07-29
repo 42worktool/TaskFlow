@@ -52,6 +52,13 @@
   border-color: #2563eb;
 }
 
+.card-detail-field input:read-only,
+.card-detail-field textarea:read-only,
+.card-detail-field input:disabled {
+  background: #f9fafb;
+  color: #4b5563;
+}
+
 .card-detail-dates {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

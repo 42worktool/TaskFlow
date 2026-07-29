@@ -118,6 +118,11 @@
   cursor: pointer;
 }
 
-.cal-card:hover {
+.cal-card:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.cal-card:not(:disabled):hover {
   background: #dbeafe;
 }

@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import type { Card } from '../types'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     card: Card
+    openable?: boolean
+    showDeleteAction?: boolean
     showInboxAction?: boolean
   }>(),
   {
+    openable: true,
+    showDeleteAction: true,
     showInboxAction: false,
   },
 )
@@ -22,6 +26,10 @@ function formatDate(iso: string | null) {
   const d = new Date(iso)
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
+
+function openCard() {
+  if (props.openable) emit('open', props.card)
+}
 </script>
 
 <template>
@@ -29,15 +37,17 @@ function formatDate(iso: string | null) {
     <div class="card-title-row">
       <span
         class="card-title"
-        role="button"
-        tabindex="0"
-        @click.stop="emit('open', card)"
-        @keydown.enter.stop="emit('open', card)"
-        @keydown.space.prevent.stop="emit('open', card)"
+        :class="{ 'card-title--openable': openable }"
+        :role="openable ? 'button' : undefined"
+        :tabindex="openable ? 0 : undefined"
+        @click.stop="openCard"
+        @keydown.enter.stop="openCard"
+        @keydown.space.prevent.stop="openCard"
       >
         {{ card.title }}
       </span>
       <button
+        v-if="showDeleteAction"
         class="card-delete-btn"
         type="button"
         aria-label="카드 삭제"
