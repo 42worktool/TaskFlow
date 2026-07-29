@@ -14,9 +14,12 @@ import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit
 import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
+import { normalizeEmail } from '../auth/auth.utils'
 import { toWorkspaceDto, workspaceInclude } from './workspace.dto'
 
 const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
+const WORKSPACE_INVITE_AUDIENCE = 'workspace-invite'
+const INVITE_ROLES = new Set<Role>(['ADMIN', 'MEMBER', 'VIEWER'])
 
 interface InvitePayload {
   workspace_id: string
@@ -36,6 +39,16 @@ class LastOwnerError extends AppError {
 class InviteTokenError extends AppError {
   constructor() {
     super('INVITE_TOKEN_INVALID', 400, 'invalid or expired invite token')
+  }
+}
+
+class InviteEmailMismatchError extends AppError {
+  constructor() {
+    super(
+      'INVITE_EMAIL_MISMATCH',
+      403,
+      'this invitation was sent to another email address',
+    )
   }
 }
 
@@ -315,10 +328,47 @@ export async function removeMember(input: {
 /**
  * Generate a signed invite token. The caller sends this link by email.
  */
-function generateInviteToken(workspaceId: string, role: Role, email: string): string {
-  return jwt.sign({ workspace_id: workspaceId, role, email }, config.jwtAccessSecret, {
-    expiresIn: INVITE_TTL_SECONDS,
-  })
+export function generateInviteToken(
+  workspaceId: string,
+  role: Exclude<Role, 'OWNER'>,
+  email: string,
+): string {
+  return jwt.sign(
+    { workspace_id: workspaceId, role, email },
+    config.jwtAccessSecret,
+    {
+      algorithm: 'HS256',
+      issuer: config.jwtIssuer,
+      audience: WORKSPACE_INVITE_AUDIENCE,
+      expiresIn: INVITE_TTL_SECONDS,
+    },
+  )
+}
+
+function verifyInviteToken(token: string): InvitePayload {
+  try {
+    const payload = jwt.verify(token, config.jwtAccessSecret, {
+      algorithms: ['HS256'],
+      issuer: config.jwtIssuer,
+      audience: WORKSPACE_INVITE_AUDIENCE,
+    })
+    if (
+      typeof payload !== 'object' ||
+      typeof payload.workspace_id !== 'string' ||
+      typeof payload.email !== 'string' ||
+      !INVITE_ROLES.has(payload.role as Role)
+    ) {
+      throw new InviteTokenError()
+    }
+    return {
+      workspace_id: payload.workspace_id,
+      role: payload.role as Role,
+      email: normalizeEmail(payload.email),
+    }
+  } catch (error) {
+    if (error instanceof InviteTokenError) throw error
+    throw new InviteTokenError()
+  }
 }
 
 export async function inviteWorkspaceMember(input: {
@@ -327,6 +377,7 @@ export async function inviteWorkspaceMember(input: {
   email: string
   role: Exclude<Role, 'OWNER'>
 }): Promise<void> {
+  const email = normalizeEmail(input.email)
   const workspace = await getWorkspace({
     userId: input.userId,
     workspaceId: input.workspaceId,
@@ -336,13 +387,13 @@ export async function inviteWorkspaceMember(input: {
   const token = generateInviteToken(
     input.workspaceId,
     input.role,
-    input.email,
+    email,
   )
   const inviteUrl = `${config.appOrigin}/invite/${token}`
 
-  await checkMailRateLimit(input.email)
+  await checkMailRateLimit(email)
   await enqueue({
-    to: input.email,
+    to: email,
     ...inviteEmail(workspace.name, inviteUrl),
   })
 }
@@ -352,11 +403,13 @@ export async function inviteWorkspaceMember(input: {
  * Returns the workspace DTO on success.
  */
 export async function acceptInvite(input: { userId: string; token: string }) {
-  let payload: InvitePayload
-  try {
-    payload = jwt.verify(input.token, config.jwtAccessSecret) as InvitePayload
-  } catch {
-    throw new InviteTokenError()
+  const payload = verifyInviteToken(input.token)
+  const invitee = await prisma.user.findFirst({
+    where: { id: input.userId, deleted_at: null },
+    select: { email: true },
+  })
+  if (!invitee || normalizeEmail(invitee.email) !== payload.email) {
+    throw new InviteEmailMismatchError()
   }
 
   const ws = await prisma.workspace.findFirst({
