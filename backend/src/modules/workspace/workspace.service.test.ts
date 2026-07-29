@@ -74,6 +74,66 @@ function workspace() {
   }
 }
 
+test('public workspace reads hide member email addresses', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { getWorkspace, listWorkspaces }] = await Promise.all([
+    import('../../db'),
+    import('./workspace.service'),
+  ])
+  const publicWorkspace = { ...workspace(), is_public: true }
+
+  await t.test('separates member and public list projections', async (t) => {
+    stubMethod(t, prisma.workspace, 'findMany', async () => [publicWorkspace])
+
+    const result = await listWorkspaces({ userId: USER_ID })
+
+    assert.equal(
+      result.my[0]?.members[0]?.user.email,
+      'owner@example.com',
+    )
+    assert.equal(
+      'email' in (result.public[0]?.members[0]?.user ?? {}),
+      false,
+    )
+  })
+
+  await t.test('sanitizes a public detail response for a nonmember', async (t) => {
+    stubMethod(t, prisma.workspace, 'findFirst', async () => publicWorkspace)
+
+    const result = await getWorkspace({
+      userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
+    })
+
+    assert.equal('email' in (result.members[0]?.user ?? {}), false)
+  })
+
+  await t.test('keeps email in a member detail response', async (t) => {
+    const memberWorkspace = {
+      ...publicWorkspace,
+      members: publicWorkspace.members.map((member) => ({
+        ...member,
+        user_id: USER_ID,
+        user: {
+          ...member.user,
+          id: USER_ID,
+        },
+      })),
+    }
+    stubMethod(t, prisma.workspace, 'findFirst', async () => memberWorkspace)
+
+    const result = await getWorkspace({
+      userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
+    })
+
+    assert.equal(
+      result.members[0]?.user.email,
+      'owner@example.com',
+    )
+  })
+})
+
 test('workspace invitation acceptance is bound to the invited email', async (t) => {
   setRequiredEnvironment()
   const [

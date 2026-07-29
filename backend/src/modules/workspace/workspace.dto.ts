@@ -22,7 +22,10 @@ type WorkspaceWithMembers = Workspace & {
   })[]
 }
 
-export function toWorkspaceDto(workspace: WorkspaceWithMembers) {
+export function toWorkspaceDto(
+  workspace: WorkspaceWithMembers,
+  options: { includeMemberEmail: boolean },
+) {
   return {
     id: workspace.id,
     name: workspace.name,
@@ -35,7 +38,7 @@ export function toWorkspaceDto(workspace: WorkspaceWithMembers) {
       user: {
         id: member.user.id,
         name: member.user.name,
-        email: member.user.email,
+        ...(options.includeMemberEmail ? { email: member.user.email } : {}),
         profile_image_url: member.user.profile_image_url,
       },
     })),

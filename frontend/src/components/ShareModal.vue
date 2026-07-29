@@ -115,7 +115,7 @@ async function handleRemoveMember(userId: string) {
             </div>
             <div class="member-info">
               <p class="member-name">{{ m.user.name }}</p>
-              <p class="member-email">{{ m.user.email }}</p>
+              <p v-if="m.user.email" class="member-email">{{ m.user.email }}</p>
             </div>
             <div class="member-actions">
               <span class="role-badge">{{ roleLabels[m.role] }}</span>

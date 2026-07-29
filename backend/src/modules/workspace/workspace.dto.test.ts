@@ -41,12 +41,21 @@ test('workspace DTO serializes dates and nested member identities', () => {
     })[]
   }
 
-  const dto = toWorkspaceDto(workspace)
+  const dto = toWorkspaceDto(workspace, { includeMemberEmail: true })
   assert.equal(dto.created_at, timestamp.toISOString())
   assert.deepEqual(dto.members[0]?.user, {
     id: 'user-id',
     name: 'User',
     email: 'user@example.com',
+    profile_image_url: null,
+  })
+
+  const publicDto = toWorkspaceDto(workspace, {
+    includeMemberEmail: false,
+  })
+  assert.deepEqual(publicDto.members[0]?.user, {
+    id: 'user-id',
+    name: 'User',
     profile_image_url: null,
   })
 })

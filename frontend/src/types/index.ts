@@ -8,7 +8,7 @@ export interface WorkspaceMember {
   user: {
     id: UUID
     name: string
-    email: string
+    email?: string
     profile_image_url: string | null
   }
 }
