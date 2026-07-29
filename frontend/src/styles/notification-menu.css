@@ -80,12 +80,20 @@
   overflow-y: auto;
 }
 
+.notification-empty {
+  padding: 28px 14px;
+  color: #9ca3af;
+  font-size: 13px;
+  text-align: center;
+}
+
 .notification-item {
   display: flex;
   align-items: flex-start;
   padding: 12px 14px;
   gap: 10px;
   border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
 }
 
 .notification-item:hover {

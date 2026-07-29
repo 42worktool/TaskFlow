@@ -1,4 +1,4 @@
-import type { Card, Notification } from '../types'
+import type { Card } from '../types'
 
 export const cards: Card[] = [
   {
@@ -128,39 +128,4 @@ export const calendarCards = [
   { date: 20, month: 5, year: 2025, title: '메인 대시보드', color: '#2563EB' },
   { date: 23, month: 5, year: 2025, title: 'API 문서화', color: '#10B981' },
   { date: 27, month: 5, year: 2025, title: 'UI 컴포넌트', color: '#F59E0B' },
-]
-
-export const notifications: Notification[] = [
-  {
-    id: 'n-1',
-    text: '이지우님이 카드를 할당했습니다',
-    time: '5분 전',
-    read: false,
-    avatar: '이',
-    avatar_color: '#10B981',
-  },
-  {
-    id: 'n-2',
-    text: '박서준님이 댓글을 남겼습니다',
-    time: '1시간 전',
-    read: false,
-    avatar: '박',
-    avatar_color: '#7C3AED',
-  },
-  {
-    id: 'n-3',
-    text: 'OAuth 구현 카드 완료됨',
-    time: '2시간 전',
-    read: true,
-    avatar: '',
-    avatar_color: '#6B7280',
-  },
-  {
-    id: 'n-4',
-    text: '새 팀원이 프로젝트에 참여',
-    time: '어제',
-    read: true,
-    avatar: '',
-    avatar_color: '#6B7280',
-  },
 ]

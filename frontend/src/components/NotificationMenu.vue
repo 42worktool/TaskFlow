@@ -1,17 +1,33 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { notifications } from '../mock/data'
+import {
+  markNotificationRead,
+  notificationState,
+} from '../services/notifications'
 
 const open = ref(false)
 const activeFilter = ref<'알림' | '멘션' | '업데이트'>('알림')
 
 const filteredNotifications = computed(() => {
-  if (activeFilter.value === '알림') return notifications
-  if (activeFilter.value === '멘션') return notifications.filter((item) => item.text.includes('님'))
-  return notifications.filter((item) => item.text.includes('완료') || item.text.includes('참여'))
+  if (activeFilter.value === '알림') return notificationState.items
+  const category = activeFilter.value === '멘션' ? 'MENTION' : 'UPDATE'
+  return notificationState.items.filter((item) => item.category === category)
 })
 
-const unreadCount = computed(() => notifications.filter((item) => !item.read).length)
+const unreadCount = computed(
+  () => notificationState.items.filter((item) => !item.read).length,
+)
+
+function formatNotificationTime(createdAt: string): string {
+  const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return ''
+  return created.toLocaleString('ko-KR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 </script>
 
 <template>
@@ -42,14 +58,22 @@ const unreadCount = computed(() => notifications.filter((item) => !item.read).le
       </div>
 
       <ul class="notification-list">
-        <li v-for="item in filteredNotifications" :key="item.id" class="notification-item">
+        <li v-if="filteredNotifications.length === 0" class="notification-empty">
+          새 알림이 없습니다.
+        </li>
+        <li
+          v-for="item in filteredNotifications"
+          :key="item.id"
+          class="notification-item"
+          @click="markNotificationRead(item.id)"
+        >
           <span class="unread-dot" :class="{ visible: !item.read }" />
-          <div class="notif-avatar" :style="{ background: item.avatar_color }">
-            {{ item.avatar }}
+          <div class="notif-avatar">
+            {{ item.actor.name[0] }}
           </div>
           <div class="notif-content">
             <p class="notif-text">{{ item.text }}</p>
-            <span class="notif-time">{{ item.time }}</span>
+            <span class="notif-time">{{ formatNotificationTime(item.created_at) }}</span>
           </div>
         </li>
       </ul>

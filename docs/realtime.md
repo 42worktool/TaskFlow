@@ -12,6 +12,14 @@ rate-limiting, per-user connection quotas, broker abstractions, and a shared
 contract package should be added only when a concrete feature or deployment
 requires them.
 
+The first feature slice is `notification.created`. When an invited user joins a
+workspace, the backend sends one update notification to each currently
+connected existing member. The frontend keeps the most recent 50 events in
+memory and clears them when the session ends or changes user. There is
+intentionally no notification history or persisted read state yet; those
+belong in a later PostgreSQL-backed notification feature if the project needs
+them.
+
 ## Connection and authentication lifecycle
 
 1. The frontend opens `wss://<current-origin>/ws` and sends

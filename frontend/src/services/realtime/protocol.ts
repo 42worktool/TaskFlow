@@ -1,3 +1,5 @@
+import type { NotificationEvent } from '../../types'
+
 export const REALTIME_PROTOCOL_VERSION = 1 as const
 export const REALTIME_CLOSE_CODE = {
   AUTHENTICATION_REQUIRED: 4401,
@@ -57,6 +59,7 @@ export interface RealtimeAuthRefreshResult {
 export interface RealtimeServerEvents {
   'system.ready': RealtimeReadyData
   'system.error': RealtimeErrorData
+  'notification.created': NotificationEvent
 }
 
 export interface RealtimeClientEvents {

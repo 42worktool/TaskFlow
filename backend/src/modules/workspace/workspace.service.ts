@@ -15,6 +15,7 @@ import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
 import { normalizeEmail } from '../auth/auth.utils'
+import { notifyWorkspaceMemberJoined } from '../notification/notification.service'
 import { toWorkspaceDto, workspaceInclude } from './workspace.dto'
 
 const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -406,7 +407,7 @@ export async function acceptInvite(input: { userId: string; token: string }) {
   const payload = verifyInviteToken(input.token)
   const invitee = await prisma.user.findFirst({
     where: { id: input.userId, deleted_at: null },
-    select: { email: true },
+    select: { email: true, name: true, profile_image_url: true },
   })
   if (!invitee || normalizeEmail(invitee.email) !== payload.email) {
     throw new InviteEmailMismatchError()
@@ -456,6 +457,17 @@ export async function acceptInvite(input: { userId: string; token: string }) {
   const updated = await prisma.workspace.findFirst({
     where: { id: payload.workspace_id, deleted_at: null },
     include: workspaceInclude,
+  })
+
+  notifyWorkspaceMemberJoined({
+    recipientUserIds: ws.members.map((member) => member.user_id),
+    workspaceId: ws.id,
+    workspaceName: ws.name,
+    actor: {
+      userId: input.userId,
+      name: invitee.name,
+      profileImageUrl: invitee.profile_image_url,
+    },
   })
 
   return toWorkspaceDto(updated!)
