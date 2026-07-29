@@ -122,17 +122,19 @@ test('protected routes reject requests without a bearer token', async () => {
   });
 });
 
-test('friend routes reject requests without a bearer token', async () => {
-  const result = await send('/api/friends');
+test('friend and inbox routes reject requests without a bearer token', async () => {
+  for (const path of ['/api/friends', '/api/inbox']) {
+    const result = await send(path);
 
-  assert.deepEqual(result, {
-    status: 401,
-    body: {
-      status_code: 401,
-      error: 'UNAUTHORIZED',
-      message: 'A Bearer access token is required',
-    },
-  });
+    assert.deepEqual(result, {
+      status: 401,
+      body: {
+        status_code: 401,
+        error: 'UNAUTHORIZED',
+        message: 'A Bearer access token is required',
+      },
+    });
+  }
 });
 
 test('password login rejects cross-origin requests before service access', async () => {

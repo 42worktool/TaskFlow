@@ -48,18 +48,18 @@
   font-weight: 600;
 }
 
-.panel-action {
-  padding: 6px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-  color: #374151;
-  font-size: 13px;
-  font-weight: 600;
+.inbox-panel-state {
+  flex: 1;
+  margin: 0;
+  padding: 18px 20px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 14px;
 }
 
-.panel-action:hover {
-  background: #f9fafb;
+.inbox-panel-state--error {
+  flex: 0;
+  color: #b91c1c;
 }
 
 .inbox-card-list {

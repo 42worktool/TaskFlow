@@ -5,7 +5,7 @@ import { openApiDocument } from './docs/openapi';
 import { authRouter, googleCallback } from './modules/auth';
 import { workspaceRouter } from './modules/workspace';
 import { listRouter } from './modules/list';
-import { cardRouter, commentRouter } from './modules/card';
+import { cardRouter, commentRouter, inboxRouter } from './modules/card';
 import { friendRouter } from './modules/friend';
 import { errorHandler } from './errors';
 
@@ -40,6 +40,7 @@ app.use('/api/lists', listRouter);
 app.use('/api/cards', cardRouter);
 app.use('/api/comments', commentRouter);
 app.use('/api/friends', friendRouter);
+app.use('/api/inbox', inboxRouter);
 app.use(errorHandler);
 
 export default app;

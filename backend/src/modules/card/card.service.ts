@@ -82,6 +82,18 @@ async function requireCardRole(card: Card, userId: string, minRole?: Role): Prom
 
 // ─── Cards ────────────────────────────────────────────────────
 
+export async function listInboxCards(input: { userId: string }) {
+  const cards = await prisma.card.findMany({
+    where: {
+      list_id: null,
+      user_id: input.userId,
+      deleted_at: null,
+    },
+    orderBy: { updated_at: 'desc' },
+  })
+  return cards.map(toCardDto)
+}
+
 export async function createCard(
   input: {
     userId: string

@@ -22,7 +22,7 @@ const emit = defineEmits<{
       >
         ×
       </button>
-      <InboxCardsPanel compact />
+      <InboxCardsPanel v-if="open" compact />
     </aside>
   </Teleport>
 </template>

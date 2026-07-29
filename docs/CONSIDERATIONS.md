@@ -118,6 +118,9 @@
 
 ## Misc (Inbox / Calendar / Search)
 
+- **Inbox 조회는 로그인 사용자의 개인 카드만 반환한다.**
+  `GET /api/inbox`는 `list_id = null`, `user_id = 현재 사용자`인 활성 카드를 조회한다.
+
 - **Inbox 카드의 생성·수정·삭제·이동은 모두 Cards API로 처리한다.**
   inbox 전용 mutation 엔드포인트는 두지 않는다.
 
