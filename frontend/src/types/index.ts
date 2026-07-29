@@ -62,11 +62,23 @@ export interface DraggableChange {
   moved?: { element: { id: string }; newIndex: number }
 }
 
-export interface Notification {
+export type NotificationCategory = 'MENTION' | 'UPDATE'
+export type NotificationKind = 'workspace.member_joined'
+
+export interface NotificationEvent {
   id: UUID
+  category: NotificationCategory
+  kind: NotificationKind
   text: string
-  time: string
+  created_at: ISODateString
+  workspace_id: UUID
+  actor: {
+    user_id: UUID
+    name: string
+    profile_image_url: string | null
+  }
+}
+
+export interface Notification extends NotificationEvent {
   read: boolean
-  avatar?: string
-  avatar_color?: string
 }

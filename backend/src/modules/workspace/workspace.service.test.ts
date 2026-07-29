@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 
 const USER_ID = '00000000-0000-4000-8000-000000000001'
 const WORKSPACE_ID = '00000000-0000-4000-8000-000000000002'
+const OWNER_ID = '00000000-0000-4000-8000-000000000003'
 
 function setRequiredEnvironment(): void {
   Object.assign(process.env, {
@@ -51,7 +52,25 @@ function workspace() {
     updated_by: USER_ID,
     deleted_at: null,
     deleted_by: null,
-    members: [],
+    members: [
+      {
+        workspace_id: WORKSPACE_ID,
+        user_id: OWNER_ID,
+        role: 'OWNER' as const,
+        created_at: now,
+        created_by: OWNER_ID,
+        updated_at: now,
+        updated_by: OWNER_ID,
+        deleted_at: null,
+        deleted_by: null,
+        user: {
+          id: OWNER_ID,
+          name: 'Owner',
+          email: 'owner@example.com',
+          profile_image_url: null,
+        },
+      },
+    ],
   }
 }
 
@@ -60,10 +79,12 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
   const [
     { prisma },
     { config },
+    { realtime },
     { acceptInvite, generateInviteToken },
   ] = await Promise.all([
     import('../../db'),
     import('../../config'),
+    import('../../realtime'),
     import('./workspace.service'),
   ])
 
@@ -89,7 +110,13 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
   await t.test('rejects a different signed-in account', async (t) => {
     stubMethod(t, prisma.user, 'findFirst', async () => ({
       email: 'other@example.com',
+      name: 'Other',
+      profile_image_url: null,
     }))
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args) => {
+      deliveries.push(args)
+    })
 
     await assert.rejects(
       () =>
@@ -107,19 +134,57 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
         'code' in error &&
         error.code === 'INVITE_EMAIL_MISMATCH',
     )
+    assert.equal(deliveries.length, 0)
+  })
+
+  await t.test('does not notify when an active member reuses the link', async (t) => {
+    stubMethod(t, prisma.user, 'findFirst', async () => ({
+      email: 'invitee@example.com',
+      name: 'Invitee',
+      profile_image_url: null,
+    }))
+    stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
+    stubMethod(t, prisma.workspaceMember, 'findUnique', async () => ({
+      deleted_at: null,
+    }))
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args) => {
+      deliveries.push(args)
+    })
+
+    const accepted = await acceptInvite({
+      userId: USER_ID,
+      token: generateInviteToken(
+        WORKSPACE_ID,
+        'MEMBER',
+        'invitee@example.com',
+      ),
+    })
+
+    assert.equal(accepted.id, WORKSPACE_ID)
+    assert.equal(deliveries.length, 0)
   })
 
   await t.test('accepts a case-insensitive email match', async (t) => {
     stubMethod(t, prisma.user, 'findFirst', async () => ({
       email: 'invitee@example.com',
+      name: 'Invitee',
+      profile_image_url: null,
     }))
     stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
     stubMethod(t, prisma.workspaceMember, 'findUnique', async () => null)
 
+    const operationOrder: string[] = []
     let membershipCreate: unknown
     stubMethod(t, prisma.workspaceMember, 'create', async (args) => {
+      operationOrder.push('membership')
       membershipCreate = args
       return {}
+    })
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args) => {
+      operationOrder.push('notification')
+      deliveries.push(args)
     })
 
     const accepted = await acceptInvite({
@@ -141,5 +206,13 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
         updated_by: USER_ID,
       },
     })
+    assert.equal(deliveries.length, 1)
+    assert.equal(deliveries[0]?.[0], OWNER_ID)
+    assert.equal(deliveries[0]?.[1], 'notification.created')
+    assert.equal(
+      (deliveries[0]?.[2] as { kind?: unknown }).kind,
+      'workspace.member_joined',
+    )
+    assert.deepEqual(operationOrder, ['membership', 'notification'])
   })
 })
