@@ -35,7 +35,6 @@ async function drainPendingNotifications(timeoutMs: number): Promise<void> {
     Promise.allSettled(tasks).then(() => 'drained' as const),
     new Promise<'timed_out'>((resolve) => {
       timer = setTimeout(() => resolve('timed_out'), timeoutMs)
-      timer.unref()
     }),
   ])
   if (timer) clearTimeout(timer)
