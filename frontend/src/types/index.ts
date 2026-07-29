@@ -115,6 +115,18 @@ export interface Friend {
   online: boolean
 }
 
+export interface FriendRequest {
+  id: UUID
+  name: string
+  profile_image_url: string | null
+  requested_at: ISODateString
+}
+
+export interface FriendRequestLists {
+  incoming: FriendRequest[]
+  outgoing: FriendRequest[]
+}
+
 export interface FriendPresenceEvent {
   user_id: UUID
   online: boolean

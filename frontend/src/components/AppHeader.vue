@@ -22,6 +22,9 @@ const emit = defineEmits<{ openInbox: [] }>()
     <div class="app-topbar-main">
       <SearchInput :initial-query="initialQuery" />
       <div class="app-topbar-actions">
+        <RouterLink to="/friends" class="app-topbar-button app-topbar-link">
+          친구
+        </RouterLink>
         <NotificationMenu />
         <button
           v-if="showInbox"

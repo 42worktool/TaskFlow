@@ -29,6 +29,11 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   INVALID_CREDENTIALS: '이메일 또는 비밀번호가 올바르지 않습니다.',
   LOGIN_RATE_LIMITED: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
   INVALID_ORIGIN: '허용되지 않은 요청입니다. 페이지를 새로고침해 주세요.',
+  USER_NOT_FOUND: '해당 이메일로 가입한 사용자를 찾을 수 없습니다.',
+  CANNOT_FRIEND_SELF: '자기 자신에게 친구 요청을 보낼 수 없습니다.',
+  ALREADY_FRIENDS: '이미 친구인 사용자입니다.',
+  FRIEND_REQUEST_ALREADY_RECEIVED: '상대방이 먼저 보낸 요청이 있습니다. 받은 요청에서 수락해 주세요.',
+  FRIEND_REQUEST_NOT_FOUND: '친구 요청을 찾을 수 없습니다. 목록을 새로고침해 주세요.',
 }
 
 export const authState = reactive<{
@@ -267,8 +272,10 @@ export async function apiRequest<T>(
   const response = await authFetch(input, requestInit)
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null
-    throw new Error(body?.message || `Request failed with status ${response.status}`)
+    throw await authRequestError(
+      response,
+      `Request failed with status ${response.status}`,
+    )
   }
 
   if (response.status === 204) return undefined as T
