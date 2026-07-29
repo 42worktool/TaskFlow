@@ -95,6 +95,11 @@
   gap: 8px;
 }
 
+.team-avatar-wrap {
+  position: relative;
+  flex: 0 0 28px;
+}
+
 .team-avatar {
   width: 28px;
   height: 28px;
@@ -108,9 +113,39 @@
   flex-shrink: 0;
 }
 
+.team-presence-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.team-presence-dot--online {
+  background: #22c55e;
+}
+
+.team-member-copy {
+  min-width: 0;
+}
+
 .team-name {
+  display: block;
+  overflow: hidden;
   font-size: 13px;
   color: #374151;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-presence-label {
+  display: block;
+  margin-top: 1px;
+  color: #9ca3af;
+  font-size: 10px;
 }
 
 .sidebar-actions {

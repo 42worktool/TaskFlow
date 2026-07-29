@@ -5,7 +5,7 @@
 //  - 테이블명: DBML 그대로 PascalCase 복수형 → @@map("Users")
 //  - 컬럼명: DBML 그대로 snake_case (DTO도 snake_case라 통일)
 //  - uuid PK: DB가 생성 (postgres 15의 gen_random_uuid())
-//  - 11개 도메인 모델: created_at/by, updated_at/by, deleted_at/by 감사 컬럼
+//  - 업무 데이터 모델은 필요한 경우 created/updated/deleted 감사 컬럼을 사용
 //  - *_by는 사용자 삭제 후에도 이력을 보존하기 위해 FK를 두지 않음
 // ============================================================
 
@@ -45,10 +45,11 @@ model User {
   cards                Card[]
   card_members         CardMember[]
   comments             Comment[]
-  friendships_low      Friendship[]      @relation("FriendshipLow")
-  friendships_high     Friendship[]      @relation("FriendshipHigh")
-  friend_requests_low  FriendRequest[]   @relation("FriendRequestLow")
-  friend_requests_high FriendRequest[]   @relation("FriendRequestHigh")
+  friendships_low      Friendship[]       @relation("FriendshipLow")
+  friendships_high     Friendship[]       @relation("FriendshipHigh")
+  friend_requests_low  FriendRequest[]    @relation("FriendRequestLow")
+  friend_requests_high FriendRequest[]    @relation("FriendRequestHigh")
+  workspace_messages   WorkspaceMessage[]
 
   @@map("Users")
 }
@@ -118,9 +119,10 @@ model Workspace {
   deleted_at DateTime? @db.Timestamptz(3)
   deleted_by String?   @db.Uuid
 
-  members WorkspaceMember[]
-  lists   List[]
-  labels  Label[]
+  members  WorkspaceMember[]
+  lists    List[]
+  labels   Label[]
+  messages WorkspaceMessage[]
 
   @@index([deleted_at])
   @@map("Workspaces")
@@ -146,6 +148,22 @@ model WorkspaceMember {
   @@index([workspace_id, deleted_at])
   @@index([user_id, deleted_at])
   @@map("WorkspaceMembers")
+}
+
+// 워크스페이스 기본 채팅방의 메시지. 워크스페이스마다 방을 하나만 두는
+// 프로토타입 범위이므로 별도 채팅방 테이블 없이 메시지를 바로 연결한다.
+model WorkspaceMessage {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_id String   @db.Uuid
+  user_id      String   @db.Uuid
+  content      String   @db.Text
+  created_at   DateTime @default(now()) @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([workspace_id, created_at])
+  @@map("WorkspaceMessages")
 }
 
 // 보드의 세로 칼럼 (To Do / In Progress / Done 등).

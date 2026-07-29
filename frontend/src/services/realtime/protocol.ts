@@ -1,4 +1,11 @@
-import type { FriendPresenceEvent, NotificationEvent } from '../../types'
+import type {
+  FriendPresenceEvent,
+  NotificationEvent,
+  WorkspaceChangedEvent,
+  WorkspaceMemberPresenceEvent,
+  WorkspaceMessage,
+  WorkspaceSubscriptionResult,
+} from '../../types'
 
 export const REALTIME_PROTOCOL_VERSION = 1 as const
 export const REALTIME_CLOSE_CODE = {
@@ -63,11 +70,20 @@ export interface RealtimeServerEvents {
   'system.error': RealtimeErrorData
   'notification.created': NotificationEvent
   'friend.presence_changed': FriendPresenceEvent
+  'workspace.changed': WorkspaceChangedEvent
+  'workspace.member_presence_changed': WorkspaceMemberPresenceEvent
+  'workspace.message_created': WorkspaceMessage
 }
 
 export interface RealtimeClientEvents {
   'system.ping': {
     clientTime?: string
+  }
+  'workspace.subscribe': {
+    workspace_id: string
+  }
+  'workspace.unsubscribe': {
+    workspace_id: string
   }
 }
 
@@ -75,6 +91,10 @@ export interface RealtimeClientRequestResults {
   'system.ping': {
     clientTime?: string
     serverTime: string
+  }
+  'workspace.subscribe': WorkspaceSubscriptionResult
+  'workspace.unsubscribe': {
+    workspace_id: string
   }
 }
 
@@ -149,6 +169,77 @@ export function parseFriendPresenceEvent(
     return null
   }
   return candidate as FriendPresenceEvent
+}
+
+export function parseWorkspaceChangedEvent(
+  value: unknown,
+): WorkspaceChangedEvent | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<WorkspaceChangedEvent>
+  if (
+    !isUuid(candidate.event_id) ||
+    !isUuid(candidate.workspace_id) ||
+    (candidate.entity !== 'workspace' &&
+      candidate.entity !== 'member' &&
+      candidate.entity !== 'list' &&
+      candidate.entity !== 'card') ||
+    (candidate.action !== 'created' &&
+      candidate.action !== 'updated' &&
+      candidate.action !== 'deleted' &&
+      candidate.action !== 'moved') ||
+    !isUuid(candidate.entity_id) ||
+    !Array.isArray(candidate.list_ids) ||
+    !candidate.list_ids.every(isUuid) ||
+    !isUuid(candidate.actor_user_id) ||
+    !isIsoDate(candidate.occurred_at)
+  ) {
+    return null
+  }
+  return candidate as WorkspaceChangedEvent
+}
+
+export function parseWorkspaceMemberPresenceEvent(
+  value: unknown,
+): WorkspaceMemberPresenceEvent | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<WorkspaceMemberPresenceEvent>
+  if (
+    !isUuid(candidate.workspace_id) ||
+    !isUuid(candidate.user_id) ||
+    typeof candidate.online !== 'boolean'
+  ) {
+    return null
+  }
+  return candidate as WorkspaceMemberPresenceEvent
+}
+
+export function parseWorkspaceMessage(
+  value: unknown,
+): WorkspaceMessage | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<WorkspaceMessage>
+  const author = candidate.author
+  if (
+    !isUuid(candidate.id) ||
+    !isUuid(candidate.workspace_id) ||
+    typeof candidate.content !== 'string' ||
+    candidate.content.length === 0 ||
+    !isIsoDate(candidate.created_at) ||
+    !author ||
+    typeof author !== 'object' ||
+    !isUuid(author.user_id) ||
+    typeof author.name !== 'string' ||
+    author.name.length === 0 ||
+    (author.profile_image_url !== null &&
+      typeof author.profile_image_url !== 'string')
+  ) {
+    return null
+  }
+  return candidate as WorkspaceMessage
+}
+
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_PATTERN.test(value)
 }
 
 function isIsoDate(value: unknown): value is string {

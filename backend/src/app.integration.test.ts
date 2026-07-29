@@ -122,8 +122,13 @@ test('protected routes reject requests without a bearer token', async () => {
   });
 });
 
-test('friend and inbox routes reject requests without a bearer token', async () => {
-  for (const path of ['/api/friends', '/api/inbox']) {
+test('feature routes reject requests without a bearer token', async () => {
+  for (const path of [
+    '/api/friends',
+    '/api/inbox',
+    '/api/lists/00000000-0000-4000-8000-000000000001',
+    '/api/workspaces/00000000-0000-4000-8000-000000000001/messages',
+  ]) {
     const result = await send(path);
 
     assert.deepEqual(result, {
@@ -135,6 +140,16 @@ test('friend and inbox routes reject requests without a bearer token', async () 
       },
     });
   }
+
+  const createMessage = await send(
+    '/api/workspaces/00000000-0000-4000-8000-000000000001/messages',
+    {
+      method: 'POST',
+      body: JSON.stringify({ content: 'hello' }),
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+  assert.equal(createMessage.status, 401);
 });
 
 test('password login rejects cross-origin requests before service access', async () => {

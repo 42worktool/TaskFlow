@@ -24,6 +24,7 @@ const emit = defineEmits<{
   'move-card-to-inbox': [cardId: string]
   'rename-list': [listId: string, name: string]
   'delete-list': [listId: string]
+  'drag-state': [active: boolean]
 }>()
 
 const badgeColors: Record<string, string> = {
@@ -70,7 +71,9 @@ function cancelRename() {
 }
 
 function startRename() {
-  if (props.canEdit) renaming.value = true
+  if (!props.canEdit) return
+  renameValue.value = props.list.name
+  renaming.value = true
 }
 
 const vFocus = {
@@ -115,6 +118,8 @@ const vFocus = {
       :disabled="!canEdit"
       class="card-list"
       ghost-class="card-ghost"
+      @start="emit('drag-state', true)"
+      @end="emit('drag-state', false)"
       @change="(e: DraggableChange) => emit('card-change', list.id, e)"
     >
       <template #item="{ element: card }">

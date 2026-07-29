@@ -8,10 +8,14 @@ import {
   toIsoDate,
 } from '../utils/cardDates'
 
-const props = defineProps<{
-  cardId: string
-  editable: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    cardId: string
+    editable: boolean
+    refreshToken?: number
+  }>(),
+  { refreshToken: 0 },
+)
 const emit = defineEmits<{
   close: []
   saved: [card: Card]
@@ -25,6 +29,7 @@ const deadline = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
+const remoteUpdatePending = ref(false)
 let loadGeneration = 0
 let active = true
 let initialTitle = ''
@@ -46,23 +51,48 @@ function applyDetail(card: CardDetail): void {
   initialDescription = card.description ?? ''
   initialStartDate = startDate.value
   initialDeadline = deadline.value
+  remoteUpdatePending.value = false
 }
 
-async function loadCard(): Promise<void> {
+function hasUnsavedChanges(): boolean {
+  return (
+    title.value.trim() !== initialTitle ||
+    description.value !== initialDescription ||
+    startDate.value !== initialStartDate ||
+    deadline.value !== initialDeadline
+  )
+}
+
+async function loadCard(
+  options: { background?: boolean } = {},
+): Promise<void> {
+  const background = options.background ?? false
   const generation = ++loadGeneration
-  detail.value = null
-  loading.value = true
+  if (!background) {
+    detail.value = null
+    loading.value = true
+  }
   error.value = ''
   try {
     const card = await CardAPI.get(props.cardId)
-    if (generation === loadGeneration) applyDetail(card)
+    if (generation === loadGeneration) {
+      if (
+        background &&
+        (saving.value || (props.editable && hasUnsavedChanges()))
+      ) {
+        remoteUpdatePending.value = true
+        return
+      }
+      applyDetail(card)
+      if (background) emit('saved', card)
+    }
   } catch (caught) {
     if (generation === loadGeneration) {
       error.value =
         caught instanceof Error ? caught.message : '카드 상세를 불러오지 못했습니다.'
     }
   } finally {
-    if (generation === loadGeneration) loading.value = false
+    if (!background && generation === loadGeneration) loading.value = false
   }
 }
 
@@ -97,6 +127,11 @@ async function submit(): Promise<void> {
   }
   if (!isDateRangeValid(nextStartDate, nextDeadline)) {
     error.value = '시작일은 마감일보다 늦을 수 없습니다.'
+    return
+  }
+  if (remoteUpdatePending.value) {
+    error.value =
+      '다른 팀원이 이 카드를 변경했습니다. 입력 보호를 위해 닫았다가 다시 열어 주세요.'
     return
   }
 
@@ -152,6 +187,22 @@ watch(
     void loadCard()
   },
   { immediate: true },
+)
+
+watch(
+  () => props.refreshToken,
+  (next, previous) => {
+    if (next === previous) return
+    if (!detail.value) {
+      void loadCard()
+      return
+    }
+    if (saving.value || (props.editable && hasUnsavedChanges())) {
+      remoteUpdatePending.value = true
+      return
+    }
+    void loadCard({ background: true })
+  },
 )
 
 onUnmounted(() => {
@@ -261,6 +312,14 @@ onUnmounted(() => {
           </div>
 
           <p v-if="error" class="card-detail-error" role="alert">{{ error }}</p>
+          <p
+            v-else-if="remoteUpdatePending"
+            class="card-detail-error"
+            role="status"
+          >
+            다른 팀원이 이 카드를 변경했습니다. 작성 중인 내용을 보호하기 위해
+            자동으로 덮어쓰지 않았습니다.
+          </p>
 
           <div class="card-detail-actions">
             <button
@@ -284,7 +343,11 @@ onUnmounted(() => {
 
         <div v-else class="card-detail-state">
           <p role="alert">{{ error }}</p>
-          <button type="button" class="card-detail-btn card-detail-btn--secondary" @click="loadCard">
+          <button
+            type="button"
+            class="card-detail-btn card-detail-btn--secondary"
+            @click="loadCard()"
+          >
             다시 시도
           </button>
         </div>

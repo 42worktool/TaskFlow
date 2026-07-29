@@ -11,6 +11,7 @@ import {
   isUserOnline,
   removePresenceConnection,
 } from './presence.state'
+import { publishWorkspacePresenceChanged } from '../workspace/workspace.realtime'
 
 export const friendPresenceEventSchema = z
   .object({
@@ -43,19 +44,29 @@ async function drainPendingNotifications(timeoutMs: number): Promise<void> {
   }
 }
 
-async function notifyFriends(userId: string, online: boolean): Promise<void> {
-  const friendships = await prisma.friendship.findMany({
-    where: {
-      OR: [
-        { user_low_id: userId },
-        { user_high_id: userId },
-      ],
-    },
-    select: {
-      user_low_id: true,
-      user_high_id: true,
-    },
-  })
+async function notifyPresence(userId: string, online: boolean): Promise<void> {
+  const [friendships, memberships] = await Promise.all([
+    prisma.friendship.findMany({
+      where: {
+        OR: [
+          { user_low_id: userId },
+          { user_high_id: userId },
+        ],
+      },
+      select: {
+        user_low_id: true,
+        user_high_id: true,
+      },
+    }),
+    prisma.workspaceMember.findMany({
+      where: {
+        user_id: userId,
+        deleted_at: null,
+        workspace: { deleted_at: null },
+      },
+      select: { workspace_id: true },
+    }),
+  ])
 
   if (!running || isUserOnline(userId) !== online) return
 
@@ -74,14 +85,23 @@ async function notifyFriends(userId: string, online: boolean): Promise<void> {
   for (const friendId of friendIds) {
     realtime.sendToUser(friendId, 'friend.presence_changed', event)
   }
+  for (const workspaceId of new Set(
+    memberships.map((membership) => membership.workspace_id),
+  )) {
+    publishWorkspacePresenceChanged({
+      workspace_id: workspaceId,
+      user_id: userId,
+      online,
+    })
+  }
 }
 
-function scheduleFriendNotification(userId: string, online: boolean): void {
+function schedulePresenceNotification(userId: string, online: boolean): void {
   let task: Promise<void>
-  task = notifyFriends(userId, online)
+  task = notifyPresence(userId, online)
     .catch((error: unknown) => {
       console.error(
-        '[presence] friend notification failed',
+        '[presence] notification failed',
         error instanceof Error ? error.message : error,
       )
     })
@@ -94,7 +114,7 @@ function connectionAuthenticated(
 ): void {
   if (!running) return
   if (addPresenceConnection(connection.userId, connection.connectionId)) {
-    scheduleFriendNotification(connection.userId, true)
+    schedulePresenceNotification(connection.userId, true)
   }
 }
 
@@ -103,7 +123,7 @@ function connectionDisconnected(
 ): void {
   if (!running) return
   if (removePresenceConnection(connection.userId, connection.connectionId)) {
-    scheduleFriendNotification(connection.userId, false)
+    schedulePresenceNotification(connection.userId, false)
   }
 }
 

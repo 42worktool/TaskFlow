@@ -18,6 +18,7 @@ import {
   toCardDto,
   toCommentDto,
 } from './card.dto'
+import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 
 // ─── DTOs ─────────────────────────────────────────────────────
 
@@ -74,14 +75,22 @@ async function getListOrThrow(
 }
 
 /** Write access: inbox card owner, or MEMBER+ in the card's workspace. */
-type CardAccess = Pick<Card, 'list_id' | 'user_id'>
+type CardAccess = Pick<
+  Card,
+  'list_id' | 'user_id' | 'start_at' | 'deadline'
+>
+
+interface WorkspaceCardLocation {
+  workspaceId: string
+  listId: string
+}
 
 async function lockCardOrThrow(
   tx: Prisma.TransactionClient,
   cardId: string,
 ): Promise<CardAccess> {
   const cards = await tx.$queryRaw<CardAccess[]>`
-    SELECT "list_id", "user_id"
+    SELECT "list_id", "user_id", "start_at", "deadline"
     FROM "Cards"
     WHERE "id" = ${cardId}::uuid
       AND "deleted_at" IS NULL
@@ -133,6 +142,36 @@ async function requireCardRole(
   return role
 }
 
+async function workspaceLocationForCard(
+  card: CardAccess,
+  client: CardAccessClient = prisma,
+): Promise<WorkspaceCardLocation | null> {
+  if (!card.list_id) return null
+  const list = await getListOrThrow(card.list_id, client)
+  return {
+    workspaceId: list.workspace_id,
+    listId: list.id,
+  }
+}
+
+function publishCardChange(input: {
+  userId: string
+  cardId: string
+  location: WorkspaceCardLocation | null
+  action: 'created' | 'updated' | 'deleted' | 'moved'
+  listIds?: string[]
+}): void {
+  if (!input.location) return
+  publishWorkspaceChange({
+    workspace_id: input.location.workspaceId,
+    entity: 'card',
+    action: input.action,
+    entity_id: input.cardId,
+    list_ids: input.listIds ?? [],
+    actor_user_id: input.userId,
+  })
+}
+
 // ─── Cards ────────────────────────────────────────────────────
 
 export async function listInboxCards(input: { userId: string }) {
@@ -161,7 +200,7 @@ export async function createCard(
   const role = await getRole(list.workspace_id, input.userId)
   if (!role || ROLE_RANK[role] < ROLE_RANK.MEMBER) throw new ForbiddenError()
 
-  return prisma.$transaction(async (tx) => {
+  const created = await prisma.$transaction(async (tx) => {
     const lockedList = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT "id"
       FROM "Lists"
@@ -189,6 +228,18 @@ export async function createCard(
     })
     return toCardDto(card)
   })
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: created.id,
+    location: {
+      workspaceId: list.workspace_id,
+      listId: list.id,
+    },
+    action: 'created',
+    listIds: [list.id],
+  })
+  return created
 }
 
 export async function getCard(input: { userId: string; cardId: string }) {
@@ -205,29 +256,56 @@ export async function updateCard(
     description?: string | null
   },
 ) {
-  const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.userId)
+  const result = await prisma.$transaction(async (tx) => {
+    const card = await lockCardOrThrow(tx, input.cardId)
+    await requireCardWrite(card, input.userId, tx)
+    const location = await workspaceLocationForCard(card, tx)
 
-  const updated = await prisma.card.update({
-    where: { id: input.cardId },
-    data: {
-      ...(input.title !== undefined ? { title: input.title } : {}),
-      ...('description' in input
-        ? { description: input.description ?? '' }
-        : {}),
-      ...updatedBy(input.userId),
-    },
+    const updated = await tx.card.update({
+      where: { id: input.cardId },
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...('description' in input
+          ? { description: input.description ?? '' }
+          : {}),
+        ...updatedBy(input.userId),
+      },
+    })
+    return {
+      card: toCardDto(updated),
+      location,
+    }
   })
-  return toCardDto(updated)
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location: result.location,
+    action: 'updated',
+    listIds: result.location ? [result.location.listId] : [],
+  })
+  return result.card
 }
 
 export async function deleteCard(input: { userId: string; cardId: string }): Promise<void> {
-  const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.userId)
+  const location = await prisma.$transaction(async (tx) => {
+    const card = await lockCardOrThrow(tx, input.cardId)
+    await requireCardWrite(card, input.userId, tx)
+    const currentLocation = await workspaceLocationForCard(card, tx)
 
-  await prisma.card.update({
-    where: { id: input.cardId },
-    data: softDeletedBy(input.userId),
+    await tx.card.update({
+      where: { id: input.cardId },
+      data: softDeletedBy(input.userId),
+    })
+    return currentLocation
+  })
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location,
+    action: 'deleted',
+    listIds: location ? [location.listId] : [],
   })
 }
 
@@ -239,25 +317,44 @@ export async function reorderCard(
     afterCardId?: string | null
   },
 ) {
-  const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.userId)
-  if (!card.list_id) throw new BadRequestError('Cannot reorder inbox cards')
+  const result = await prisma.$transaction(async (tx) => {
+    const card = await lockCardOrThrow(tx, input.cardId)
+    await requireCardWrite(card, input.userId, tx)
+    if (!card.list_id) throw new BadRequestError('Cannot reorder inbox cards')
+    const location = await workspaceLocationForCard(card, tx)
 
-  const siblings = await prisma.card.findMany({
-    where: { list_id: card.list_id, deleted_at: null, id: { not: input.cardId } },
-    orderBy: { sequence: 'asc' },
+    const siblings = await tx.card.findMany({
+      where: {
+        list_id: card.list_id,
+        deleted_at: null,
+        id: { not: input.cardId },
+      },
+      orderBy: { sequence: 'asc' },
+    })
+
+    const newSequence = computeSequence(
+      siblings,
+      input.beforeCardId,
+      input.afterCardId,
+    )
+    const updated = await tx.card.update({
+      where: { id: input.cardId },
+      data: { sequence: newSequence, ...updatedBy(input.userId) },
+    })
+    return {
+      card: toCardDto(updated),
+      location,
+    }
   })
 
-  const newSequence = computeSequence(
-    siblings,
-    input.beforeCardId,
-    input.afterCardId,
-  )
-  const updated = await prisma.card.update({
-    where: { id: input.cardId },
-    data: { sequence: newSequence, ...updatedBy(input.userId) },
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location: result.location,
+    action: 'moved',
+    listIds: result.location ? [result.location.listId] : [],
   })
-  return toCardDto(updated)
+  return result.card
 }
 
 export async function moveCard(
@@ -269,7 +366,7 @@ export async function moveCard(
     afterCardId?: string | null
   },
 ) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const lockedTarget = await tx.$queryRaw<
       Array<{ id: string; workspace_id: string }>
     >`
@@ -285,11 +382,13 @@ export async function moveCard(
     const card = await lockCardOrThrow(tx, input.cardId)
     await requireCardWrite(card, input.userId, tx)
 
+    let sourceListId: string | null = null
     if (card.list_id !== null) {
       const sourceList = await getListOrThrow(card.list_id, tx)
       if (sourceList.workspace_id !== targetList.workspace_id) {
         throw new BadRequestError('Cards cannot be moved between workspaces')
       }
+      sourceListId = sourceList.id
     }
     const targetRole = await getRoleWithClient(
       tx,
@@ -334,8 +433,29 @@ export async function moveCard(
         ...updatedBy(input.userId),
       },
     })
-    return toCardDto(updated)
+    return {
+      card: toCardDto(updated),
+      workspaceId: targetList.workspace_id,
+      sourceListId,
+      targetListId: targetList.id,
+    }
   })
+
+  const listIds = [
+    ...(result.sourceListId ? [result.sourceListId] : []),
+    result.targetListId,
+  ].filter((listId, index, values) => values.indexOf(listId) === index)
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location: {
+      workspaceId: result.workspaceId,
+      listId: result.targetListId,
+    },
+    action: result.sourceListId ? 'moved' : 'created',
+    listIds,
+  })
+  return result.card
 }
 
 export async function updateCardDates(
@@ -346,36 +466,52 @@ export async function updateCardDates(
     deadline?: string | null
   },
 ) {
-  const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.userId)
+  const result = await prisma.$transaction(async (tx) => {
+    const card = await lockCardOrThrow(tx, input.cardId)
+    await requireCardWrite(card, input.userId, tx)
+    const location = await workspaceLocationForCard(card, tx)
 
-  const newStart =
-    'startAt' in input ? input.startAt : card.start_at?.toISOString() ?? null
-  const newEnd =
-    'deadline' in input ? input.deadline : card.deadline?.toISOString() ?? null
-  if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
-    throw new BadRequestError('start_at must be before or equal to deadline')
-  }
+    const newStart =
+      'startAt' in input ? input.startAt : card.start_at?.toISOString() ?? null
+    const newEnd =
+      'deadline' in input ? input.deadline : card.deadline?.toISOString() ?? null
+    if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
+      throw new BadRequestError('start_at must be before or equal to deadline')
+    }
 
-  const updated = await prisma.card.update({
-    where: { id: input.cardId },
-    data: {
-      ...('startAt' in input
-        ? { start_at: input.startAt ? new Date(input.startAt) : null }
-        : {}),
-      ...('deadline' in input
-        ? { deadline: input.deadline ? new Date(input.deadline) : null }
-        : {}),
-      ...updatedBy(input.userId),
-    },
+    const updated = await tx.card.update({
+      where: { id: input.cardId },
+      data: {
+        ...('startAt' in input
+          ? { start_at: input.startAt ? new Date(input.startAt) : null }
+          : {}),
+        ...('deadline' in input
+          ? { deadline: input.deadline ? new Date(input.deadline) : null }
+          : {}),
+        ...updatedBy(input.userId),
+      },
+    })
+    return {
+      card: toCardDto(updated),
+      location,
+    }
   })
-  return toCardDto(updated)
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location: result.location,
+    action: 'updated',
+    listIds: result.location ? [result.location.listId] : [],
+  })
+  return result.card
 }
 
 export async function moveCardToInbox(input: { userId: string; cardId: string }) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const card = await lockCardOrThrow(tx, input.cardId)
     await requireCardWrite(card, input.userId, tx)
+    const location = await workspaceLocationForCard(card, tx)
 
     const detachedRelation = softDeletedBy(input.userId)
     await tx.cardMember.updateMany({
@@ -394,8 +530,20 @@ export async function moveCardToInbox(input: { userId: string; cardId: string })
         ...updatedBy(input.userId),
       },
     })
-    return toCardDto(updated)
+    return {
+      card: toCardDto(updated),
+      location,
+    }
   })
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location: result.location,
+    action: 'deleted',
+    listIds: result.location ? [result.location.listId] : [],
+  })
+  return result.card
 }
 
 // ─── Card Members ─────────────────────────────────────────────
@@ -405,7 +553,7 @@ export async function addCardMember(input: {
   cardId: string
   targetUserId: string
 }) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const card = await lockCardOrThrow(tx, input.cardId)
     await requireCardWrite(card, input.userId, tx)
     if (!card.list_id) {
@@ -451,11 +599,25 @@ export async function addCardMember(input: {
     })
     if (!user) throw new NotFoundError()
     return {
-      user_id: input.targetUserId,
-      name: user.name,
-      profile_image_url: user.profile_image_url,
+      member: {
+        user_id: input.targetUserId,
+        name: user.name,
+        profile_image_url: user.profile_image_url,
+      },
+      location: {
+        workspaceId: list.workspace_id,
+        listId: list.id,
+      },
     }
   })
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location: result.location,
+    action: 'updated',
+  })
+  return result.member
 }
 
 export async function removeCardMember(input: {
@@ -465,6 +627,7 @@ export async function removeCardMember(input: {
 }): Promise<void> {
   const card = await getCardOrThrow(input.cardId)
   await requireCardWrite(card, input.userId)
+  const location = await workspaceLocationForCard(card)
 
   const existing = await prisma.cardMember.findUnique({
     where: {
@@ -478,6 +641,13 @@ export async function removeCardMember(input: {
       card_id_user_id: { card_id: input.cardId, user_id: input.targetUserId },
     },
     data: softDeletedBy(input.userId),
+  })
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location,
+    action: 'updated',
   })
 }
 
@@ -493,6 +663,7 @@ export async function addAttachment(
 ) {
   const card = await getCardOrThrow(input.cardId)
   await requireCardWrite(card, input.userId)
+  const location = await workspaceLocationForCard(card)
 
   const attachment = await prisma.attachment.create({
     data: {
@@ -502,7 +673,14 @@ export async function addAttachment(
       ...createdBy(input.userId),
     },
   })
-  return toAttachmentDto(attachment)
+  const dto = toAttachmentDto(attachment)
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location,
+    action: 'updated',
+  })
+  return dto
 }
 
 export async function removeAttachment(input: {
@@ -515,10 +693,18 @@ export async function removeAttachment(input: {
   if (!attachment) throw new NotFoundError()
   const card = await getCardOrThrow(attachment.card_id)
   await requireCardWrite(card, input.userId)
+  const location = await workspaceLocationForCard(card)
 
   await prisma.attachment.update({
     where: { id: input.attachmentId },
     data: softDeletedBy(input.userId),
+  })
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: card.id,
+    location,
+    action: 'updated',
   })
 }
 
@@ -531,6 +717,7 @@ export async function createComment(input: {
 }) {
   const card = await getCardOrThrow(input.cardId)
   await requireCardRole(card, input.userId)
+  const location = await workspaceLocationForCard(card)
 
   const comment = await prisma.comment.create({
     data: {
@@ -541,7 +728,14 @@ export async function createComment(input: {
     },
     include: { user: { select: { id: true, name: true, profile_image_url: true } } },
   })
-  return toCommentDto(comment)
+  const dto = toCommentDto(comment)
+  publishCardChange({
+    userId: input.userId,
+    cardId: input.cardId,
+    location,
+    action: 'updated',
+  })
+  return dto
 }
 
 export async function updateComment(input: {
@@ -554,6 +748,8 @@ export async function updateComment(input: {
   })
   if (!comment) throw new NotFoundError()
   if (comment.user_id !== input.userId) throw new ForbiddenError()
+  const card = await getCardOrThrow(comment.card_id)
+  const location = await workspaceLocationForCard(card)
 
   const updated = await prisma.comment.update({
     where: { id: input.commentId },
@@ -563,7 +759,14 @@ export async function updateComment(input: {
     },
     include: { user: { select: { id: true, name: true, profile_image_url: true } } },
   })
-  return toCommentDto(updated)
+  const dto = toCommentDto(updated)
+  publishCardChange({
+    userId: input.userId,
+    cardId: comment.card_id,
+    location,
+    action: 'updated',
+  })
+  return dto
 }
 
 export async function deleteComment(input: {
@@ -574,17 +777,25 @@ export async function deleteComment(input: {
     where: { id: input.commentId, deleted_at: null },
   })
   if (!comment) throw new NotFoundError()
+  const card = await getCardOrThrow(comment.card_id)
 
   if (comment.user_id !== input.userId) {
-    const card = await getCardOrThrow(comment.card_id)
     if (!card.list_id) throw new ForbiddenError()
     const list = await getListOrThrow(card.list_id)
     const role = await getRole(list.workspace_id, input.userId)
     if (!role || ROLE_RANK[role] < ROLE_RANK.ADMIN) throw new ForbiddenError()
   }
+  const location = await workspaceLocationForCard(card)
 
   await prisma.comment.update({
     where: { id: input.commentId },
     data: softDeletedBy(input.userId),
+  })
+
+  publishCardChange({
+    userId: input.userId,
+    cardId: comment.card_id,
+    location,
+    action: 'updated',
   })
 }

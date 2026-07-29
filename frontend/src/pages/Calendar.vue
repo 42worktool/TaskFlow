@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import CardDetailModal from '../components/CardDetailModal.vue'
 import { ListAPI } from '../api/list'
-import type { Card } from '../types'
+import { realtime } from '../services/realtime'
+import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
+import type { Card, ListWithCards } from '../types'
 import { cardOccursOnDate } from '../utils/calendar'
 
 const route = useRoute()
@@ -11,19 +13,31 @@ const props = withDefaults(
   defineProps<{
     canEditBoard?: boolean
     canViewCardDetails?: boolean
+    workspaceSyncVersion?: number
   }>(),
   {
     canEditBoard: false,
     canViewCardDetails: false,
+    workspaceSyncVersion: 0,
   },
 )
 const now = new Date()
 const year = ref(now.getFullYear())
 const month = ref(now.getMonth() + 1)
-const cards = ref<Card[]>([])
+const lists = ref<ListWithCards[]>([])
+const cards = computed(() => lists.value.flatMap((list) => list.cards))
 const loading = ref(false)
 const error = ref('')
 const selectedCardId = ref<string | null>(null)
+const cardDetailRefreshToken = ref(0)
+let loadGeneration = 0
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+let refreshRunning = false
+let fullRefreshPending = false
+let fullRefreshRetriesRemaining = 0
+const MAX_FULL_REFRESH_RETRIES = 2
+const pendingListIds = new Set<string>()
+const pendingDeletedListIds = new Set<string>()
 
 const todayDate = now.getDate()
 const todayMonth = now.getMonth() + 1
@@ -50,9 +64,12 @@ function isToday(date: number | null): boolean {
 }
 
 function updateSavedCard(saved: Card): void {
-  cards.value = cards.value.map((card) =>
-    card.id === saved.id ? saved : card,
-  )
+  lists.value = lists.value.map((list) => ({
+    ...list,
+    cards: list.cards.map((card) =>
+      card.id === saved.id ? saved : card,
+    ),
+  }))
 }
 
 function openCard(cardId: string): void {
@@ -92,34 +109,211 @@ const hasCardsThisMonth = computed(() =>
   calendarDays.value.some((cell) => cell.cards.length > 0),
 )
 
+async function loadLists(reset: boolean): Promise<void> {
+  const generation = ++loadGeneration
+  const workspaceId = String(route.params.workspaceId ?? '')
+  const showLoading = reset || loading.value
+  if (reset) {
+    lists.value = []
+    error.value = ''
+  }
+  if (showLoading) loading.value = true
+
+  try {
+    const loaded = await ListAPI.listByWorkspace(workspaceId)
+    if (
+      generation === loadGeneration &&
+      workspaceId === String(route.params.workspaceId ?? '')
+    ) {
+      lists.value = loaded
+      error.value = ''
+      if (!fullRefreshPending) fullRefreshRetriesRemaining = 0
+    }
+  } catch (caught) {
+    if (generation !== loadGeneration) return
+    const message =
+      caught instanceof Error
+        ? caught.message
+        : '달력 일정을 불러오지 못했습니다.'
+    if (showLoading) error.value = message
+    else console.warn('[calendar] background refresh failed', message)
+    if (!reset && fullRefreshRetriesRemaining > 0) {
+      fullRefreshRetriesRemaining -= 1
+      fullRefreshPending = true
+      pendingListIds.clear()
+    }
+  } finally {
+    if (showLoading && generation === loadGeneration) loading.value = false
+  }
+}
+
+async function refreshLists(listIds: readonly string[]): Promise<void> {
+  const workspaceId = String(route.params.workspaceId ?? '')
+  const results = await Promise.allSettled(
+    [...new Set(listIds)].map((listId) => ListAPI.get(listId)),
+  )
+  if (workspaceId !== String(route.params.workspaceId ?? '')) return
+  if (results.some((result) => result.status === 'rejected')) {
+    queueFullRefresh()
+    return
+  }
+
+  const refreshed = results
+    .filter(
+      (result): result is PromiseFulfilledResult<ListWithCards> =>
+        result.status === 'fulfilled' &&
+        result.value.workspace_id === workspaceId,
+    )
+    .map((result) => result.value)
+  const refreshedById = new Map(refreshed.map((list) => [list.id, list]))
+  const next = lists.value.map(
+    (list) => refreshedById.get(list.id) ?? list,
+  )
+  for (const list of refreshed) {
+    if (!next.some((item) => item.id === list.id)) next.push(list)
+  }
+  lists.value = next.sort((left, right) => left.sequence - right.sequence)
+  error.value = ''
+}
+
+function scheduleInvalidationFlush(): void {
+  if (
+    refreshRunning ||
+    refreshTimer ||
+    (!fullRefreshPending &&
+      pendingListIds.size === 0 &&
+      pendingDeletedListIds.size === 0)
+  ) {
+    return
+  }
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null
+    void flushInvalidations()
+  }, 80)
+}
+
+function queueFullRefresh(): void {
+  fullRefreshPending = true
+  fullRefreshRetriesRemaining = MAX_FULL_REFRESH_RETRIES
+  pendingListIds.clear()
+  scheduleInvalidationFlush()
+}
+
+async function flushInvalidations(): Promise<void> {
+  if (refreshRunning) return
+  refreshRunning = true
+
+  const deletedIds = new Set(pendingDeletedListIds)
+  pendingDeletedListIds.clear()
+  lists.value = lists.value.filter((list) => !deletedIds.has(list.id))
+
+  const refreshAll = fullRefreshPending
+  fullRefreshPending = false
+  const listIds = [...pendingListIds].filter((id) => !deletedIds.has(id))
+  pendingListIds.clear()
+
+  try {
+    if (refreshAll) await loadLists(false)
+    else if (listIds.length > 0) await refreshLists(listIds)
+  } finally {
+    refreshRunning = false
+    scheduleInvalidationFlush()
+  }
+}
+
 watch(
   () => String(route.params.workspaceId ?? ''),
-  async (workspaceId, _previousWorkspaceId, onCleanup) => {
-    let cancelled = false
-    onCleanup(() => {
-      cancelled = true
-    })
-
-    cards.value = []
+  (workspaceId) => {
+    loadGeneration += 1
+    lists.value = []
     selectedCardId.value = null
     error.value = ''
+    loading.value = false
+    fullRefreshPending = false
+    fullRefreshRetriesRemaining = 0
+    pendingListIds.clear()
+    pendingDeletedListIds.clear()
+    if (refreshTimer) clearTimeout(refreshTimer)
+    refreshTimer = null
     if (!workspaceId) return
-
-    loading.value = true
-    try {
-      const lists = await ListAPI.listByWorkspace(workspaceId)
-      if (!cancelled) cards.value = lists.flatMap((list) => list.cards)
-    } catch (caught) {
-      if (!cancelled) {
-        error.value =
-          caught instanceof Error ? caught.message : '달력 일정을 불러오지 못했습니다.'
-      }
-    } finally {
-      if (!cancelled) loading.value = false
-    }
+    void loadLists(true)
   },
   { immediate: true },
 )
+
+watch(
+  () => props.workspaceSyncVersion,
+  (next, previous) => {
+    if (next === previous) return
+    queueFullRefresh()
+  },
+)
+
+const removeWorkspaceChangeListener = realtime.on(
+  'workspace.changed',
+  (value) => {
+    const event = parseWorkspaceChangedEvent(value)
+    const currentWorkspaceId = String(route.params.workspaceId ?? '')
+    if (!event || event.workspace_id !== currentWorkspaceId) return
+
+    if (loading.value) {
+      if (
+        event.entity === 'card' &&
+        selectedCardId.value === event.entity_id
+      ) {
+        cardDetailRefreshToken.value += 1
+      }
+      fullRefreshPending = true
+      pendingListIds.clear()
+      scheduleInvalidationFlush()
+      return
+    }
+
+    if (event.entity === 'list') {
+      if (event.action === 'deleted') {
+        const deletedList = lists.value.find(
+          (list) => list.id === event.entity_id,
+        )
+        if (
+          selectedCardId.value &&
+          deletedList?.cards.some(
+            (card) => card.id === selectedCardId.value,
+          )
+        ) {
+          selectedCardId.value = null
+        }
+        pendingDeletedListIds.add(event.entity_id)
+        pendingListIds.delete(event.entity_id)
+      } else {
+        const ids =
+          event.list_ids.length > 0
+            ? event.list_ids
+            : [event.entity_id]
+        ids.forEach((id) => pendingListIds.add(id))
+      }
+      scheduleInvalidationFlush()
+      return
+    }
+
+    if (event.entity !== 'card') return
+    if (
+      event.action === 'deleted' &&
+      selectedCardId.value === event.entity_id
+    ) {
+      selectedCardId.value = null
+    } else if (selectedCardId.value === event.entity_id) {
+      cardDetailRefreshToken.value += 1
+    }
+    event.list_ids.forEach((id) => pendingListIds.add(id))
+    scheduleInvalidationFlush()
+  },
+)
+
+onUnmounted(() => {
+  loadGeneration += 1
+  removeWorkspaceChangeListener()
+  if (refreshTimer) clearTimeout(refreshTimer)
+})
 
 const weekDays = ['일', '월', '화', '수', '목', '금', '토']
 </script>
@@ -183,6 +377,7 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
       v-if="selectedCardId"
       :card-id="selectedCardId"
       :editable="canEditBoard"
+      :refresh-token="cardDetailRefreshToken"
       @saved="updateSavedCard"
       @close="selectedCardId = null"
     />

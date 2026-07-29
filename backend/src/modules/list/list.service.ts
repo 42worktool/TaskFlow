@@ -11,6 +11,7 @@ import { getRole, requireRole } from '../workspace/workspace.service'
 import { createdBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
 import { toBoardListDto, toListDto } from './list.dto'
+import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 
 async function assertReadAccess(userId: string, workspaceId: string): Promise<void> {
   const ws = await prisma.workspace.findFirst({ where: { id: workspaceId, deleted_at: null } })
@@ -41,6 +42,22 @@ export async function listLists(input: { userId: string; workspaceId: string }) 
   return lists.map(toBoardListDto)
 }
 
+export async function getList(input: { userId: string; listId: string }) {
+  const list = await prisma.list.findFirst({
+    where: { id: input.listId, deleted_at: null },
+    include: {
+      cards: {
+        where: { deleted_at: null },
+        orderBy: { sequence: 'asc' },
+      },
+    },
+  })
+  if (!list) throw new NotFoundError()
+
+  await assertReadAccess(input.userId, list.workspace_id)
+  return toBoardListDto(list)
+}
+
 /**
  * Create a list at the end of the workspace's board. Requires MEMBER+.
  */
@@ -64,7 +81,16 @@ export async function createList(input: {
       ...createdBy(input.userId),
     },
   })
-  return toListDto(list)
+  const dto = toListDto(list)
+  publishWorkspaceChange({
+    workspace_id: input.workspaceId,
+    entity: 'list',
+    action: 'created',
+    entity_id: list.id,
+    list_ids: [list.id],
+    actor_user_id: input.userId,
+  })
+  return dto
 }
 
 /**
@@ -79,7 +105,16 @@ export async function updateList(input: { userId: string; listId: string; name: 
     where: { id: input.listId },
     data: { name: input.name, ...updatedBy(input.userId) },
   })
-  return toListDto(updated)
+  const dto = toListDto(updated)
+  publishWorkspaceChange({
+    workspace_id: list.workspace_id,
+    entity: 'list',
+    action: 'updated',
+    entity_id: list.id,
+    list_ids: [list.id],
+    actor_user_id: input.userId,
+  })
+  return dto
 }
 
 /**
@@ -130,6 +165,15 @@ export async function deleteList(input: { userId: string; listId: string }): Pro
       },
     })
   })
+
+  publishWorkspaceChange({
+    workspace_id: list.workspace_id,
+    entity: 'list',
+    action: 'deleted',
+    entity_id: list.id,
+    list_ids: [list.id],
+    actor_user_id: input.userId,
+  })
 }
 
 /**
@@ -162,5 +206,14 @@ export async function reorderList(
     where: { id: input.listId },
     data: { sequence: newSequence, ...updatedBy(input.userId) },
   })
-  return toListDto(updated)
+  const dto = toListDto(updated)
+  publishWorkspaceChange({
+    workspace_id: list.workspace_id,
+    entity: 'list',
+    action: 'moved',
+    entity_id: list.id,
+    list_ids: [list.id],
+    actor_user_id: input.userId,
+  })
+  return dto
 }

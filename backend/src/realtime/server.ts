@@ -226,6 +226,26 @@ export class RealtimeServer {
     }
   }
 
+  leaveUserChannel(userId: string, channel: string): void {
+    const connectionIds = this.userConnections.get(userId);
+    if (!connectionIds) return;
+
+    for (const connectionId of [...connectionIds]) {
+      const connection = this.connections.get(connectionId);
+      if (connection) this.leave(connection, channel);
+    }
+  }
+
+  clearChannel(channel: string): void {
+    const connectionIds = this.channels.get(channel);
+    if (!connectionIds) return;
+
+    for (const connectionId of [...connectionIds]) {
+      const connection = this.connections.get(connectionId);
+      if (connection) this.leave(connection, channel);
+    }
+  }
+
   disconnectUser(userId: string, reason = 'Session ended'): void {
     const connectionIds = this.userConnections.get(userId);
     if (!connectionIds) return;

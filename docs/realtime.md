@@ -26,6 +26,19 @@ when a user gains their first authenticated socket or loses their last one.
 There is no persisted `last_seen`, device count, grace period, or presence
 subscription request.
 
+Workspace realtime is the third slice. Active members subscribe to a
+`workspace:<id>` channel. Successful REST mutations publish a compact
+`workspace.changed` invalidation hint after the database commit, and the
+browser refetches the affected list snapshots. `workspace.message_created`
+delivers PostgreSQL-backed group-chat messages, while
+`workspace.member_presence_changed` carries first-connect/last-disconnect
+presence transitions. Public non-members can still read public boards through
+REST, but cannot subscribe to the member channel or use chat.
+
+The invalidation event is intentionally not a durable mutation stream. The
+browser treats REST as canonical and performs a full workspace/board/chat
+snapshot refresh after every successful reconnect.
+
 ## Connection and authentication lifecycle
 
 1. The frontend opens `wss://<current-origin>/ws` and sends
@@ -123,15 +136,21 @@ import { realtime, RealtimeError } from '../../realtime';
 
 realtime.register(
   'workspace.subscribe',
-  z.object({ workspaceId: z.string().uuid() }).strict(),
-  async (context, { workspaceId }) => {
-    const membership = await findMembership(context.userId, workspaceId);
+  z.object({ workspace_id: z.string().uuid() }).strict(),
+  async (context, { workspace_id }) => {
+    const membership = await findMembership(context.userId, workspace_id);
     if (!membership) {
-      throw new RealtimeError('FORBIDDEN', 'Workspace access is required');
+      throw new RealtimeError(
+        'WORKSPACE_ACCESS_REQUIRED',
+        'Active workspace membership is required',
+      );
     }
 
-    context.join(`workspace:${workspaceId}`);
-    return { workspaceId, cursor: await currentWorkspaceCursor(workspaceId) };
+    context.join(`workspace:${workspace_id}`);
+    return {
+      workspace_id,
+      online_user_ids: await onlineMemberIds(workspace_id),
+    };
   },
 );
 ```
@@ -164,15 +183,18 @@ request results remain distinct:
 
 ```ts
 export interface RealtimeServerEvents {
-  'card.updated': WorkspaceEvent;
+  'workspace.changed': WorkspaceChangedEvent;
 }
 
 export interface RealtimeClientEvents {
-  'workspace.subscribe': { workspaceId: string };
+  'workspace.subscribe': { workspace_id: string };
 }
 
 export interface RealtimeClientRequestResults {
-  'workspace.subscribe': { workspaceId: string; cursor: number };
+  'workspace.subscribe': {
+    workspace_id: string;
+    online_user_ids: string[];
+  };
 }
 ```
 
@@ -185,34 +207,37 @@ callback:
 const removeRecovery = realtime.registerSubscriptionRecovery(
   `workspace:${workspaceId}`,
   async () => {
-    await realtime.request('workspace.subscribe', { workspaceId });
-
-    const missed = await apiRequest<WorkspaceEvent[]>(
-      `/api/workspaces/${workspaceId}/events?after=${lastCursor}`,
-    );
-    applyInSequenceAndDeduplicate(missed);
+    await realtime.request('workspace.subscribe', {
+      workspace_id: workspaceId,
+    });
+    await refreshWorkspace();
+    await refreshBoard();
+    await refreshChat();
   },
 );
 
-const unsubscribe = realtime.on('card.updated', applyRealtimeEvent);
+const unsubscribe = realtime.on('workspace.changed', scheduleTargetedRefresh);
 
 // Component cleanup
 unsubscribe();
 removeRecovery();
+await realtime.request('workspace.unsubscribe', {
+  workspace_id: workspaceId,
+});
 ```
 
 Listener invocation follows wire arrival order, but asynchronous listener
 completion is not serialized. Apply ordered state changes synchronously, or put
-cursor-bearing events through a feature-owned sequential consumer.
+bursts through a small feature-owned debounce/merge queue.
 
 The recovery callback runs once after each new valid `system.ready`, and also
 runs when registered on an already-connected client. It must re-subscribe and
-then recover from the last durable cursor over HTTP. Live events can interleave
-with that response, so domain events need a stable event ID and monotonic
-cursor/sequence and must be applied idempotently. Callback failures are logged;
-feature code owns any same-connection retry. Explicit `disconnect()` clears all
-registered recovery intents to prevent one user's private subscriptions from
-being replayed in another session.
+then reload canonical HTTP snapshots. Live events can interleave with that
+response, so the workspace feature merges presence deltas and deduplicates chat
+messages by ID. Callback failures are logged; feature code owns any
+same-connection retry. Explicit `disconnect()` clears all registered recovery
+intents to prevent one user's private subscriptions from being replayed in
+another session.
 
 ## Presence hooks and multiple replicas
 
@@ -231,13 +256,13 @@ because a user can have multiple tabs or devices. These indexes, channels,
 hooks, `publish()`, and `sendToUser()` are currently local to one backend
 process. Before adding replicas, route cross-process events through Redis
 Pub/Sub and keep presence connection IDs in Redis with heartbeat/TTL cleanup.
-PostgreSQL remains the durable source for messages and workspace events, and
-HTTP cursor recovery remains the repair path.
+PostgreSQL remains the durable source for messages and workspace state, and
+HTTP snapshot recovery remains the repair path.
 
 The current friend implementation follows that process-local model. A first
 connection sends `online: true` to current friends, a last disconnect sends
 `online: false`, and intermediate tab changes emit nothing. Events are
-best-effort; opening the Account page and reconnecting both refresh the
+best-effort; opening the Friends page and reconnecting both refresh the
 authoritative snapshot through `GET /api/friends`.
 
 ## Limits and configuration

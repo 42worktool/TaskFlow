@@ -4,6 +4,7 @@ import test, { type TestContext } from 'node:test'
 const USER_ID = '00000000-0000-4000-8000-000000000001'
 const LIST_ID = '00000000-0000-4000-8000-000000000002'
 const WORKSPACE_ID = '00000000-0000-4000-8000-000000000003'
+const CARD_ID = '00000000-0000-4000-8000-000000000004'
 
 function setRequiredEnvironment(): void {
   Object.assign(process.env, {
@@ -41,8 +42,9 @@ function stubMethod(
 
 test('deleteList detaches relations and transfers cards to the member inbox', async (t) => {
   setRequiredEnvironment()
-  const [{ prisma }, { deleteList }] = await Promise.all([
+  const [{ prisma }, { realtime }, { deleteList }] = await Promise.all([
     import('../../db'),
+    import('../../realtime'),
     import('./list.service'),
   ])
 
@@ -80,10 +82,50 @@ test('deleteList detaches relations and transfers cards to the member inbox', as
     return [{ id: LIST_ID }]
   })
   stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  let publication: unknown[]
+  stubMethod(t, realtime, 'publish', (...args) => {
+    operationOrder.push('publish')
+    publication = args
+  })
 
   await deleteList({ userId: USER_ID, listId: LIST_ID })
 
-  assert.deepEqual(operationOrder, ['list', 'lock', 'members', 'labels', 'cards'])
+  assert.deepEqual(operationOrder, [
+    'list',
+    'lock',
+    'members',
+    'labels',
+    'cards',
+    'publish',
+  ])
+  assert.equal(publication![0], `workspace:${WORKSPACE_ID}`)
+  assert.equal(publication![1], 'workspace.changed')
+  const event = publication![2] as {
+    workspace_id: string
+    entity: string
+    action: string
+    entity_id: string
+    list_ids: string[]
+    actor_user_id: string
+  }
+  assert.deepEqual(
+    {
+      workspace_id: event.workspace_id,
+      entity: event.entity,
+      action: event.action,
+      entity_id: event.entity_id,
+      list_ids: event.list_ids,
+      actor_user_id: event.actor_user_id,
+    },
+    {
+      workspace_id: WORKSPACE_ID,
+      entity: 'list',
+      action: 'deleted',
+      entity_id: LIST_ID,
+      list_ids: [LIST_ID],
+      actor_user_id: USER_ID,
+    },
+  )
   for (const update of [memberUpdate, labelUpdate]) {
     assert.deepEqual(update.where, {
       deleted_at: null,
@@ -129,4 +171,60 @@ test('deleteList rejects viewers before creating transaction operations', async 
   )
   assert.equal(cardUpdateCalls, 0)
   assert.equal(listUpdateCalls, 0)
+})
+
+test('getList returns one list with cards under the board read policy', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { getList }] = await Promise.all([
+    import('../../db'),
+    import('./list.service'),
+  ])
+  const now = new Date('2026-07-29T00:00:00.000Z')
+  let listQuery: any
+  stubMethod(t, prisma.list, 'findFirst', async (args) => {
+    listQuery = args
+    return {
+      id: LIST_ID,
+      workspace_id: WORKSPACE_ID,
+      name: 'Todo',
+      sequence: 1,
+      is_done: false,
+      created_at: now,
+      created_by: USER_ID,
+      updated_at: now,
+      updated_by: USER_ID,
+      deleted_at: null,
+      deleted_by: null,
+      cards: [
+        {
+          id: CARD_ID,
+          list_id: LIST_ID,
+          user_id: null,
+          title: 'Card',
+          description: '',
+          start_at: null,
+          deadline: null,
+          sequence: 1,
+          created_at: now,
+          created_by: USER_ID,
+          updated_at: now,
+          updated_by: USER_ID,
+          deleted_at: null,
+          deleted_by: null,
+        },
+      ],
+    }
+  })
+  stubMethod(t, prisma.workspace, 'findFirst', async () => ({
+    is_public: true,
+  }))
+
+  const result = await getList({ userId: USER_ID, listId: LIST_ID })
+
+  assert.equal(result.id, LIST_ID)
+  assert.deepEqual(result.cards.map((card) => card.id), [CARD_ID])
+  assert.deepEqual(listQuery.include.cards, {
+    where: { deleted_at: null },
+    orderBy: { sequence: 'asc' },
+  })
 })
