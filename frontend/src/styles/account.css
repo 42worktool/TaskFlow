@@ -216,6 +216,28 @@
   font-size: 12px;
 }
 
+.friend-meta .friend-presence {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.friend-presence::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9ca3af;
+  content: '';
+}
+
+.friend-meta .friend-presence--online {
+  color: #15803d;
+}
+
+.friend-presence--online::before {
+  background: #22c55e;
+}
+
 .friend-remove-button {
   padding: 6px 8px;
   border: 0;

@@ -88,4 +88,10 @@ export interface Friend {
   name: string
   profile_image_url: string | null
   friends_since: ISODateString
+  online: boolean
+}
+
+export interface FriendPresenceEvent {
+  user_id: UUID
+  online: boolean
 }

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import LegalFooter from '../components/LegalFooter.vue'
 import { FriendAPI } from '../api/friend'
 import { authState, deleteAccount, updateAccount } from '../services/auth'
+import { realtime } from '../services/realtime'
+import { parseFriendPresenceEvent } from '../services/realtime/protocol'
 import type { Friend } from '../types'
 
 const router = useRouter()
@@ -18,6 +20,15 @@ const addingFriend = ref(false)
 const removingFriendId = ref<string | null>(null)
 const friendMessage = ref('')
 const friendError = ref('')
+let friendLoadGeneration = 0
+let presenceSequence = 0
+let reloadAfterMutation = false
+const livePresence = new Map<
+  string,
+  { online: boolean; sequence: number }
+>()
+let removePresenceListener: (() => void) | null = null
+let removeRealtimeStateListener: (() => void) | null = null
 
 async function saveProfile() {
   saving.value = true
@@ -48,26 +59,74 @@ async function removeAccount() {
   }
 }
 
-async function loadFriends() {
+async function loadFriends(options: { preserveError?: boolean } = {}) {
+  const generation = ++friendLoadGeneration
+  const presenceAtStart = presenceSequence
   loadingFriends.value = true
-  friendError.value = ''
+  if (!options.preserveError) friendError.value = ''
   try {
-    friends.value = await FriendAPI.list()
+    const loaded = await FriendAPI.list()
+    if (generation !== friendLoadGeneration) return
+    for (const friend of loaded) {
+      const live = livePresence.get(friend.id)
+      if (live && live.sequence > presenceAtStart) {
+        friend.online = live.online
+      }
+    }
+    friends.value = loaded
   } catch (caught) {
+    if (generation !== friendLoadGeneration) return
     friendError.value =
       caught instanceof Error ? caught.message : '친구 목록을 불러오지 못했습니다.'
   } finally {
-    loadingFriends.value = false
+    if (generation === friendLoadGeneration) loadingFriends.value = false
+  }
+}
+
+function receiveFriendPresence(value: unknown) {
+  const event = parseFriendPresenceEvent(value)
+  if (!event) return
+
+  presenceSequence += 1
+  livePresence.set(event.user_id, {
+    online: event.online,
+    sequence: presenceSequence,
+  })
+  const friend = friends.value.find((item) => item.id === event.user_id)
+  if (friend) friend.online = event.online
+}
+
+function refreshFriendsAfterReconnect() {
+  if (addingFriend.value || removingFriendId.value) {
+    reloadAfterMutation = true
+    return
+  }
+  void loadFriends()
+}
+
+function runDeferredFriendRefresh() {
+  if (
+    reloadAfterMutation &&
+    !addingFriend.value &&
+    !removingFriendId.value
+  ) {
+    reloadAfterMutation = false
+    void loadFriends({ preserveError: true })
   }
 }
 
 async function addFriend() {
   if (loadingFriends.value || addingFriend.value || !friendEmail.value.trim()) return
+  const presenceAtStart = presenceSequence
   addingFriend.value = true
   friendMessage.value = ''
   friendError.value = ''
   try {
     const friend = await FriendAPI.add(friendEmail.value)
+    const live = livePresence.get(friend.id)
+    if (live && live.sequence > presenceAtStart) {
+      friend.online = live.online
+    }
     const existingIndex = friends.value.findIndex((item) => item.id === friend.id)
     if (existingIndex === -1) friends.value.unshift(friend)
     else friends.value[existingIndex] = friend
@@ -78,6 +137,7 @@ async function addFriend() {
       caught instanceof Error ? caught.message : '친구를 추가하지 못했습니다.'
   } finally {
     addingFriend.value = false
+    runDeferredFriendRefresh()
   }
 }
 
@@ -95,11 +155,26 @@ async function removeFriend(friend: Friend) {
       caught instanceof Error ? caught.message : '친구를 삭제하지 못했습니다.'
   } finally {
     removingFriendId.value = null
+    runDeferredFriendRefresh()
   }
 }
 
 onMounted(() => {
+  removePresenceListener = realtime.on(
+    'friend.presence_changed',
+    receiveFriendPresence,
+  )
+  removeRealtimeStateListener = realtime.onStateChange((state) => {
+    if (state === 'connected') refreshFriendsAfterReconnect()
+  })
   void loadFriends()
+})
+
+onUnmounted(() => {
+  friendLoadGeneration += 1
+  removePresenceListener?.()
+  removeRealtimeStateListener?.()
+  livePresence.clear()
 })
 </script>
 
@@ -207,6 +282,12 @@ onMounted(() => {
             </div>
             <div class="friend-meta">
               <strong>{{ friend.name }}</strong>
+              <span
+                class="friend-presence"
+                :class="{ 'friend-presence--online': friend.online }"
+              >
+                {{ friend.online ? '온라인' : '오프라인' }}
+              </span>
               <span>
                 {{ new Date(friend.friends_since).toLocaleDateString('ko-KR') }}부터 친구
               </span>

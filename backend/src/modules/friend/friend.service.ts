@@ -2,6 +2,7 @@ import { prisma } from '../../db'
 import { AppError, NotFoundError } from '../../errors'
 import { normalizeEmail } from '../auth/auth.utils'
 import { friendshipInclude, toFriendDto } from './friend.dto'
+import { isUserOnline } from '../presence/presence.state'
 
 class CannotFriendSelfError extends AppError {
   constructor() {
@@ -37,9 +38,17 @@ export async function listFriends(input: { userId: string }) {
     orderBy: { created_at: 'desc' },
   })
 
-  return friendships.map((friendship) =>
-    toFriendDto(friendship, input.userId),
-  )
+  return friendships.map((friendship) => {
+    const friendUserId =
+      friendship.user_low_id === input.userId
+        ? friendship.user_high_id
+        : friendship.user_low_id
+    return toFriendDto(
+      friendship,
+      input.userId,
+      isUserOnline(friendUserId),
+    )
+  })
 }
 
 export async function addFriend(input: { userId: string; email: string }) {
@@ -63,7 +72,7 @@ export async function addFriend(input: { userId: string; email: string }) {
     include: friendshipInclude,
   })
 
-  return toFriendDto(friendship, input.userId)
+  return toFriendDto(friendship, input.userId, isUserOnline(target.id))
 }
 
 export async function removeFriend(input: {

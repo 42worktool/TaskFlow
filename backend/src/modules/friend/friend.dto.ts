@@ -21,11 +21,13 @@ export interface FriendDto {
   name: string
   profile_image_url: string | null
   friends_since: string
+  online: boolean
 }
 
 export function toFriendDto(
   friendship: FriendshipWithUsers,
   currentUserId: string,
+  online: boolean,
 ): FriendDto {
   const friend =
     friendship.user_low_id === currentUserId
@@ -37,5 +39,6 @@ export function toFriendDto(
     name: friend.name,
     profile_image_url: friend.profile_image_url,
     friends_since: friendship.created_at.toISOString(),
+    online,
   }
 }
