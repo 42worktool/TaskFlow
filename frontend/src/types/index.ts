@@ -82,3 +82,10 @@ export interface NotificationEvent {
 export interface Notification extends NotificationEvent {
   read: boolean
 }
+
+export interface Friend {
+  id: UUID
+  name: string
+  profile_image_url: string | null
+  friends_since: ISODateString
+}
