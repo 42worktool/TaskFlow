@@ -25,6 +25,7 @@ describe('ChatAPI', () => {
     const message = {
       id: 'message-1',
       workspace_id: 'workspace-1',
+      card_id: null,
       content: '안녕하세요',
       created_at: '2026-07-29T00:00:00.000Z',
       author: {
@@ -43,6 +44,36 @@ describe('ChatAPI', () => {
       {
         method: 'POST',
         json: { content: '안녕하세요' },
+      },
+    )
+  })
+
+  it('sends an optional card reference with a workspace message', async () => {
+    const message = {
+      id: 'message-1',
+      workspace_id: 'workspace-1',
+      card_id: 'card-1',
+      content: '카드 코멘트',
+      created_at: '2026-07-29T00:00:00.000Z',
+      author: {
+        user_id: 'user-1',
+        name: 'Sean',
+        profile_image_url: null,
+      },
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(message)
+
+    await expect(
+      ChatAPI.send('workspace-1', '카드 코멘트', 'card-1'),
+    ).resolves.toEqual(message)
+    expect(apiRequest).toHaveBeenCalledWith(
+      '/api/workspaces/workspace-1/messages',
+      {
+        method: 'POST',
+        json: {
+          content: '카드 코멘트',
+          card_id: 'card-1',
+        },
       },
     )
   })

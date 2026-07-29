@@ -42,6 +42,7 @@ export interface WorkspaceMemberPresenceEvent {
 export interface WorkspaceMessage {
   id: UUID
   workspace_id: UUID
+  card_id: UUID | null
   content: string
   created_at: ISODateString
   author: {
@@ -104,10 +105,24 @@ export interface CardAttachment {
   created_at: ISODateString
 }
 
+export interface CardComment {
+  id: UUID
+  card_id: UUID
+  author: {
+    user_id: UUID
+    name: string
+    profile_image_url: string | null
+  }
+  comment_str: string
+  created_at: ISODateString
+  updated_at: ISODateString
+}
+
 export interface CardDetail extends Card {
   members: CardDetailMember[]
   labels: CardDetailLabel[]
   attachments: CardAttachment[]
+  comments: CardComment[]
 }
 
 export interface ListWithCards extends List {
@@ -115,9 +130,10 @@ export interface ListWithCards extends List {
 }
 
 /** Payload shape emitted by vuedraggable's `change` event. */
-export interface DraggableChange {
-  added?: { element: { id: string }; newIndex: number }
-  moved?: { element: { id: string }; newIndex: number }
+export interface DraggableChange<T extends { id: string } = { id: string }> {
+  added?: { element: T; newIndex: number }
+  moved?: { element: T; oldIndex: number; newIndex: number }
+  removed?: { element: T; oldIndex: number }
 }
 
 export type NotificationCategory = 'MENTION' | 'UPDATE'

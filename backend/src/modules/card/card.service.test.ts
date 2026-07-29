@@ -535,7 +535,7 @@ test('moveCard rechecks inbox ownership after locking the card', async (t) => {
   assert.equal(updateCalls, 0)
 })
 
-test('getCard includes active labels in its detail response', async (t) => {
+test('getCard includes active labels and comments in its detail response', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { getCard }] = await Promise.all([
     import('../../db'),
@@ -557,6 +557,28 @@ test('getCard includes active labels in its detail response', async (t) => {
     }]
   })
   stubMethod(t, prisma.attachment, 'findMany', async () => [])
+  let commentQuery: unknown
+  stubMethod(t, prisma.comment, 'findMany', async (args) => {
+    commentQuery = args
+    const now = new Date('2026-07-27T00:00:00.000Z')
+    return [{
+      id: '00000000-0000-4000-8000-000000000008',
+      card_id: CARD_ID,
+      user_id: USER_ID,
+      comment_str: 'From workspace chat',
+      created_at: now,
+      created_by: USER_ID,
+      updated_at: now,
+      updated_by: USER_ID,
+      deleted_at: null,
+      deleted_by: null,
+      user: {
+        id: USER_ID,
+        name: 'User',
+        profile_image_url: null,
+      },
+    }]
+  })
 
   const detail = await getCard({ userId: USER_ID, cardId: CARD_ID })
 
@@ -575,6 +597,27 @@ test('getCard includes active labels in its detail response', async (t) => {
     include: {
       label: {
         select: { id: true, label_name: true, label_color: true },
+      },
+    },
+  })
+  assert.deepEqual(detail.comments, [{
+    id: '00000000-0000-4000-8000-000000000008',
+    card_id: CARD_ID,
+    author: {
+      user_id: USER_ID,
+      name: 'User',
+      profile_image_url: null,
+    },
+    comment_str: 'From workspace chat',
+    created_at: new Date('2026-07-27T00:00:00.000Z'),
+    updated_at: new Date('2026-07-27T00:00:00.000Z'),
+  }])
+  assert.deepEqual(commentQuery, {
+    where: { card_id: CARD_ID, deleted_at: null },
+    orderBy: { created_at: 'asc' },
+    include: {
+      user: {
+        select: { id: true, name: true, profile_image_url: true },
       },
     },
   })

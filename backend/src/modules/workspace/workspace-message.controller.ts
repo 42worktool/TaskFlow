@@ -19,6 +19,7 @@ export const create: RequestHandler = async (req, res) => {
     userId: req.user!.id,
     workspaceId: req.params.workspaceId as string,
     content: body.content,
+    cardId: body.card_id,
   })
   res.status(201).json(message)
 }

@@ -73,11 +73,13 @@ export function toCardDetailDto(
   members: Parameters<typeof toCardMemberDto>[0][],
   labels: CardLabelWithLabel[],
   attachments: Attachment[],
+  comments: CommentWithUser[],
 ) {
   return {
     ...toCardDto(card),
     members: members.map(toCardMemberDto),
     labels: labels.map(toCardLabelDto),
     attachments: attachments.map(toAttachmentDto),
+    comments: comments.map(toCommentDto),
   }
 }

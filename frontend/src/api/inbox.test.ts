@@ -52,7 +52,10 @@ describe('InboxAPI', () => {
       .mockReturnValueOnce(move as never)
       .mockResolvedValueOnce([] as never)
 
-    const movePromise = InboxAPI.moveToList('card-1', 'list-1')
+    const movePromise = InboxAPI.moveToList('card-1', 'list-1', {
+      before_card_id: 'card-before',
+      after_card_id: 'card-after',
+    })
     const listPromise = InboxAPI.list()
     await Promise.resolve()
 
@@ -62,7 +65,11 @@ describe('InboxAPI', () => {
       '/api/cards/card-1/move',
       {
         method: 'PUT',
-        json: { list_id: 'list-1' },
+        json: {
+          list_id: 'list-1',
+          before_card_id: 'card-before',
+          after_card_id: 'card-after',
+        },
       },
     )
 

@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
+import type { CSSProperties } from 'vue'
 import { useRoute } from 'vue-router'
 import CardDetailModal from '../components/CardDetailModal.vue'
 import { ListAPI } from '../api/list'
 import { realtime } from '../services/realtime'
 import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
 import type { Card, ListWithCards } from '../types'
-import { cardOccursOnDate } from '../utils/calendar'
+import {
+  buildCalendarWeeks,
+  type CalendarRangeSegment,
+} from '../utils/calendar'
 
 const route = useRoute()
 const props = withDefaults(
@@ -76,38 +80,54 @@ function openCard(cardId: string): void {
   if (props.canViewCardDetails) selectedCardId.value = cardId
 }
 
-interface CalendarCell {
-  date: number | null
-  cards: Card[]
-}
-
-const calendarDays = computed<CalendarCell[]>(() => {
-  const firstDay = new Date(year.value, month.value - 1, 1).getDay()
-  const daysInMonth = new Date(year.value, month.value, 0).getDate()
-  const days: CalendarCell[] = []
-
-  for (let i = 0; i < firstDay; i++) {
-    days.push({ date: null, cards: [] })
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    const date = new Date(year.value, month.value - 1, d)
-    days.push({
-      date: d,
-      cards: cards.value.filter((card) => cardOccursOnDate(card, date)),
-    })
-  }
-  const remaining = 7 - (days.length % 7)
-  if (remaining < 7) {
-    for (let i = 0; i < remaining; i++) {
-      days.push({ date: null, cards: [] })
-    }
-  }
-  return days
-})
+const calendarWeeks = computed(() =>
+  buildCalendarWeeks(year.value, month.value, cards.value),
+)
 
 const hasCardsThisMonth = computed(() =>
-  calendarDays.value.some((cell) => cell.cards.length > 0),
+  calendarWeeks.value.some((week) => week.segments.length > 0),
 )
+
+const rangeColors = ['#2563eb', '#7c3aed', '#0f766e', '#c2410c', '#be123c']
+
+function rangeColor(cardId: string): string {
+  let hash = 0
+  for (let index = 0; index < cardId.length; index++) {
+    hash = (hash * 31 + cardId.charCodeAt(index)) | 0
+  }
+  return rangeColors[Math.abs(hash) % rangeColors.length]
+}
+
+function weekStyle(laneCount: number): CSSProperties {
+  return {
+    '--cal-lane-count': String(Math.max(1, laneCount)),
+  }
+}
+
+function segmentStyle(segment: CalendarRangeSegment): CSSProperties {
+  return {
+    gridColumn: `${segment.startColumn + 1} / ${segment.endColumn + 2}`,
+    gridRow: String(segment.lane + 1),
+    '--cal-range-color': rangeColor(segment.card.id),
+  }
+}
+
+function formatCardDate(value: string | null): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`
+}
+
+function cardRangeLabel(card: Card): string {
+  const start = formatCardDate(card.start_at)
+  const deadline = formatCardDate(card.deadline)
+  const period =
+    start && deadline
+      ? `${start}부터 ${deadline}까지`
+      : start || deadline
+  return period ? `${card.title}, ${period}` : card.title
+}
 
 async function loadLists(reset: boolean): Promise<void> {
   const generation = ++loadGeneration
@@ -339,38 +359,59 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
     </p>
 
     <div v-if="!loading && !error" class="cal-grid">
-      <div
-        v-for="day in weekDays"
-        :key="day"
-        class="weekday-header"
-        :class="{ 'weekday-sun': day === '일' }"
-      >
-        {{ day }}
+      <div class="cal-weekdays">
+        <div
+          v-for="day in weekDays"
+          :key="day"
+          class="weekday-header"
+          :class="{ 'weekday-sun': day === '일' }"
+        >
+          {{ day }}
+        </div>
       </div>
 
       <div
-        v-for="(cell, i) in calendarDays"
-        :key="i"
-        class="cal-cell"
-        :class="{ 'cal-cell--today': isToday(cell.date) }"
+        v-for="(week, weekIndex) in calendarWeeks"
+        :key="weekIndex"
+        class="cal-week"
+        :style="weekStyle(week.laneCount)"
       >
-        <span
-          v-if="cell.date"
-          class="cell-date"
-          :class="{ 'cell-date--today': isToday(cell.date) }"
-        >
-          {{ cell.date }}
-        </span>
-        <button
-          v-for="c in cell.cards"
-          :key="c.id"
-          type="button"
-          class="cal-card"
-          :disabled="!canViewCardDetails"
-          @click="openCard(c.id)"
-        >
-          {{ c.title }}
-        </button>
+        <div class="cal-week-days">
+          <div
+            v-for="(day, dayIndex) in week.days"
+            :key="dayIndex"
+            class="cal-cell"
+            :class="{ 'cal-cell--today': isToday(day.date) }"
+          >
+            <span
+              v-if="day.date"
+              class="cell-date"
+              :class="{ 'cell-date--today': isToday(day.date) }"
+            >
+              {{ day.date }}
+            </span>
+          </div>
+        </div>
+
+        <div class="cal-week-ranges">
+          <button
+            v-for="segment in week.segments"
+            :key="segment.card.id"
+            type="button"
+            class="cal-range"
+            :class="{
+              'cal-range--continues-before': segment.continuesBefore,
+              'cal-range--continues-after': segment.continuesAfter,
+            }"
+            :style="segmentStyle(segment)"
+            :title="cardRangeLabel(segment.card)"
+            :aria-label="cardRangeLabel(segment.card)"
+            :disabled="!canViewCardDetails"
+            @click="openCard(segment.card.id)"
+          >
+            <span class="cal-range-label">{{ segment.card.title }}</span>
+          </button>
+        </div>
       </div>
     </div>
     <CardDetailModal

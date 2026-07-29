@@ -30,10 +30,18 @@ export const InboxAPI = {
   moveToInbox: (cardId: string): Promise<Card> =>
     queueInboxMutation(() => CardAPI.moveToInbox(cardId)),
 
-  moveToList: (cardId: string, listId: string): Promise<Card> =>
+  moveToList: (
+    cardId: string,
+    listId: string,
+    neighbor: {
+      before_card_id?: string | null
+      after_card_id?: string | null
+    } = {},
+  ): Promise<Card> =>
     queueInboxMutation(() =>
       CardAPI.move(cardId, {
         list_id: listId,
+        ...neighbor,
       }),
     ),
 

@@ -1,4 +1,6 @@
 import { prisma } from '../../db'
+import { NotFoundError } from '../../errors'
+import { createdBy } from '../../lib/audit'
 import { realtime } from '../../realtime'
 import { requireRole } from './workspace.service'
 import {
@@ -6,7 +8,7 @@ import {
   workspaceMessageDtoSchema,
   type WorkspaceMessageDto,
 } from './workspace-message.dto'
-import { workspaceChannel } from './workspace.realtime'
+import { publishWorkspaceChange, workspaceChannel } from './workspace.realtime'
 
 const messageAuthorSelect = {
   id: true,
@@ -53,18 +55,62 @@ export async function createWorkspaceMessage(input: {
   userId: string
   workspaceId: string
   content: string
+  cardId?: string | null
 }) {
   await requireRole(input.workspaceId, input.userId, 'VIEWER')
 
-  const message = await prisma.workspaceMessage.create({
-    data: {
-      workspace_id: input.workspaceId,
-      user_id: input.userId,
-      content: input.content,
-    },
-    include: { user: { select: messageAuthorSelect } },
+  const cardId = input.cardId ?? null
+  const dto = await prisma.$transaction(async (tx) => {
+    if (cardId) {
+      const card = await tx.card.findFirst({
+        where: {
+          id: cardId,
+          deleted_at: null,
+          list: {
+            workspace_id: input.workspaceId,
+            deleted_at: null,
+            workspace: { deleted_at: null },
+          },
+        },
+        select: { id: true },
+      })
+      if (!card) throw new NotFoundError()
+    }
+
+    const message = await tx.workspaceMessage.create({
+      data: {
+        workspace_id: input.workspaceId,
+        user_id: input.userId,
+        card_id: cardId,
+        content: input.content,
+      },
+      include: { user: { select: messageAuthorSelect } },
+    })
+
+    if (cardId) {
+      await tx.comment.create({
+        data: {
+          card_id: cardId,
+          user_id: input.userId,
+          comment_str: input.content,
+          ...createdBy(input.userId),
+        },
+      })
+    }
+
+    return toWorkspaceMessageDto(message)
   })
-  const dto = toWorkspaceMessageDto(message)
+
   publishWorkspaceMessageCreated(dto)
+  if (cardId) {
+    publishWorkspaceChange({
+      workspace_id: input.workspaceId,
+      entity: 'card',
+      action: 'updated',
+      entity_id: cardId,
+      list_ids: [],
+      actor_user_id: input.userId,
+    })
+  }
   return dto
 }

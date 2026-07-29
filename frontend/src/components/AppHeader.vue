@@ -2,10 +2,6 @@
 import NotificationMenu from './NotificationMenu.vue'
 import ProfileMenu from './ProfileMenu.vue'
 import SearchInput from './SearchInput.vue'
-import {
-  toggleUtilityDrawer,
-  utilityDrawerState,
-} from '../services/utilityDrawer'
 
 withDefaults(
   defineProps<{
@@ -23,25 +19,7 @@ withDefaults(
     <div class="app-topbar-main">
       <SearchInput :initial-query="initialQuery" />
       <div class="app-topbar-actions">
-        <button
-          class="app-topbar-button"
-          type="button"
-          aria-controls="utility-drawer"
-          :aria-expanded="utilityDrawerState.active === 'friends'"
-          @click="toggleUtilityDrawer('friends')"
-        >
-          친구
-        </button>
         <NotificationMenu />
-        <button
-          class="app-topbar-button"
-          type="button"
-          aria-controls="utility-drawer"
-          :aria-expanded="utilityDrawerState.active === 'inbox'"
-          @click="toggleUtilityDrawer('inbox')"
-        >
-          인박스
-        </button>
         <ProfileMenu />
       </div>
     </div>

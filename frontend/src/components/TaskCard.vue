@@ -6,19 +6,16 @@ const props = withDefaults(
     card: Card
     openable?: boolean
     showDeleteAction?: boolean
-    showInboxAction?: boolean
   }>(),
   {
     openable: true,
     showDeleteAction: true,
-    showInboxAction: false,
   },
 )
 
 const emit = defineEmits<{
   open: [card: Card]
   delete: [cardId: string]
-  'move-to-inbox': [cardId: string]
 }>()
 
 function formatDate(iso: string | null) {
@@ -57,14 +54,6 @@ function openCard() {
       </button>
     </div>
     <div class="card-meta">
-      <button
-        v-if="showInboxAction"
-        class="card-inbox-btn"
-        type="button"
-        @click.stop="emit('move-to-inbox', card.id)"
-      >
-        인박스
-      </button>
       <span v-if="card.deadline" class="card-date">{{ formatDate(card.deadline) }}</span>
     </div>
   </article>

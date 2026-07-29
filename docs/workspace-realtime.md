@@ -64,7 +64,10 @@ for this prototype.
 ```text
 GET  /api/workspaces/:workspaceId/messages
 POST /api/workspaces/:workspaceId/messages
-     { "content": "message, 1 to 1000 characters" }
+     {
+       "content": "message, 1 to 1000 characters",
+       "card_id": "optional card uuid or null"
+     }
 ```
 
 Both endpoints require active membership; all roles including `VIEWER` may
@@ -75,7 +78,17 @@ publishes the same DTO as `workspace.message_created`. Clients deduplicate by
 message ID, so the sender's HTTP response and WebSocket echo do not create two
 rows. The latest 100 messages are reloaded on entry and reconnect.
 
-Message editing/deletion, read receipts, typing indicators, attachments,
+When `card_id` is supplied, the backend verifies that the active card belongs
+to the same workspace and creates the message plus a card comment in one
+transaction. After commit it publishes both the message and the normal
+`workspace.changed` card invalidation hint. Opening the linked card therefore
+shows the same text in its comment list.
+
+The Vue UI exposes the current workspace room inside the global bottom-right
+messenger beside Friends and Inbox. Leaving the workspace removes the room
+context while keeping the other two panes available.
+
+Message editing/deletion, read receipts, typing indicators, file attachments,
 pagination, extra rooms, and direct messages are outside this slice.
 
 ## Team presence

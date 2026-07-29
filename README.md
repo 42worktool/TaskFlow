@@ -24,12 +24,16 @@ HTTP controllers or the Vue component tree.
 - Kanban lists and cards with drag-and-drop reordering.
 - Realtime list-level board synchronization across workspace members.
 - Editable card titles, descriptions, start dates, and deadlines.
-- A personal inbox that can receive cards from a board and return them to a
-  selected list.
-- Calendar and text search views derived from workspaces the user can access.
+- A personal inbox with direct drag-and-drop between the inbox and board lists,
+  including horizontal edge scrolling.
+- A calendar that renders card start/deadline ranges as continuous weekly bars,
+  plus text search across workspaces the user can access.
 - Email-based friend requests with acceptance/rejection and realtime
   online/offline presence for accepted friends.
-- A persistent workspace group chat and realtime team-member online status.
+- A floating messenger that combines friends, the personal inbox, and the
+  current workspace group chat.
+- Card-linked workspace messages that are also stored and displayed as card
+  comments, plus realtime team-member online status.
 - Realtime workspace-member-joined notifications.
 - HTTPS and WSS through Nginx, backed by PostgreSQL and Redis.
 
@@ -165,14 +169,15 @@ environment running the suite must allow loopback port binding.
 2. Create a private or public workspace.
 3. Add lists and cards, then drag them to reorder or move them.
 4. Open a card to edit its details and dates.
-5. Move a card to the personal inbox and restore it to a board when ready.
+5. Drag a card onto the floating Inbox target and drag it back to a board list
+   when ready.
 6. Invite a registered or future user by email from the workspace share menu.
-7. Open the Friends sidebar to send or accept a friend request and view
-   accepted friends' connection state.
-8. Open the workspace Chat tab to talk with members and see team online status
-   in the sidebar.
-9. Search cards across accessible workspaces or open Calendar for the current
-   workspace.
+7. Open the bottom-right messenger to manage friends, Inbox cards, and the
+   current workspace chat.
+8. Optionally connect one card before sending a workspace message to also
+   record that text in the card's comments.
+9. See team online status in the workspace sidebar, search accessible cards, or
+   open Calendar to view card date ranges.
 
 Workspace permissions are deliberately small:
 
@@ -240,7 +245,7 @@ Prisma application model.
 | `FriendRequests` | `user_low_id UUID`, `user_high_id UUID`, `requested_by_id UUID`, `created_at DateTime` | Canonical pending pair; deleted on accept, reject, or cancel |
 | `Workspaces` | `id UUID`, `name String`, `is_public Boolean` | Parent of members, lists, and labels |
 | `WorkspaceMembers` | `workspace_id UUID`, `user_id UUID`, `role Role` | Composite key; role is `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` |
-| `WorkspaceMessages` | `id UUID`, `workspace_id UUID`, `user_id UUID`, `content Text`, `created_at DateTime` | Append-only messages for the workspace's default group chat |
+| `WorkspaceMessages` | `id UUID`, `workspace_id UUID`, `user_id UUID`, `card_id UUID?`, `content Text`, `created_at DateTime` | Append-only default-room messages; an optional card link is cleared if the card is deleted |
 | `Lists` | `id UUID`, `workspace_id UUID`, `name String`, `sequence Float`, `is_done Boolean` | Fractional sequence supports reordering |
 | `Cards` | `id UUID`, `list_id UUID?`, `user_id UUID?`, `title String`, `description Text`, `start_at DateTime?`, `deadline DateTime?`, `sequence Float` | A null `list_id` denotes a personal inbox card |
 | `CardMembers` | `card_id UUID`, `user_id UUID` | Composite assignment relation |
@@ -265,9 +270,9 @@ guessing an identity where the repository does not prove one.
 | Workspace and permissions | CRUD, role checks, member removal, final-owner guard, public data projection | `Saususge`, `copilot-swe-agent[bot]`, `seankim96` |
 | Email invitations | JWT invitation link, account binding, Redis queue, per-address limit | `Saususge`, `seankim96` |
 | Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
-| Personal inbox | API-backed cards and board/inbox round trip | `seankim96` |
-| Calendar and search | Current-workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
-| Friends and presence | Request/accept flow, symmetric friendships, toggleable Friends sidebar, and online/offline events | `seankim96` |
+| Personal inbox | API-backed cards, board/inbox drag round trip, and edge scrolling | `seankim96` |
+| Calendar and search | Range-bar workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
+| Friends and presence | Request/accept flow, symmetric friendships, unified messenger panel, and online/offline events | `seankim96` |
 | Realtime foundation | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain | `seankim96` |
 | Workspace realtime and chat | Member-only channels, targeted list reconciliation, team presence, and persistent group chat | `seankim96` |
 | Infrastructure | Docker services, HTTPS/WSS Nginx proxy, migrations | `ynam` / `nyhwbh`, `yeonjunky` / `yeonjunkim` |
@@ -413,9 +418,9 @@ to an AI system.
 
 ## Prototype limitations
 
-- Workspace chat has one default room and no editing, deletion, read receipts,
-  typing indicator, attachment, or additional-room lifecycle. Direct messages
-  remain outside the current scope.
+- Workspace chat has one default room and optional single-card links, but no
+  editing, deletion, read receipts, typing indicator, file attachment, or
+  additional-room lifecycle. Direct messages remain outside the current scope.
 - Workspace change events are best-effort invalidation hints rather than a
   durable event stream; reconnect performs a canonical REST snapshot refresh.
 - Notifications are session-local member-join events; they have no persistent
@@ -425,8 +430,9 @@ to an AI system.
   history, blocking, or realtime request-delivery event.
 - Search is client-side text matching without filters, ranking, or pagination.
 - Attachment APIs store URL metadata; there is no binary upload service.
-- Card comments, labels, and assignments have backend support but are not a
-  complete frontend feature.
+- Card comments created through linked workspace chat are visible in card
+  details; direct comment editing/deletion and the rest of the label/assignment
+  UI remain incomplete.
 - Public workspaces are visible to authenticated users, not anonymous visitors.
 - Swagger currently documents authentication and account endpoints, not the
   entire application API.

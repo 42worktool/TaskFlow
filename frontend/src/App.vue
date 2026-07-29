@@ -1,14 +1,8 @@
 <script setup lang="ts">
-import UtilityDrawerHost from './components/UtilityDrawerHost.vue'
-import { authState } from './services/auth'
-import { utilityDrawerState } from './services/utilityDrawer'
+import MessengerHost from './components/MessengerHost.vue'
 </script>
 
 <template>
-  <div
-    :inert="authState.user && utilityDrawerState.active ? true : undefined"
-  >
-    <RouterView />
-  </div>
-  <UtilityDrawerHost />
+  <RouterView />
+  <MessengerHost />
 </template>

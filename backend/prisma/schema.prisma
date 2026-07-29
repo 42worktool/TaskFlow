@@ -156,13 +156,16 @@ model WorkspaceMessage {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   workspace_id String   @db.Uuid
   user_id      String   @db.Uuid
+  card_id      String?  @db.Uuid
   content      String   @db.Text
   created_at   DateTime @default(now()) @db.Timestamptz(3)
 
   workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  card      Card?     @relation(fields: [card_id], references: [id], onDelete: SetNull)
 
   @@index([workspace_id, created_at])
+  @@index([card_id])
   @@map("WorkspaceMessages")
 }
 
@@ -212,10 +215,11 @@ model Card {
   list List? @relation(fields: [list_id], references: [id], onDelete: SetNull) //인박스에 들어가는 경우 null이 가능해서 set null
   user User? @relation(fields: [user_id], references: [id], onDelete: SetNull) //인박스에 들어가는 경우 null이 가능해서 set null
 
-  card_members CardMember[]
-  card_labels  CardLabel[]
-  attachments  Attachment[]
-  comments     Comment[]
+  card_members       CardMember[]
+  card_labels        CardLabel[]
+  attachments        Attachment[]
+  comments           Comment[]
+  workspace_messages WorkspaceMessage[]
 
   @@index([list_id, deleted_at])
   @@map("Cards")

@@ -6,7 +6,6 @@ import Workspace from '../pages/Workspace.vue'
 import WorkspaceLayout from '../layouts/WorkspaceLayout.vue'
 import Board from '../pages/Board.vue'
 import Calendar from '../pages/Calendar.vue'
-import WorkspaceChat from '../pages/WorkspaceChat.vue'
 import Search from '../pages/Search.vue'
 import Account from '../pages/Account.vue'
 import PrivacyPolicy from '../pages/PrivacyPolicy.vue'
@@ -25,7 +24,7 @@ const router = createRouter({
     { path: '/account', component: Account, meta: { requiresAuth: true } },
     {
       path: '/friends',
-      redirect: { path: '/workspaces', query: { drawer: 'friends' } },
+      redirect: { path: '/workspaces', query: { messenger: 'friends' } },
     },
     { path: '/workspaces', component: Workspace, meta: { requiresAuth: true } },
     { path: '/invite/:token', component: AcceptInvite, meta: { requiresAuth: true } },
@@ -38,7 +37,13 @@ const router = createRouter({
         { path: '', redirect: 'board' },
         { path: 'board', component: Board },
         { path: 'calendar', component: Calendar },
-        { path: 'chat', component: WorkspaceChat },
+        {
+          path: 'chat',
+          redirect: (to) => ({
+            path: `/workspaces/${String(to.params.workspaceId)}/board`,
+            query: { messenger: 'chat' },
+          }),
+        },
       ],
     },
   ],
