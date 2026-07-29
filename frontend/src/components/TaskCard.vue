@@ -12,6 +12,7 @@ withDefaults(
 )
 
 const emit = defineEmits<{
+  open: [card: Card]
   delete: [cardId: string]
   'move-to-inbox': [cardId: string]
 }>()
@@ -26,7 +27,16 @@ function formatDate(iso: string | null) {
 <template>
   <article class="task-card">
     <div class="card-title-row">
-      <p class="card-title">{{ card.title }}</p>
+      <span
+        class="card-title"
+        role="button"
+        tabindex="0"
+        @click.stop="emit('open', card)"
+        @keydown.enter.stop="emit('open', card)"
+        @keydown.space.prevent.stop="emit('open', card)"
+      >
+        {{ card.title }}
+      </span>
       <button
         class="card-delete-btn"
         type="button"
@@ -46,7 +56,6 @@ function formatDate(iso: string | null) {
         인박스
       </button>
       <span v-if="card.deadline" class="card-date">{{ formatDate(card.deadline) }}</span>
-      <div class="card-assignee" />
     </div>
   </article>
 </template>

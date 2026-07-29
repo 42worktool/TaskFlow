@@ -52,6 +52,32 @@ export interface Card {
   label_color?: string
 }
 
+export interface CardDetailMember {
+  user_id: UUID
+  name: string
+  profile_image_url: string | null
+}
+
+export interface CardDetailLabel {
+  label_id: UUID
+  label_name: string
+  label_color: string
+}
+
+export interface CardAttachment {
+  id: UUID
+  card_id: UUID
+  file_url: string | null
+  file_name: string | null
+  created_at: ISODateString
+}
+
+export interface CardDetail extends Card {
+  members: CardDetailMember[]
+  labels: CardDetailLabel[]
+  attachments: CardAttachment[]
+}
+
 export interface ListWithCards extends List {
   cards: Card[]
 }

@@ -103,6 +103,8 @@
 }
 
 .cal-card {
+  width: 100%;
+  border: 0;
   background: #eff6ff;
   color: #1d4ed8;
   font-size: 12px;
@@ -112,4 +114,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-card:hover {
+  background: #dbeafe;
 }

@@ -30,4 +30,42 @@ describe('CardAPI', () => {
       method: 'PUT',
     })
   })
+
+  it('loads and updates card detail fields through the existing routes', async () => {
+    const request = vi.mocked(apiRequest)
+    request
+      .mockResolvedValueOnce({ id: 'card-1', members: [], labels: [], attachments: [] })
+      .mockResolvedValueOnce({ id: 'card-1', title: 'Updated' })
+      .mockResolvedValueOnce({
+        id: 'card-1',
+        start_at: '2026-07-29T00:00:00.000Z',
+        deadline: null,
+      })
+
+    await CardAPI.get('card-1')
+    await CardAPI.update('card-1', {
+      title: 'Updated',
+      description: 'Details',
+    })
+    await CardAPI.updateDates('card-1', {
+      start_at: '2026-07-29T00:00:00.000Z',
+      deadline: null,
+    })
+
+    expect(request).toHaveBeenNthCalledWith(1, '/api/cards/card-1')
+    expect(request).toHaveBeenNthCalledWith(2, '/api/cards/card-1', {
+      method: 'PUT',
+      json: {
+        title: 'Updated',
+        description: 'Details',
+      },
+    })
+    expect(request).toHaveBeenNthCalledWith(3, '/api/cards/card-1/dates', {
+      method: 'PATCH',
+      json: {
+        start_at: '2026-07-29T00:00:00.000Z',
+        deadline: null,
+      },
+    })
+  })
 })

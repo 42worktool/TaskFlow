@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import CardDetailModal from './CardDetailModal.vue'
 import TaskCard from './TaskCard.vue'
 import { InboxAPI } from '../api/inbox'
 import type { Card, List } from '../types'
@@ -26,6 +27,7 @@ const loading = ref(true)
 const error = ref('')
 const destinationListId = ref('')
 const busyCardId = ref<string | null>(null)
+const selectedCardId = ref<string | null>(null)
 let inboxLoadGeneration = 0
 
 watch(
@@ -93,6 +95,12 @@ async function moveCardToBoard(card: Card) {
   }
 }
 
+function updateSavedCard(saved: Card): void {
+  cards.value = cards.value.map((card) =>
+    card.id === saved.id ? saved : card,
+  )
+}
+
 onMounted(() => {
   void loadInbox()
 })
@@ -137,7 +145,11 @@ onUnmounted(() => {
     </p>
     <ul v-else-if="cards.length > 0" class="inbox-card-list">
       <li v-for="card in cards" :key="card.id">
-        <TaskCard :card="card" @delete="deleteCard" />
+        <TaskCard
+          :card="card"
+          @open="selectedCardId = card.id"
+          @delete="deleteCard"
+        />
         <button
           v-if="destinationLists.length"
           class="inbox-card-move-btn"
@@ -150,6 +162,12 @@ onUnmounted(() => {
       </li>
     </ul>
   </section>
+  <CardDetailModal
+    v-if="selectedCardId"
+    :card-id="selectedCardId"
+    @saved="updateSavedCard"
+    @close="selectedCardId = null"
+  />
 </template>
 
 <style scoped src="../styles/inbox-cards-panel.css"></style>
