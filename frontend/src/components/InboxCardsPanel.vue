@@ -165,6 +165,7 @@ onUnmounted(() => {
   <CardDetailModal
     v-if="selectedCardId"
     :card-id="selectedCardId"
+    :editable="true"
     @saved="updateSavedCard"
     @close="selectedCardId = null"
   />

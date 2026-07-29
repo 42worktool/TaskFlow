@@ -7,6 +7,16 @@ import type { Card } from '../types'
 import { cardOccursOnDate } from '../utils/calendar'
 
 const route = useRoute()
+const props = withDefaults(
+  defineProps<{
+    canEditBoard?: boolean
+    canViewCardDetails?: boolean
+  }>(),
+  {
+    canEditBoard: false,
+    canViewCardDetails: false,
+  },
+)
 const now = new Date()
 const year = ref(now.getFullYear())
 const month = ref(now.getMonth() + 1)
@@ -43,6 +53,10 @@ function updateSavedCard(saved: Card): void {
   cards.value = cards.value.map((card) =>
     card.id === saved.id ? saved : card,
   )
+}
+
+function openCard(cardId: string): void {
+  if (props.canViewCardDetails) selectedCardId.value = cardId
 }
 
 interface CalendarCell {
@@ -158,7 +172,8 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
           :key="c.id"
           type="button"
           class="cal-card"
-          @click="selectedCardId = c.id"
+          :disabled="!canViewCardDetails"
+          @click="openCard(c.id)"
         >
           {{ c.title }}
         </button>
@@ -167,6 +182,7 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
     <CardDetailModal
       v-if="selectedCardId"
       :card-id="selectedCardId"
+      :editable="canEditBoard"
       @saved="updateSavedCard"
       @close="selectedCardId = null"
     />

@@ -12,6 +12,16 @@ import type { Card, DraggableChange, ListWithCards } from '../types'
 import { neighborIds } from '../utils/ordering'
 
 const route = useRoute()
+const props = withDefaults(
+  defineProps<{
+    canEditBoard?: boolean
+    canViewCardDetails?: boolean
+  }>(),
+  {
+    canEditBoard: false,
+    canViewCardDetails: false,
+  },
+)
 
 const lists = ref<ListWithCards[]>([])
 const loading = ref(false)
@@ -52,7 +62,7 @@ watch(
 )
 
 async function submitAddList() {
-  if (isSubmittingList) return
+  if (!props.canEditBoard || isSubmittingList) return
   const name = newListName.value.trim()
   showAddList.value = false
   if (!name) return
@@ -75,7 +85,7 @@ function cancelAddList() {
 }
 
 function onListChange(event: DraggableChange) {
-  if (!event.moved) return
+  if (!props.canEditBoard || !event.moved) return
   const { element, newIndex } = event.moved
   const { beforeId, afterId } = neighborIds(lists.value, newIndex)
   ListAPI.reorder(element.id, {
@@ -85,6 +95,7 @@ function onListChange(event: DraggableChange) {
 }
 
 function onCardChange(listId: string, event: DraggableChange) {
+  if (!props.canEditBoard) return
   const list = lists.value.find((l) => l.id === listId)
   if (!list) return
 
@@ -107,6 +118,7 @@ function onCardChange(listId: string, event: DraggableChange) {
 }
 
 async function onAddCard(listId: string, title: string) {
+  if (!props.canEditBoard) return
   try {
     await CardAPI.create(listId, { title })
     await fetchLists()
@@ -116,6 +128,7 @@ async function onAddCard(listId: string, title: string) {
 }
 
 async function onDeleteCard(cardId: string) {
+  if (!props.canEditBoard) return
   try {
     await InboxAPI.remove(cardId)
     const boardRefresh = fetchLists()
@@ -127,6 +140,7 @@ async function onDeleteCard(cardId: string) {
 }
 
 async function onMoveCardToInbox(cardId: string) {
+  if (!props.canEditBoard) return
   const list = lists.value.find((item) =>
     item.cards.some((card) => card.id === cardId),
   )
@@ -146,6 +160,10 @@ function onInboxCardMoved() {
   void fetchLists()
 }
 
+function openCard(card: Card) {
+  if (props.canViewCardDetails) selectedCardId.value = card.id
+}
+
 function onCardSaved(saved: Card) {
   lists.value = lists.value.map((list) => ({
     ...list,
@@ -154,6 +172,7 @@ function onCardSaved(saved: Card) {
 }
 
 async function onRenameList(listId: string, name: string) {
+  if (!props.canEditBoard) return
   try {
     await ListAPI.rename(listId, name)
     await fetchLists()
@@ -163,6 +182,7 @@ async function onRenameList(listId: string, name: string) {
 }
 
 async function onDeleteList(listId: string) {
+  if (!props.canEditBoard) return
   try {
     await InboxAPI.removeList(listId)
     const boardRefresh = fetchLists()
@@ -182,6 +202,7 @@ async function onDeleteList(listId: string) {
       v-else
       v-model="lists"
       item-key="id"
+      :disabled="!canEditBoard"
       handle=".list-header"
       class="board-columns"
       @change="onListChange"
@@ -189,7 +210,9 @@ async function onDeleteList(listId: string) {
       <template #item="{ element: col }">
         <TaskList
           :list="col"
-          @open-card="selectedCardId = $event.id"
+          :can-edit="canEditBoard"
+          :can-open-details="canViewCardDetails"
+          @open-card="openCard"
           @card-change="onCardChange"
           @add-card="onAddCard"
           @delete-card="onDeleteCard"
@@ -199,7 +222,7 @@ async function onDeleteList(listId: string) {
         />
       </template>
       <template #footer>
-        <div class="add-list-column">
+        <div v-if="canEditBoard" class="add-list-column">
           <form v-if="showAddList" class="add-list-form" @submit.prevent="submitAddList">
             <input
               v-model="newListName"
@@ -219,13 +242,14 @@ async function onDeleteList(listId: string) {
       </template>
     </draggable>
     <InboxCardsPanel
-      :destination-lists="lists"
+      :destination-lists="canEditBoard ? lists : []"
       :refresh-token="inboxRefreshKey"
       @moved="onInboxCardMoved"
     />
     <CardDetailModal
       v-if="selectedCardId"
       :card-id="selectedCardId"
+      :editable="canEditBoard"
       @saved="onCardSaved"
       @close="selectedCardId = null"
     />

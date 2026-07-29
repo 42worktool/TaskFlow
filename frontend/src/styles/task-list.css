@@ -17,6 +17,11 @@
   cursor: grab;
 }
 
+.task-list--readonly .list-header,
+.task-list--readonly .list-name {
+  cursor: default;
+}
+
 .list-name {
   font-size: 14px;
   font-weight: 600;

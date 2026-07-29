@@ -5,13 +5,30 @@ import AppHeader from '../components/AppHeader.vue'
 import InboxDrawer from '../components/InboxDrawer.vue'
 import ShareModal from '../components/ShareModal.vue'
 import { WorkspaceAPI } from '../api/workspace'
+import { authState } from '../services/auth'
 import type { Workspace } from '../types'
+import {
+  hasWorkspaceRole,
+  workspaceRoleFor,
+} from '../utils/workspacePermissions'
 
 const route = useRoute()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
 const workspace = ref<Workspace | null>(null)
 const loadError = ref('')
 const isBoardRoute = computed(() => route.path.endsWith('/board'))
+const currentRole = computed(() =>
+  workspace.value
+    ? workspaceRoleFor(workspace.value, authState.user?.id)
+    : null,
+)
+const canViewCardDetails = computed(() => currentRole.value !== null)
+const canEditBoard = computed(() =>
+  hasWorkspaceRole(currentRole.value, 'MEMBER'),
+)
+const canManageMembers = computed(() =>
+  hasWorkspaceRole(currentRole.value, 'ADMIN'),
+)
 
 const showShareModal = ref(false)
 const showInbox = ref(false)
@@ -23,6 +40,7 @@ watch(
   async (id, _previousId, onCleanup) => {
     workspace.value = null
     loadError.value = ''
+    showShareModal.value = false
     if (!id) return
 
     let cancelled = false
@@ -100,24 +118,29 @@ watch(
               <span class="team-name">{{ m.user.name }}</span>
             </li>
           </ul>
-          <div class="sidebar-actions">
-            <button class="sidebar-action-btn" type="button">팀원 관리</button>
+          <div v-if="canManageMembers" class="sidebar-actions">
             <button
               class="sidebar-action-btn sidebar-action-btn--primary"
               type="button"
               @click="showShareModal = true"
             >
-              공유
+              팀원 관리
             </button>
           </div>
         </div>
       </nav>
 
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <component
+          :is="Component"
+          :can-edit-board="canEditBoard"
+          :can-view-card-details="canViewCardDetails"
+        />
+      </RouterView>
     </div>
 
     <ShareModal
-      v-if="showShareModal"
+      v-if="showShareModal && canManageMembers"
       :workspace-name="workspace.name"
       :workspace-id="workspaceId"
       :workspace="workspace"
