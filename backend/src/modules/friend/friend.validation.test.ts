@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { addFriendSchema, friendUserIdSchema } from './friend.validation'
+import { friendRequestSchema, friendUserIdSchema } from './friend.validation'
 
 test('friend validation normalizes email and requires a UUID path id', () => {
   assert.deepEqual(
-    addFriendSchema.parse({ email: ' Friend@Example.COM ' }),
+    friendRequestSchema.parse({ email: ' Friend@Example.COM ' }),
     { email: 'friend@example.com' },
   )
-  assert.throws(() => addFriendSchema.parse({ email: 'not-an-email' }))
+  assert.throws(() => friendRequestSchema.parse({ email: 'not-an-email' }))
   assert.equal(
     friendUserIdSchema.parse('00000000-0000-4000-8000-000000000001'),
     '00000000-0000-4000-8000-000000000001',

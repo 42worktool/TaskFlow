@@ -189,4 +189,29 @@ describe('auth session generation', () => {
     expect(authState.accessToken).toBe('second-token')
     expect(authState.user?.id).toBe('second-user')
   })
+
+  it('maps application API error codes to user-facing messages', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: 'ALREADY_FRIENDS',
+            message: 'you are already friends',
+          }),
+          {
+            status: 409,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { apiRequest, authState } = await import('./auth')
+    authState.initialized = true
+
+    await expect(
+      apiRequest('/api/friends/requests', { method: 'POST' }),
+    ).rejects.toThrow('이미 친구인 사용자입니다.')
+  })
 })

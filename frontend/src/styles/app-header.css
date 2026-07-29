@@ -57,6 +57,46 @@
   white-space: nowrap;
 }
 
+.app-topbar-link {
+  text-decoration: none;
+}
+
+.app-topbar-link.router-link-active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .app-topbar-button:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+@media (max-width: 640px) {
+  .app-topbar {
+    height: auto;
+    min-height: 52px;
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .app-topbar-logo {
+    margin-right: 0;
+  }
+
+  .app-topbar-workspace {
+    min-width: 0;
+  }
+
+  .app-topbar-main,
+  .app-topbar--workspace .app-topbar-main {
+    flex: 1 0 100%;
+    gap: 8px;
+  }
+
+  .app-topbar-actions {
+    gap: 6px;
+  }
+
+  .app-topbar-button {
+    padding: 7px 9px;
+  }
 }

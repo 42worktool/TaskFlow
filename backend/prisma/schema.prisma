@@ -40,19 +40,21 @@ model User {
   deleted_at        DateTime? @db.Timestamptz(3)
   deleted_by        String?   @db.Uuid
 
-  oauth_accounts   OAuthAccount[]
-  memberships      WorkspaceMember[]
-  cards            Card[]
-  card_members     CardMember[]
-  comments         Comment[]
-  friendships_low  Friendship[]      @relation("FriendshipLow")
-  friendships_high Friendship[]      @relation("FriendshipHigh")
+  oauth_accounts       OAuthAccount[]
+  memberships          WorkspaceMember[]
+  cards                Card[]
+  card_members         CardMember[]
+  comments             Comment[]
+  friendships_low      Friendship[]      @relation("FriendshipLow")
+  friendships_high     Friendship[]      @relation("FriendshipHigh")
+  friend_requests_low  FriendRequest[]   @relation("FriendRequestLow")
+  friend_requests_high FriendRequest[]   @relation("FriendRequestHigh")
 
   @@map("Users")
 }
 
 // 방향 없는 전역 친구 관계. 두 사용자 ID를 정렬해 한 행만 저장한다.
-// Toy 프로토타입에서는 요청/수락 상태와 soft-delete를 두지 않는다.
+// 수락된 관계만 이 테이블에 저장한다.
 model Friendship {
   user_low_id  String   @db.Uuid
   user_high_id String   @db.Uuid
@@ -64,6 +66,23 @@ model Friendship {
   @@id([user_low_id, user_high_id])
   @@index([user_high_id])
   @@map("Friendships")
+}
+
+// 대기 중인 친구 요청. 두 사용자 ID를 정렬한 복합 키로 양방향 중복
+// 요청을 막고, requested_by_id로 요청을 보낸 사용자를 구분한다.
+// 수락 또는 거절 시 행을 삭제하는 Toy 프로토타입 구조다.
+model FriendRequest {
+  user_low_id     String   @db.Uuid
+  user_high_id    String   @db.Uuid
+  requested_by_id String   @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+
+  user_low  User @relation("FriendRequestLow", fields: [user_low_id], references: [id], onDelete: Cascade)
+  user_high User @relation("FriendRequestHigh", fields: [user_high_id], references: [id], onDelete: Cascade)
+
+  @@id([user_low_id, user_high_id])
+  @@index([user_high_id])
+  @@map("FriendRequests")
 }
 
 // 유저에 연결된 OAuth 계정. (provider, provider_id) 조합으로

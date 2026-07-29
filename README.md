@@ -26,7 +26,8 @@ HTTP controllers or the Vue component tree.
 - A personal inbox that can receive cards from a board and return them to a
   selected list.
 - Calendar and text search views derived from workspaces the user can access.
-- Direct friend add/remove by email and realtime online/offline presence.
+- Email-based friend requests with acceptance/rejection and realtime
+  online/offline presence for accepted friends.
 - Realtime workspace-member-joined notifications.
 - HTTPS and WSS through Nginx, backed by PostgreSQL and Redis.
 
@@ -162,7 +163,8 @@ environment running the suite must allow loopback port binding.
 4. Open a card to edit its details and dates.
 5. Move a card to the personal inbox and restore it to a board when ready.
 6. Invite a registered or future user by email from the workspace share menu.
-7. Add a friend by email to see their current connection state.
+7. Send or accept a friend request, then view accepted friends' connection
+   state in the Friends tab.
 8. Search cards across accessible workspaces or open Calendar for the current
    workspace.
 
@@ -214,6 +216,7 @@ erDiagram
     CARD ||--o{ COMMENT : has
     USER ||--o{ COMMENT : writes
     USER ||--o{ FRIENDSHIP : endpoint
+    USER ||--o{ FRIEND_REQUEST : participates
     WORKSPACE ||--o{ ACTIVITY_LOG : logical_scope
 ```
 
@@ -226,6 +229,7 @@ Prisma application model.
 | `Users` | `id UUID`, `email String`, `password_hash String?`, `name String`, `profile_image_url String?` | Email is unique; OAuth-only users may have no password hash |
 | `OAuthAccounts` | `id UUID`, `user_id UUID`, `provider String`, `provider_id String` | Unique provider/provider ID pair |
 | `Friendships` | `user_low_id UUID`, `user_high_id UUID`, `created_at DateTime` | Sorted composite key represents one undirected friendship |
+| `FriendRequests` | `user_low_id UUID`, `user_high_id UUID`, `requested_by_id UUID`, `created_at DateTime` | Canonical pending pair; deleted on accept, reject, or cancel |
 | `Workspaces` | `id UUID`, `name String`, `is_public Boolean` | Parent of members, lists, and labels |
 | `WorkspaceMembers` | `workspace_id UUID`, `user_id UUID`, `role Role` | Composite key; role is `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` |
 | `Lists` | `id UUID`, `workspace_id UUID`, `name String`, `sequence Float`, `is_done Boolean` | Fractional sequence supports reordering |
@@ -254,7 +258,7 @@ guessing an identity where the repository does not prove one.
 | Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
 | Personal inbox | API-backed cards and board/inbox round trip | `seankim96` |
 | Calendar and search | Current-workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
-| Friends and presence | Symmetric friendships and online/offline events | `seankim96` |
+| Friends and presence | Request/accept flow, symmetric friendships, dedicated Friends tab, and online/offline events | `seankim96` |
 | Realtime foundation | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain | `seankim96` |
 | Infrastructure | Docker services, HTTPS/WSS Nginx proxy, migrations | `ynam` / `nyhwbh`, `yeonjunky` / `yeonjunkim` |
 | Database and activity audit | Core schema, migrations, trigger-based activity log | `injo`, `seankim96` |
@@ -404,7 +408,8 @@ to an AI system.
 - Notifications are session-local member-join events; they have no persistent
   history or read-state backend.
 - Presence is designed for a single backend instance, not cross-replica fanout.
-- Friendships are immediate; there is no request/accept/block lifecycle.
+- Friend requests support accept, reject, and cancel, but have no persistent
+  history, blocking, or realtime request-delivery event.
 - Search is client-side text matching without filters, ranking, or pagination.
 - Attachment APIs store URL metadata; there is no binary upload service.
 - Card comments, labels, and assignments have backend support but are not a
