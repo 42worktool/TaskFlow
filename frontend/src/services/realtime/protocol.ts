@@ -1,4 +1,4 @@
-import type { NotificationEvent } from '../../types'
+import type { FriendPresenceEvent, NotificationEvent } from '../../types'
 
 export const REALTIME_PROTOCOL_VERSION = 1 as const
 export const REALTIME_CLOSE_CODE = {
@@ -30,6 +30,8 @@ export function isRealtimeControlEvent(event: string): boolean {
 
 const REALTIME_EVENT_NAME_PATTERN =
   /^[a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)+$/
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export interface RealtimeMessage<T = unknown> {
   v: typeof REALTIME_PROTOCOL_VERSION
@@ -60,6 +62,7 @@ export interface RealtimeServerEvents {
   'system.ready': RealtimeReadyData
   'system.error': RealtimeErrorData
   'notification.created': NotificationEvent
+  'friend.presence_changed': FriendPresenceEvent
 }
 
 export interface RealtimeClientEvents {
@@ -131,6 +134,21 @@ export function parseRealtimeAuthRefreshResult(
   const candidate = value as Partial<RealtimeAuthRefreshResult>
   if (!isIsoDate(candidate.accessTokenExpiresAt)) return null
   return candidate as RealtimeAuthRefreshResult
+}
+
+export function parseFriendPresenceEvent(
+  value: unknown,
+): FriendPresenceEvent | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<FriendPresenceEvent>
+  if (
+    typeof candidate.user_id !== 'string' ||
+    !UUID_PATTERN.test(candidate.user_id) ||
+    typeof candidate.online !== 'boolean'
+  ) {
+    return null
+  }
+  return candidate as FriendPresenceEvent
 }
 
 function isIsoDate(value: unknown): value is string {

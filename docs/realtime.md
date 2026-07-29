@@ -20,6 +20,12 @@ intentionally no notification history or persisted read state yet; those
 belong in a later PostgreSQL-backed notification feature if the project needs
 them.
 
+Friend presence is the second small slice. `GET /api/friends` returns an
+in-memory online snapshot, and the server emits `friend.presence_changed` only
+when a user gains their first authenticated socket or loses their last one.
+There is no persisted `last_seen`, device count, grace period, or presence
+subscription request.
+
 ## Connection and authentication lifecycle
 
 1. The frontend opens `wss://<current-origin>/ws` and sends
@@ -227,6 +233,12 @@ process. Before adding replicas, route cross-process events through Redis
 Pub/Sub and keep presence connection IDs in Redis with heartbeat/TTL cleanup.
 PostgreSQL remains the durable source for messages and workspace events, and
 HTTP cursor recovery remains the repair path.
+
+The current friend implementation follows that process-local model. A first
+connection sends `online: true` to current friends, a last disconnect sends
+`online: false`, and intermediate tab changes emit nothing. Events are
+best-effort; opening the Account page and reconnecting both refresh the
+authoritative snapshot through `GET /api/friends`.
 
 ## Limits and configuration
 

@@ -63,6 +63,7 @@ test('friend service stores and reads one canonical relationship', async (t) => 
         name: 'Bob',
         profile_image_url: 'https://example.com/bob.png',
         friends_since: CREATED_AT.toISOString(),
+        online: false,
       },
     ])
     assert.deepEqual(query, {
@@ -102,6 +103,7 @@ test('friend service stores and reads one canonical relationship', async (t) => 
     })
 
     assert.equal(friend.id, USER_B)
+    assert.equal(friend.online, false)
     assert.deepEqual(userQuery, {
       where: {
         email: { equals: 'bob@example.com', mode: 'insensitive' },
