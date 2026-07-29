@@ -76,7 +76,8 @@ Swagger UI에서 회원가입 또는 로그인을 실행하면 HttpOnly Refresh 
     "email": "user@example.com",
     "name": "홍길동",
     "profile_image_url": null,
-    "created_at": "2026-07-22T00:00:00.000Z"
+    "created_at": "2026-07-22T00:00:00.000Z",
+    "auth_provider": "password"
   },
   "access_token": "jwt",
   "token_type": "Bearer",
@@ -150,6 +151,14 @@ Refresh Token 쿠키를 회전시키고 새 Access Token을 발급한다. 요청
 
 ```json
 {
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "name": "홍길동",
+    "profile_image_url": null,
+    "created_at": "2026-07-22T00:00:00.000Z",
+    "auth_provider": "password"
+  },
   "access_token": "jwt",
   "token_type": "Bearer",
   "expires_in": 900
@@ -183,7 +192,8 @@ Refresh Token 쿠키를 회전시키고 새 Access Token을 발급한다. 요청
   "email": "user@example.com",
   "name": "홍길동",
   "profile_image_url": null,
-  "created_at": "2026-07-22T00:00:00.000Z"
+  "created_at": "2026-07-22T00:00:00.000Z",
+  "auth_provider": "password"
 }
 ```
 
@@ -214,6 +224,6 @@ Refresh Token 쿠키를 회전시키고 새 Access Token을 발급한다. 요청
 - `401 INVALID_ACCESS_TOKEN`: 토큰 만료 또는 검증 실패
 - `403 INVALID_ORIGIN`: 허용되지 않은 브라우저 Origin
 - `404 USER_NOT_FOUND`: 토큰 사용자가 더 이상 존재하지 않음
-- `500 AUTH_INTERNAL_ERROR`: 처리 중 예상하지 못한 오류
+- `500 INTERNAL_ERROR`: 처리 중 예상하지 못한 오류
 
 `/privacy`와 `/terms`는 공개 프런트엔드 페이지이며 JSON API가 아니다.

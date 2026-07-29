@@ -396,8 +396,9 @@ export const openApiDocument = {
       },
       AccessTokenResponse: {
         type: 'object',
-        required: ['access_token', 'token_type', 'expires_in'],
+        required: ['user', 'access_token', 'token_type', 'expires_in'],
         properties: {
+          user: { $ref: '#/components/schemas/User' },
           access_token: { type: 'string', description: 'JWT Access Token' },
           token_type: { type: 'string', enum: ['Bearer'] },
           expires_in: { type: 'integer', format: 'int32', example: 900 },

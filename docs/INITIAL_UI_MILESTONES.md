@@ -1,5 +1,9 @@
 # Initial UI Milestones
 
+> Historical milestone plan. Mock data described below has been replaced by
+> live API-backed prototype features. See the root `README.md` for current
+> behavior and limitations.
+
 This plan starts the Vue UI while treating `docs/*.dto.ts` as the current API contract.
 DTOs may change, so pages should not import request logic directly. Keep API access in
 `frontend/src/api/`, shared shapes in `frontend/src/types/`, and feature state in
