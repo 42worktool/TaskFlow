@@ -54,7 +54,7 @@ async function handleLogout() {
 
       <div class="menu-divider" />
 
-      <RouterLink to="/account" class="menu-item" @click="open = false">계정 설정</RouterLink>
+      <RouterLink to="/account" class="menu-item" @click="open = false">계정 / 친구</RouterLink>
       <button type="button" class="menu-item" @click="handleLogout">로그아웃</button>
     </div>
   </div>

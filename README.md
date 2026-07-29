@@ -22,6 +22,8 @@ With the Docker stack running, interactive Swagger documentation is available at
 
 The authenticated WebSocket foundation, event format, extension points, and
 channel security rules are documented in [`docs/realtime.md`](docs/realtime.md).
+The current add/list/remove friend contract is documented in
+[`docs/friends.md`](docs/friends.md).
 
 ## Google OAuth local setup
 

@@ -6,6 +6,7 @@ import { authRouter, googleCallback } from './modules/auth';
 import { workspaceRouter } from './modules/workspace';
 import { listRouter } from './modules/list';
 import { cardRouter, commentRouter } from './modules/card';
+import { friendRouter } from './modules/friend';
 import { errorHandler } from './errors';
 
 const app = express();
@@ -38,6 +39,7 @@ app.use('/api/workspaces', workspaceRouter);
 app.use('/api/lists', listRouter);
 app.use('/api/cards', cardRouter);
 app.use('/api/comments', commentRouter);
+app.use('/api/friends', friendRouter);
 app.use(errorHandler);
 
 export default app;
