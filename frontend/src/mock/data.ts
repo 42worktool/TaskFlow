@@ -122,10 +122,3 @@ export const cards: Card[] = [
     label_color: '#10B981',
   },
 ]
-
-export const calendarCards = [
-  { date: 15, month: 5, year: 2025, title: 'OAuth 구현', color: '#7C3AED' },
-  { date: 20, month: 5, year: 2025, title: '메인 대시보드', color: '#2563EB' },
-  { date: 23, month: 5, year: 2025, title: 'API 문서화', color: '#10B981' },
-  { date: 27, month: 5, year: 2025, title: 'UI 컴포넌트', color: '#F59E0B' },
-]

@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { calendarCards } from '../mock/data'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { ListAPI } from '../api/list'
+import type { Card } from '../types'
+import { cardOccursOnDate } from '../utils/calendar'
 
+const route = useRoute()
 const now = new Date()
 const year = ref(now.getFullYear())
 const month = ref(now.getMonth() + 1)
+const cards = ref<Card[]>([])
+const loading = ref(false)
+const error = ref('')
 
 const todayDate = now.getDate()
 const todayMonth = now.getMonth() + 1
@@ -30,20 +37,24 @@ function isToday(date: number | null): boolean {
   return date === todayDate && month.value === todayMonth && year.value === todayYear
 }
 
-const calendarDays = computed(() => {
+interface CalendarCell {
+  date: number | null
+  cards: Card[]
+}
+
+const calendarDays = computed<CalendarCell[]>(() => {
   const firstDay = new Date(year.value, month.value - 1, 1).getDay()
   const daysInMonth = new Date(year.value, month.value, 0).getDate()
-  const days: Array<{ date: number | null; cards: typeof calendarCards }> = []
+  const days: CalendarCell[] = []
 
   for (let i = 0; i < firstDay; i++) {
     days.push({ date: null, cards: [] })
   }
   for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year.value, month.value - 1, d)
     days.push({
       date: d,
-      cards: calendarCards.filter(
-        (c) => c.date === d && c.month === month.value && c.year === year.value,
-      ),
+      cards: cards.value.filter((card) => cardOccursOnDate(card, date)),
     })
   }
   const remaining = 7 - (days.length % 7)
@@ -55,18 +66,62 @@ const calendarDays = computed(() => {
   return days
 })
 
+const hasCardsThisMonth = computed(() =>
+  calendarDays.value.some((cell) => cell.cards.length > 0),
+)
+
+watch(
+  () => String(route.params.workspaceId ?? ''),
+  async (workspaceId, _previousWorkspaceId, onCleanup) => {
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
+
+    cards.value = []
+    error.value = ''
+    if (!workspaceId) return
+
+    loading.value = true
+    try {
+      const lists = await ListAPI.listByWorkspace(workspaceId)
+      if (!cancelled) cards.value = lists.flatMap((list) => list.cards)
+    } catch (caught) {
+      if (!cancelled) {
+        error.value =
+          caught instanceof Error ? caught.message : '달력 일정을 불러오지 못했습니다.'
+      }
+    } finally {
+      if (!cancelled) loading.value = false
+    }
+  },
+  { immediate: true },
+)
+
 const weekDays = ['일', '월', '화', '수', '목', '금', '토']
 </script>
 
 <template>
   <div class="calendar-page">
     <div class="cal-header">
-      <button class="nav-arrow" @click="prevMonth">&lt;</button>
+      <button type="button" class="nav-arrow" aria-label="이전 달" @click="prevMonth">
+        &lt;
+      </button>
       <h2 class="month-label">{{ monthLabel }}</h2>
-      <button class="nav-arrow" @click="nextMonth">&gt;</button>
+      <button type="button" class="nav-arrow" aria-label="다음 달" @click="nextMonth">
+        &gt;
+      </button>
     </div>
 
-    <div class="cal-grid">
+    <p v-if="loading" class="cal-status" role="status">일정을 불러오는 중…</p>
+    <p v-else-if="error" class="cal-status cal-status--error" role="alert">
+      {{ error }}
+    </p>
+    <p v-else-if="!hasCardsThisMonth" class="cal-empty">
+      이 달에 일정이 있는 카드가 없습니다.
+    </p>
+
+    <div v-if="!loading && !error" class="cal-grid">
       <div
         v-for="day in weekDays"
         :key="day"
@@ -91,9 +146,8 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
         </span>
         <div
           v-for="c in cell.cards"
-          :key="c.title"
+          :key="c.id"
           class="cal-card"
-          :style="{ background: c.color + '22', color: c.color }"
         >
           {{ c.title }}
         </div>
