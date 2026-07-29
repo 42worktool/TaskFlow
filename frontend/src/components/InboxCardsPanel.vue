@@ -1,43 +1,41 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import draggable from 'vuedraggable'
 import CardDetailModal from './CardDetailModal.vue'
 import TaskCard from './TaskCard.vue'
 import { InboxAPI } from '../api/inbox'
-import type { Card, List } from '../types'
+import type { Card, DraggableChange, List } from '../types'
 
 const props = withDefaults(
   defineProps<{
     compact?: boolean
     destinationLists?: Pick<List, 'id' | 'name'>[]
     refreshToken?: number
+    acceptingDrop?: boolean
   }>(),
   {
     compact: false,
     destinationLists: () => [],
     refreshToken: 0,
+    acceptingDrop: false,
   },
 )
 
 const emit = defineEmits<{
-  moved: [card: Card]
+  'drop-settled': []
+  'drag-start': [card: Card]
+  'drag-end': [movedToBoard: boolean]
 }>()
 
 const cards = ref<Card[]>([])
 const loading = ref(true)
 const error = ref('')
-const destinationListId = ref('')
 const busyCardId = ref<string | null>(null)
 const selectedCardId = ref<string | null>(null)
 let inboxLoadGeneration = 0
 
-watch(
-  () => props.destinationLists.map((list) => list.id),
-  (listIds) => {
-    if (listIds.length > 0 && !listIds.includes(destinationListId.value)) {
-      destinationListId.value = listIds[0] ?? ''
-    }
-  },
-  { immediate: true },
+const dragEnabled = computed(
+  () => props.destinationLists.length > 0 && busyCardId.value === null,
 )
 
 async function loadInbox() {
@@ -79,20 +77,37 @@ async function deleteCard(cardId: string) {
   }
 }
 
-async function moveCardToBoard(card: Card) {
-  if (busyCardId.value || !destinationListId.value) return
+async function handleCardChange(event: DraggableChange<Card>) {
+  if (!event.added || busyCardId.value) return
+  const card = event.added.element
+  inboxLoadGeneration += 1
+  loading.value = false
   busyCardId.value = card.id
   error.value = ''
   try {
-    const moved = await InboxAPI.moveToList(card.id, destinationListId.value)
-    cards.value = cards.value.filter((item) => item.id !== card.id)
-    emit('moved', moved)
+    const moved = await InboxAPI.moveToInbox(card.id)
+    cards.value = cards.value.map((item) =>
+      item.id === card.id ? moved : item,
+    )
   } catch (caught) {
+    cards.value = cards.value.filter((item) => item.id !== card.id)
     error.value =
-      caught instanceof Error ? caught.message : '카드를 보드로 옮기지 못했습니다.'
+      caught instanceof Error ? caught.message : '카드를 인박스로 옮기지 못했습니다.'
   } finally {
     busyCardId.value = null
+    emit('drop-settled')
   }
+}
+
+function startInboxDrag(event: { oldIndex?: number | null }) {
+  const index = event.oldIndex
+  if (index === null || index === undefined) return
+  const card = cards.value[index]
+  if (card) emit('drag-start', card)
+}
+
+function finishInboxDrag(event: { from?: Element; to?: Element }) {
+  emit('drag-end', Boolean(event.from && event.to && event.from !== event.to))
 }
 
 function updateSavedCard(saved: Card): void {
@@ -121,46 +136,66 @@ onUnmounted(() => {
 
     <div class="inbox-panel-toolbar">
       <span class="card-count">카드 {{ cards.length }}개</span>
-      <select
-        v-if="destinationLists.length"
-        v-model="destinationListId"
-        class="inbox-destination-select"
-        aria-label="인박스 카드가 이동할 리스트"
-        :disabled="busyCardId !== null"
-      >
-        <option v-for="list in destinationLists" :key="list.id" :value="list.id">
-          {{ list.name }}
-        </option>
-      </select>
+      <span v-if="destinationLists.length" class="inbox-drag-hint">
+        카드를 보드 리스트로 드래그하세요
+      </span>
     </div>
 
     <p v-if="error" class="inbox-panel-state inbox-panel-state--error" role="alert">
       {{ error }}
     </p>
-    <p v-if="loading" class="inbox-panel-state" role="status">
-      인박스를 불러오는 중…
-    </p>
-    <p v-else-if="!error && cards.length === 0" class="inbox-panel-state">
-      인박스가 비어 있습니다.
-    </p>
-    <ul v-else-if="cards.length > 0" class="inbox-card-list">
-      <li v-for="card in cards" :key="card.id">
-        <TaskCard
-          :card="card"
-          @open="selectedCardId = card.id"
-          @delete="deleteCard"
-        />
-        <button
-          v-if="destinationLists.length"
-          class="inbox-card-move-btn"
-          type="button"
-          :disabled="busyCardId !== null || !destinationListId"
-          @click="moveCardToBoard(card)"
+    <draggable
+      v-model="cards"
+      tag="ul"
+      item-key="id"
+      class="inbox-card-list"
+      :class="{ 'inbox-card-list--drop-active': acceptingDrop }"
+      :group="{ name: 'board-cards', pull: dragEnabled, put: dragEnabled }"
+      :disabled="!dragEnabled"
+      :sort="false"
+      ghost-class="card-ghost"
+      :scroll="true"
+      :scroll-sensitivity="80"
+      :scroll-speed="12"
+      :bubble-scroll="true"
+      :force-auto-scroll-fallback="true"
+      :fallback-on-body="true"
+      @start="startInboxDrag"
+      @end="finishInboxDrag"
+      @change="handleCardChange"
+    >
+      <template #item="{ element: card }">
+        <li>
+          <TaskCard
+            :card="card"
+            @open="selectedCardId = card.id"
+            @delete="deleteCard"
+          />
+        </li>
+      </template>
+      <template #footer>
+        <li
+          v-if="acceptingDrop"
+          class="inbox-drop-prompt"
+          aria-hidden="true"
         >
-          {{ busyCardId === card.id ? '이동 중…' : '선택한 리스트로 이동' }}
-        </button>
-      </li>
-    </ul>
+          여기에 놓아 인박스로 이동
+        </li>
+        <li
+          v-else-if="loading"
+          class="inbox-panel-state"
+          role="status"
+        >
+          인박스를 불러오는 중…
+        </li>
+        <li
+          v-else-if="!error && cards.length === 0"
+          class="inbox-panel-state"
+        >
+          인박스가 비어 있습니다.
+        </li>
+      </template>
+    </draggable>
   </section>
   <CardDetailModal
     v-if="selectedCardId"

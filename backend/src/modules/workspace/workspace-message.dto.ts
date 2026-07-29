@@ -5,6 +5,7 @@ export const workspaceMessageDtoSchema = z
   .object({
     id: z.string().uuid(),
     workspace_id: z.string().uuid(),
+    card_id: z.string().uuid().nullable(),
     content: z.string().min(1).max(1000),
     created_at: z.string().datetime(),
     author: z
@@ -29,6 +30,7 @@ export function toWorkspaceMessageDto(
   return workspaceMessageDtoSchema.parse({
     id: message.id,
     workspace_id: message.workspace_id,
+    card_id: message.card_id,
     content: message.content,
     created_at: message.created_at.toISOString(),
     author: {

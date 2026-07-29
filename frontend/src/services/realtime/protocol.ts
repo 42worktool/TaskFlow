@@ -222,6 +222,7 @@ export function parseWorkspaceMessage(
   if (
     !isUuid(candidate.id) ||
     !isUuid(candidate.workspace_id) ||
+    (candidate.card_id !== null && !isUuid(candidate.card_id)) ||
     typeof candidate.content !== 'string' ||
     candidate.content.length === 0 ||
     !isIsoDate(candidate.created_at) ||

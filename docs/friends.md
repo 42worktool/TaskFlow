@@ -3,7 +3,8 @@
 The friend feature uses an explicit request and acceptance flow:
 
 1. A user sends a request to an existing account by email.
-2. The receiver accepts or rejects it from the toggleable Friends sidebar.
+2. The receiver accepts or rejects it from the Friends pane in the floating
+   messenger.
 3. Only acceptance creates a `Friendships` row.
 4. Accepted friends can see each other's current online/offline state.
 
@@ -62,7 +63,8 @@ never participate in presence notifications.
 
 ## UI
 
-The authenticated application header toggles the Friends sidebar for:
+The bottom-right messenger combines Friends, Inbox, and the current workspace
+chat. Its Friends pane supports:
 
 - sending a request by email;
 - accepting or rejecting received requests;
@@ -70,8 +72,8 @@ The authenticated application header toggles the Friends sidebar for:
 - listing and removing accepted friends;
 - observing accepted friends' realtime online status.
 
-Request received/accepted events are not pushed in this slice. The sidebar
-reloads when opened and after WebSocket reconnection, and also provides a
+Request received/accepted events are not pushed in this slice. The pane reloads
+when first opened and after WebSocket reconnection, and also provides a
 manual refresh button. The legacy `/friends` URL redirects to `/workspaces`
-with the sidebar open instead of rendering a separate page. Blocking and
+with the Friends pane open instead of rendering a separate page. Blocking and
 request history remain outside the Toy scope.

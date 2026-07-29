@@ -63,6 +63,15 @@ function hasUnsavedChanges(): boolean {
   )
 }
 
+function formatCommentTime(value: string): string {
+  return new Date(value).toLocaleString('ko-KR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 async function loadCard(
   options: { background?: boolean } = {},
 ): Promise<void> {
@@ -310,6 +319,40 @@ onUnmounted(() => {
               </span>
             </div>
           </div>
+
+          <section class="card-detail-comments">
+            <div class="card-detail-comments-heading">
+              <h3>댓글</h3>
+              <span>{{ detail.comments.length }}</span>
+            </div>
+            <p v-if="detail.comments.length === 0" class="card-detail-comments-empty">
+              아직 댓글이 없습니다.
+            </p>
+            <article
+              v-for="comment in detail.comments"
+              :key="comment.id"
+              class="card-detail-comment"
+            >
+              <img
+                v-if="comment.author.profile_image_url"
+                :src="comment.author.profile_image_url"
+                alt=""
+                referrerpolicy="no-referrer"
+              />
+              <span v-else class="card-detail-comment-avatar">
+                {{ comment.author.name.charAt(0).toUpperCase() }}
+              </span>
+              <div>
+                <header>
+                  <strong>{{ comment.author.name }}</strong>
+                  <time :datetime="comment.created_at">
+                    {{ formatCommentTime(comment.created_at) }}
+                  </time>
+                </header>
+                <p>{{ comment.comment_str }}</p>
+              </div>
+            </article>
+          </section>
 
           <p v-if="error" class="card-detail-error" role="alert">{{ error }}</p>
           <p

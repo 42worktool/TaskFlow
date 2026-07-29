@@ -40,12 +40,23 @@
 
 .cal-grid {
   flex: 1;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: auto;
+  min-height: 0;
   border-left: 1px solid #e5e7eb;
   border-top: 1px solid #e5e7eb;
-  overflow: hidden;
+  overflow: auto;
+}
+
+.cal-weekdays,
+.cal-week-days,
+.cal-week-ranges {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cal-weekdays {
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 .cal-status,
@@ -74,15 +85,27 @@
   color: #ef4444;
 }
 
+.cal-week {
+  --cal-lane-count: 1;
+  position: relative;
+  display: grid;
+  min-height: max(100px, calc(44px + var(--cal-lane-count) * 25px));
+}
+
+.cal-week-days,
+.cal-week-ranges {
+  grid-area: 1 / 1;
+}
+
+.cal-week-days {
+  z-index: 0;
+}
+
 .cal-cell {
-  min-height: 100px;
+  min-width: 0;
   border-right: 1px solid #e5e7eb;
   border-bottom: 1px solid #e5e7eb;
   padding: 6px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  vertical-align: top;
   overflow: hidden;
 }
 
@@ -102,27 +125,64 @@
   font-weight: 700;
 }
 
-.cal-card {
-  width: 100%;
+.cal-week-ranges {
+  position: relative;
+  z-index: 1;
+  align-content: start;
+  grid-auto-rows: 22px;
+  gap: 3px 0;
+  padding: 31px 0 8px;
+  pointer-events: none;
+}
+
+.cal-range {
+  min-width: 0;
+  height: 22px;
+  margin: 0 3px;
   border: 0;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-radius: 5px;
+  background: var(--cal-range-color);
+  color: #fff;
   font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 500;
+  line-height: 22px;
+  padding: 0 7px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: left;
   cursor: pointer;
+  pointer-events: auto;
 }
 
-.cal-card:disabled {
+.cal-range--continues-before {
+  margin-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.cal-range--continues-after {
+  margin-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.cal-range-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-range:disabled {
   cursor: default;
   opacity: 1;
 }
 
-.cal-card:not(:disabled):hover {
-  background: #dbeafe;
+.cal-range:not(:disabled):hover {
+  filter: brightness(0.92);
+}
+
+.cal-range:not(:disabled):focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 1px;
 }

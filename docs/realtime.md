@@ -35,6 +35,10 @@ delivers PostgreSQL-backed group-chat messages, while
 presence transitions. Public non-members can still read public boards through
 REST, but cannot subscribe to the member channel or use chat.
 
+A workspace message may carry one optional `card_id`. The REST write creates
+the message and matching card comment atomically, then publishes the message
+and a normal card invalidation hint so open card details refetch comments.
+
 The invalidation event is intentionally not a durable mutation stream. The
 browser treats REST as canonical and performs a full workspace/board/chat
 snapshot refresh after every successful reconnect.
@@ -262,8 +266,8 @@ HTTP snapshot recovery remains the repair path.
 The current friend implementation follows that process-local model. A first
 connection sends `online: true` to current friends, a last disconnect sends
 `online: false`, and intermediate tab changes emit nothing. Events are
-best-effort; opening the Friends sidebar and reconnecting both refresh the
-authoritative snapshot through `GET /api/friends`.
+best-effort; opening the Friends messenger pane and reconnecting both refresh
+the authoritative snapshot through `GET /api/friends`.
 
 ## Limits and configuration
 

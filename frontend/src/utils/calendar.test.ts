@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Card } from '../types'
-import { cardOccursOnDate } from './calendar'
+import { buildCalendarWeeks, cardOccursOnDate } from './calendar'
 
 function localIso(year: number, monthIndex: number, day: number): string {
   return new Date(year, monthIndex, day, 12).toISOString()
@@ -52,5 +52,101 @@ describe('cardOccursOnDate', () => {
     expect(cardOccursOnDate(rangedCard, new Date(2026, 7, 1))).toBe(true)
     expect(cardOccursOnDate(rangedCard, new Date(2026, 7, 2))).toBe(true)
     expect(cardOccursOnDate(rangedCard, new Date(2026, 7, 3))).toBe(false)
+  })
+})
+
+describe('buildCalendarWeeks', () => {
+  it('turns a card range into one continuous weekly segment', () => {
+    const rangedCard = card({
+      start_at: localIso(2026, 6, 6),
+      deadline: localIso(2026, 6, 9),
+    })
+
+    const weeks = buildCalendarWeeks(2026, 7, [rangedCard])
+    const segment = weeks[1].segments[0]
+
+    expect(segment).toMatchObject({
+      card: rangedCard,
+      startColumn: 1,
+      endColumn: 4,
+      lane: 0,
+      continuesBefore: false,
+      continuesAfter: false,
+    })
+  })
+
+  it('splits a range at the week boundary and marks its continuation', () => {
+    const rangedCard = card({
+      start_at: localIso(2026, 6, 10),
+      deadline: localIso(2026, 6, 13),
+    })
+
+    const weeks = buildCalendarWeeks(2026, 7, [rangedCard])
+
+    expect(weeks[1].segments[0]).toMatchObject({
+      startColumn: 5,
+      endColumn: 6,
+      continuesBefore: false,
+      continuesAfter: true,
+    })
+    expect(weeks[2].segments[0]).toMatchObject({
+      startColumn: 0,
+      endColumn: 1,
+      continuesBefore: true,
+      continuesAfter: false,
+    })
+  })
+
+  it('puts overlapping ranges into separate lanes and reuses free lanes', () => {
+    const first = card({
+      id: 'first',
+      title: 'First',
+      start_at: localIso(2026, 6, 6),
+      deadline: localIso(2026, 6, 9),
+    })
+    const overlapping = card({
+      id: 'overlapping',
+      title: 'Overlapping',
+      start_at: localIso(2026, 6, 8),
+      deadline: localIso(2026, 6, 10),
+    })
+    const later = card({
+      id: 'later',
+      title: 'Later',
+      start_at: localIso(2026, 6, 10),
+      deadline: localIso(2026, 6, 11),
+    })
+
+    const week = buildCalendarWeeks(2026, 7, [
+      later,
+      overlapping,
+      first,
+    ])[1]
+    const lanes = Object.fromEntries(
+      week.segments.map((segment) => [segment.card.id, segment.lane]),
+    )
+
+    expect(week.laneCount).toBe(2)
+    expect(lanes).toEqual({
+      first: 0,
+      overlapping: 1,
+      later: 0,
+    })
+  })
+
+  it('clips a range crossing the month boundary to visible days', () => {
+    const rangedCard = card({
+      start_at: localIso(2026, 5, 29),
+      deadline: localIso(2026, 6, 3),
+    })
+
+    const firstWeek = buildCalendarWeeks(2026, 7, [rangedCard])[0]
+
+    expect(firstWeek.segments[0]).toMatchObject({
+      startColumn: 3,
+      endColumn: 5,
+      continuesBefore: true,
+      continuesAfter: false,
+    })
   })
 })

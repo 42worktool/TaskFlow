@@ -17,14 +17,14 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'card-change': [listId: string, event: DraggableChange]
+  'card-change': [listId: string, event: DraggableChange<Card>]
+  'card-drag-start': [card: Card]
+  'card-drag-end': []
   'open-card': [card: Card]
   'add-card': [listId: string, title: string]
   'delete-card': [cardId: string]
-  'move-card-to-inbox': [cardId: string]
   'rename-list': [listId: string, name: string]
   'delete-list': [listId: string]
-  'drag-state': [active: boolean]
 }>()
 
 const badgeColors: Record<string, string> = {
@@ -76,6 +76,13 @@ function startRename() {
   renaming.value = true
 }
 
+function startCardDrag(event: { oldIndex?: number | null }) {
+  const index = event.oldIndex
+  if (index === null || index === undefined) return
+  const card = props.list.cards[index]
+  if (card) emit('card-drag-start', card)
+}
+
 const vFocus = {
   mounted: (el: HTMLInputElement) => el.focus(),
 }
@@ -118,19 +125,22 @@ const vFocus = {
       :disabled="!canEdit"
       class="card-list"
       ghost-class="card-ghost"
-      @start="emit('drag-state', true)"
-      @end="emit('drag-state', false)"
-      @change="(e: DraggableChange) => emit('card-change', list.id, e)"
+      :scroll="true"
+      :scroll-sensitivity="80"
+      :scroll-speed="12"
+      :bubble-scroll="true"
+      :force-auto-scroll-fallback="true"
+      @start="startCardDrag"
+      @end="emit('card-drag-end')"
+      @change="(e: DraggableChange<Card>) => emit('card-change', list.id, e)"
     >
       <template #item="{ element: card }">
         <TaskCard
           :card="card"
           :openable="canOpenDetails"
           :show-delete-action="canEdit"
-          :show-inbox-action="canEdit"
           @open="emit('open-card', card)"
           @delete="emit('delete-card', card.id)"
-          @move-to-inbox="emit('move-card-to-inbox', card.id)"
         />
       </template>
     </draggable>

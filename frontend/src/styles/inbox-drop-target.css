@@ -1,0 +1,55 @@
+.inbox-edge-drop-target {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 150;
+  width: min(240px, calc(100vw - 32px));
+  min-height: 76px;
+  padding: 6px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    background 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.inbox-edge-drop-target--active {
+  background: #eff6ff;
+  box-shadow: 0 12px 34px rgba(37, 99, 235, 0.28);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.inbox-edge-drop-label {
+  min-height: 62px;
+  border: 2px dashed #60a5fa;
+  border-radius: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #1d4ed8;
+  text-align: center;
+}
+
+.inbox-edge-drop-label strong {
+  font-size: 14px;
+}
+
+.inbox-edge-drop-label span {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.inbox-edge-drop-card {
+  padding: 8px;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 3px 12px rgba(37, 99, 235, 0.18);
+}

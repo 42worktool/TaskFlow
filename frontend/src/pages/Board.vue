@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
 import CardDetailModal from '../components/CardDetailModal.vue'
@@ -11,11 +11,14 @@ import { realtime } from '../services/realtime'
 import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
 import {
   clearInboxDestinations,
+  finishCardDrag,
+  messengerState,
   notifyInboxChanged,
   setInboxDestinations,
-  utilityDrawerState,
-} from '../services/utilityDrawer'
+  startCardDrag,
+} from '../services/messenger'
 import type { Card, DraggableChange, ListWithCards } from '../types'
+import { horizontalEdgeScrollDelta } from '../utils/dragAutoScroll'
 import { neighborIds } from '../utils/ordering'
 
 const route = useRoute()
@@ -38,8 +41,11 @@ const loading = ref(false)
 const error = ref('')
 const selectedCardId = ref<string | null>(null)
 const cardDetailRefreshToken = ref(0)
+const boardColumns = ref<{ $el: HTMLElement } | null>(null)
 let listLoadGeneration = 0
 let dragDepth = 0
+let dragPointerX: number | null = null
+let autoScrollFrame: number | null = null
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
 let refreshRunning = false
 let fullRefreshPending = false
@@ -177,6 +183,48 @@ function setDragging(active: boolean): void {
   if (dragDepth === 0) scheduleInvalidationFlush()
 }
 
+function stopBoardAutoScroll(): void {
+  dragPointerX = null
+  if (autoScrollFrame !== null) {
+    window.cancelAnimationFrame(autoScrollFrame)
+    autoScrollFrame = null
+  }
+}
+
+function continueBoardAutoScroll(): void {
+  autoScrollFrame = null
+  const element = boardColumns.value?.$el
+  if (
+    !element ||
+    dragPointerX === null ||
+    messengerState.cardDrag?.source !== 'inbox'
+  ) {
+    return
+  }
+
+  const bounds = element.getBoundingClientRect()
+  const delta = horizontalEdgeScrollDelta({
+    pointerX: dragPointerX,
+    left: bounds.left,
+    right: bounds.right,
+    scrollLeft: element.scrollLeft,
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  })
+  if (delta === 0) return
+
+  element.scrollLeft += delta
+  autoScrollFrame = window.requestAnimationFrame(continueBoardAutoScroll)
+}
+
+function handleCardDragPointer(event: { clientX: number }): void {
+  if (messengerState.cardDrag?.source !== 'inbox') return
+  dragPointerX = event.clientX
+  if (autoScrollFrame === null) {
+    autoScrollFrame = window.requestAnimationFrame(continueBoardAutoScroll)
+  }
+}
+
 watch(
   () => route.params.workspaceId,
   () => {
@@ -212,9 +260,17 @@ watch(
 )
 
 watch(
-  () => utilityDrawerState.boardRefreshToken,
+  () => messengerState.boardRefreshToken,
   (next, previous) => {
     if (next !== previous) queueFullRefresh()
+  },
+)
+
+watch(
+  () => messengerState.cardDrag !== null,
+  (active, previous) => {
+    if (active !== previous) setDragging(active)
+    if (!active) stopBoardAutoScroll()
   },
 )
 
@@ -261,7 +317,7 @@ function cancelAddList() {
   showAddList.value = false
 }
 
-function onListChange(event: DraggableChange) {
+function onListChange(event: DraggableChange<ListWithCards>) {
   if (!props.canEditBoard || !event.moved) return
   const { element, newIndex } = event.moved
   const { beforeId, afterId } = neighborIds(lists.value, newIndex)
@@ -274,7 +330,7 @@ function onListChange(event: DraggableChange) {
   )
 }
 
-function onCardChange(listId: string, event: DraggableChange) {
+function onCardChange(listId: string, event: DraggableChange<Card>) {
   if (!props.canEditBoard) return
   const list = lists.value.find((l) => l.id === listId)
   if (!list) return
@@ -282,13 +338,26 @@ function onCardChange(listId: string, event: DraggableChange) {
   if (event.added) {
     const { element, newIndex } = event.added
     const { beforeId, afterId } = neighborIds(list.cards, newIndex)
-    CardAPI.move(element.id, {
-      list_id: listId,
-      before_card_id: beforeId,
-      after_card_id: afterId,
-    }).then(
-      () => queueFullRefresh(),
-      () => queueFullRefresh(),
+    const movedFromInbox = element.list_id === null
+    const request = movedFromInbox
+      ? InboxAPI.moveToList(element.id, listId, {
+          before_card_id: beforeId,
+          after_card_id: afterId,
+        })
+      : CardAPI.move(element.id, {
+          list_id: listId,
+          before_card_id: beforeId,
+          after_card_id: afterId,
+        })
+    request.then(
+      () => {
+        queueFullRefresh()
+        if (movedFromInbox) notifyInboxChanged()
+      },
+      () => {
+        queueFullRefresh()
+        if (movedFromInbox) notifyInboxChanged()
+      },
     )
   } else if (event.moved) {
     const { element, newIndex } = event.moved
@@ -324,20 +393,13 @@ async function onDeleteCard(cardId: string) {
   }
 }
 
-async function onMoveCardToInbox(cardId: string) {
+function onBoardCardDragStart(card: Card): void {
   if (!props.canEditBoard) return
-  const list = lists.value.find((item) =>
-    item.cards.some((card) => card.id === cardId),
-  )
-  if (!list) return
-  try {
-    await InboxAPI.moveToInbox(cardId)
-    queueFullRefresh()
-    notifyInboxChanged()
-  } catch (caught) {
-    error.value =
-      caught instanceof Error ? caught.message : '카드를 인박스로 옮기지 못했습니다.'
-  }
+  startCardDrag(card.id, 'board')
+}
+
+function onBoardCardDragEnd(): void {
+  finishCardDrag()
 }
 
 function openCard(card: Card) {
@@ -445,10 +507,21 @@ const removeWorkspaceChangeListener = realtime.on(
   },
 )
 
+onMounted(() => {
+  window.addEventListener('dragover', handleCardDragPointer)
+  window.addEventListener('mousemove', handleCardDragPointer)
+  window.addEventListener('pointermove', handleCardDragPointer)
+})
+
 onUnmounted(() => {
   listLoadGeneration += 1
   clearInboxDestinations()
+  if (messengerState.cardDrag?.source === 'board') finishCardDrag()
   removeWorkspaceChangeListener()
+  stopBoardAutoScroll()
+  window.removeEventListener('dragover', handleCardDragPointer)
+  window.removeEventListener('mousemove', handleCardDragPointer)
+  window.removeEventListener('pointermove', handleCardDragPointer)
   if (refreshTimer) clearTimeout(refreshTimer)
 })
 </script>
@@ -459,6 +532,7 @@ onUnmounted(() => {
     <div v-else-if="error" class="board-status board-status--error">{{ error }}</div>
     <draggable
       v-else
+      ref="boardColumns"
       v-model="lists"
       item-key="id"
       :disabled="!canEditBoard"
@@ -475,10 +549,10 @@ onUnmounted(() => {
           :can-open-details="canViewCardDetails"
           @open-card="openCard"
           @card-change="onCardChange"
-          @drag-state="setDragging"
+          @card-drag-start="onBoardCardDragStart"
+          @card-drag-end="onBoardCardDragEnd"
           @add-card="onAddCard"
           @delete-card="onDeleteCard"
-          @move-card-to-inbox="onMoveCardToInbox"
           @rename-list="onRenameList"
           @delete-list="onDeleteList"
         />

@@ -113,6 +113,7 @@ describe('workspace realtime protocol', () => {
     const message = {
       id: MESSAGE_ID,
       workspace_id: WORKSPACE_ID,
+      card_id: null,
       content: '안녕하세요',
       created_at: OCCURRED_AT,
       author: {
@@ -130,6 +131,7 @@ describe('workspace realtime protocol', () => {
       parseWorkspaceMessage({
         id: MESSAGE_ID,
         workspace_id: WORKSPACE_ID,
+        card_id: null,
         content: '',
         created_at: OCCURRED_AT,
         author: {
@@ -143,6 +145,7 @@ describe('workspace realtime protocol', () => {
       parseWorkspaceMessage({
         id: MESSAGE_ID,
         workspace_id: WORKSPACE_ID,
+        card_id: null,
         content: '안녕하세요',
         created_at: 'not-a-date',
         author: {
@@ -152,5 +155,49 @@ describe('workspace realtime protocol', () => {
         },
       }),
     ).toBeNull()
+    expect(
+      parseWorkspaceMessage({
+        id: MESSAGE_ID,
+        workspace_id: WORKSPACE_ID,
+        content: '카드 없는 메시지',
+        created_at: OCCURRED_AT,
+        author: {
+          user_id: USER_ID,
+          name: 'Sean',
+          profile_image_url: null,
+        },
+      }),
+    ).toBeNull()
+    expect(
+      parseWorkspaceMessage({
+        id: MESSAGE_ID,
+        workspace_id: WORKSPACE_ID,
+        card_id: 'card-1',
+        content: '잘못된 카드 참조',
+        created_at: OCCURRED_AT,
+        author: {
+          user_id: USER_ID,
+          name: 'Sean',
+          profile_image_url: null,
+        },
+      }),
+    ).toBeNull()
+  })
+
+  it('accepts a workspace message linked to a card', () => {
+    const message = {
+      id: MESSAGE_ID,
+      workspace_id: WORKSPACE_ID,
+      card_id: ENTITY_ID,
+      content: '카드 코멘트',
+      created_at: OCCURRED_AT,
+      author: {
+        user_id: USER_ID,
+        name: 'Sean',
+        profile_image_url: null,
+      },
+    }
+
+    expect(parseWorkspaceMessage(message)).toEqual(message)
   })
 })

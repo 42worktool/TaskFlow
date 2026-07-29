@@ -23,7 +23,7 @@ import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 // ─── DTOs ─────────────────────────────────────────────────────
 
 async function buildCardDetail(card: Card) {
-  const [members, labels, attachments] = await Promise.all([
+  const [members, labels, attachments, comments] = await Promise.all([
     prisma.cardMember.findMany({
       where: { card_id: card.id, deleted_at: null },
       include: { user: { select: { id: true, name: true, profile_image_url: true } } },
@@ -45,9 +45,18 @@ async function buildCardDetail(card: Card) {
       where: { card_id: card.id, deleted_at: null },
       orderBy: { created_at: 'asc' },
     }),
+    prisma.comment.findMany({
+      where: { card_id: card.id, deleted_at: null },
+      orderBy: { created_at: 'asc' },
+      include: {
+        user: {
+          select: { id: true, name: true, profile_image_url: true },
+        },
+      },
+    }),
   ])
 
-  return toCardDetailDto(card, members, labels, attachments)
+  return toCardDetailDto(card, members, labels, attachments, comments)
 }
 
 // ─── Access helpers ───────────────────────────────────────────

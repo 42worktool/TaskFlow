@@ -5,6 +5,10 @@ import AppHeader from '../components/AppHeader.vue'
 import ShareModal from '../components/ShareModal.vue'
 import { WorkspaceAPI } from '../api/workspace'
 import { authState } from '../services/auth'
+import {
+  clearMessengerWorkspace,
+  setMessengerWorkspace,
+} from '../services/messenger'
 import { realtime, RealtimeRequestError } from '../services/realtime'
 import {
   parseWorkspaceChangedEvent,
@@ -23,7 +27,6 @@ const workspace = ref<Workspace | null>(null)
 const loadError = ref('')
 const onlineUserIds = ref<Set<string>>(new Set())
 const workspaceSyncVersion = ref(0)
-const isChatRoute = computed(() => route.path.endsWith('/chat'))
 const currentRole = computed(() =>
   workspace.value
     ? workspaceRoleFor(workspace.value, authState.user?.id)
@@ -45,6 +48,7 @@ const SUBSCRIPTION_RETRY_DELAY_MS = 250
 let workspaceLoadGeneration = 0
 let presenceSequence = 0
 let activeSubscriptionWorkspaceId: string | null = null
+let messengerContextWorkspaceId: string | null = null
 let removeSubscriptionRecovery: (() => void) | null = null
 const livePresence = new Map<
   string,
@@ -292,10 +296,21 @@ watch(
 )
 
 watch(
-  [workspace, currentRole, isChatRoute],
-  ([loadedWorkspace, role, chatRoute]) => {
-    if (loadedWorkspace && chatRoute && !role) {
-      void router.replace(`/workspaces/${loadedWorkspace.id}/board`)
+  [workspace, currentRole, workspaceSyncVersion],
+  ([loadedWorkspace, role, syncVersion]) => {
+    if (loadedWorkspace && role) {
+      setMessengerWorkspace({
+        id: loadedWorkspace.id,
+        name: loadedWorkspace.name,
+        syncVersion,
+      })
+      messengerContextWorkspaceId = loadedWorkspace.id
+      return
+    }
+
+    if (messengerContextWorkspaceId) {
+      clearMessengerWorkspace(messengerContextWorkspaceId)
+      messengerContextWorkspaceId = null
     }
   },
   { immediate: true },
@@ -303,6 +318,10 @@ watch(
 
 onUnmounted(() => {
   workspaceLoadGeneration += 1
+  if (messengerContextWorkspaceId) {
+    clearMessengerWorkspace(messengerContextWorkspaceId)
+    messengerContextWorkspaceId = null
+  }
   stopWorkspaceSubscription()
   removeWorkspaceChangeListener()
   removeWorkspacePresenceListener()
@@ -335,15 +354,6 @@ onUnmounted(() => {
               active-class="nav-item--active"
             >
               <span class="nav-icon">▦</span> 달력
-            </RouterLink>
-          </li>
-          <li v-if="currentRole">
-            <RouterLink
-              :to="`/workspaces/${workspaceId}/chat`"
-              class="nav-item"
-              active-class="nav-item--active"
-            >
-              <span class="nav-icon">◌</span> 채팅
             </RouterLink>
           </li>
         </ul>

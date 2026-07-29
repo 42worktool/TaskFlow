@@ -60,18 +60,6 @@ test('card detail and comment DTOs preserve nested user shapes', () => {
   const label = {
     label: { id: 'label-id', label_name: 'Urgent', label_color: '#ef4444' },
   }
-  const detail = toCardDetailDto(card, [member], [label], [])
-  assert.deepEqual(detail.members[0], {
-    user_id: 'user-id',
-    name: 'User',
-    profile_image_url: null,
-  })
-  assert.deepEqual(detail.labels[0], {
-    label_id: 'label-id',
-    label_name: 'Urgent',
-    label_color: '#ef4444',
-  })
-
   const comment = {
     id: 'comment-id',
     card_id: 'card-id',
@@ -85,6 +73,18 @@ test('card detail and comment DTOs preserve nested user shapes', () => {
     deleted_by: null,
     user: member.user,
   } satisfies Comment & { user: typeof member.user }
+  const detail = toCardDetailDto(card, [member], [label], [], [comment])
+  assert.deepEqual(detail.members[0], {
+    user_id: 'user-id',
+    name: 'User',
+    profile_image_url: null,
+  })
+  assert.deepEqual(detail.labels[0], {
+    label_id: 'label-id',
+    label_name: 'Urgent',
+    label_color: '#ef4444',
+  })
+  assert.deepEqual(detail.comments, [toCommentDto(comment)])
   assert.deepEqual(toCommentDto(comment).author, {
     user_id: 'user-id',
     name: 'User',

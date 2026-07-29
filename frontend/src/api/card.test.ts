@@ -34,7 +34,13 @@ describe('CardAPI', () => {
   it('loads and updates card detail fields through the existing routes', async () => {
     const request = vi.mocked(apiRequest)
     request
-      .mockResolvedValueOnce({ id: 'card-1', members: [], labels: [], attachments: [] })
+      .mockResolvedValueOnce({
+        id: 'card-1',
+        members: [],
+        labels: [],
+        attachments: [],
+        comments: [],
+      })
       .mockResolvedValueOnce({ id: 'card-1', title: 'Updated' })
       .mockResolvedValueOnce({
         id: 'card-1',
