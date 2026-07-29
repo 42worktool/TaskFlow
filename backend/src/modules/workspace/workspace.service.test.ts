@@ -276,3 +276,74 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
     assert.deepEqual(operationOrder, ['membership', 'notification'])
   })
 })
+
+test('workspace removal events are published before channel access is revoked', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, service] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./workspace.service'),
+  ])
+
+  await t.test('member removal leaves every target connection after publish', async (t) => {
+    const operationOrder: string[] = []
+    stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+    stubMethod(t, prisma.workspace, 'findFirst', async () => ({
+      id: WORKSPACE_ID,
+      members: [
+        { user_id: USER_ID, role: 'ADMIN' },
+        { user_id: OWNER_ID, role: 'MEMBER' },
+      ],
+    }))
+    stubMethod(t, prisma.workspaceMember, 'update', async () => {
+      operationOrder.push('update')
+      return {}
+    })
+    stubMethod(t, realtime, 'publish', () => {
+      operationOrder.push('publish')
+    })
+    let leaveArgs: unknown[]
+    stubMethod(t, realtime, 'leaveUserChannel', (...args) => {
+      operationOrder.push('leave')
+      leaveArgs = args
+    })
+
+    await service.removeMember({
+      userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
+      targetUserId: OWNER_ID,
+    })
+
+    assert.deepEqual(operationOrder, ['update', 'publish', 'leave'])
+    assert.deepEqual(leaveArgs!, [OWNER_ID, `workspace:${WORKSPACE_ID}`])
+  })
+
+  await t.test('workspace deletion clears the channel after publish', async (t) => {
+    const operationOrder: string[] = []
+    stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+    stubMethod(t, prisma.workspace, 'findFirst', async () => ({
+      id: WORKSPACE_ID,
+      members: [{ user_id: USER_ID, role: 'OWNER' }],
+    }))
+    stubMethod(t, prisma.workspace, 'update', async () => {
+      operationOrder.push('update')
+      return {}
+    })
+    stubMethod(t, realtime, 'publish', () => {
+      operationOrder.push('publish')
+    })
+    let clearArgs: unknown[]
+    stubMethod(t, realtime, 'clearChannel', (...args) => {
+      operationOrder.push('clear')
+      clearArgs = args
+    })
+
+    await service.deleteWorkspace({
+      userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
+    })
+
+    assert.deepEqual(operationOrder, ['update', 'publish', 'clear'])
+    assert.deepEqual(clearArgs!, [`workspace:${WORKSPACE_ID}`])
+  })
+})

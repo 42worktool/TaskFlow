@@ -109,8 +109,9 @@ function stubMoveLocks(
 
 test('createCard locks an active list before inserting the card', async (t) => {
   setRequiredEnvironment()
-  const [{ prisma }, { createCard }] = await Promise.all([
+  const [{ prisma }, { realtime }, { createCard }] = await Promise.all([
     import('../../db'),
+    import('../../realtime'),
     import('./card.service'),
   ])
 
@@ -122,9 +123,16 @@ test('createCard locks an active list before inserting the card', async (t) => {
   stubMethod(t, prisma.card, 'aggregate', async () => ({ _max: { sequence: 2 } }))
 
   let create: any
+  const operationOrder: string[] = []
   stubMethod(t, prisma.card, 'create', async (args) => {
+    operationOrder.push('create')
     create = args
     return card({ list_id: SOURCE_LIST_ID, sequence: 3 })
+  })
+  let publication: unknown[]
+  stubMethod(t, realtime, 'publish', (...args) => {
+    operationOrder.push('publish')
+    publication = args
   })
 
   const created = await createCard({
@@ -136,6 +144,29 @@ test('createCard locks an active list before inserting the card', async (t) => {
   assert.equal(created.sequence, 3)
   assert.equal(create.data.list_id, SOURCE_LIST_ID)
   assert.equal(create.data.sequence, 3)
+  assert.deepEqual(operationOrder, ['create', 'publish'])
+  assert.equal(publication![0], `workspace:${SOURCE_WORKSPACE_ID}`)
+  assert.equal(publication![1], 'workspace.changed')
+  const event = publication![2] as {
+    entity: string
+    action: string
+    entity_id: string
+    list_ids: string[]
+  }
+  assert.deepEqual(
+    {
+      entity: event.entity,
+      action: event.action,
+      entity_id: event.entity_id,
+      list_ids: event.list_ids,
+    },
+    {
+      entity: 'card',
+      action: 'created',
+      entity_id: CARD_ID,
+      list_ids: [SOURCE_LIST_ID],
+    },
+  )
 })
 
 test('createCard rejects a list deleted before its row lock', async (t) => {
@@ -547,4 +578,175 @@ test('getCard includes active labels in its detail response', async (t) => {
       },
     },
   })
+})
+
+test('card mutations use the locked location and publish only after commit', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, service] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  const mutationCases: Array<{
+    name: string
+    run: () => Promise<unknown>
+    action: 'updated' | 'deleted' | 'moved'
+  }> = [
+    {
+      name: 'updateCard',
+      run: () =>
+        service.updateCard({
+          userId: USER_ID,
+          cardId: CARD_ID,
+          title: 'Updated',
+        }),
+      action: 'updated',
+    },
+    {
+      name: 'deleteCard',
+      run: () => service.deleteCard({ userId: USER_ID, cardId: CARD_ID }),
+      action: 'deleted',
+    },
+    {
+      name: 'reorderCard',
+      run: () =>
+        service.reorderCard({
+          userId: USER_ID,
+          cardId: CARD_ID,
+        }),
+      action: 'moved',
+    },
+    {
+      name: 'updateCardDates',
+      run: () =>
+        service.updateCardDates({
+          userId: USER_ID,
+          cardId: CARD_ID,
+          startAt: '2026-07-28T00:00:00.000Z',
+        }),
+      action: 'updated',
+    },
+  ]
+
+  for (const mutation of mutationCases) {
+    await t.test(mutation.name, async (t) => {
+      const operationOrder: string[] = []
+      stubMethod(t, prisma, '$transaction', async (operation) => {
+        const result = await operation(prisma)
+        operationOrder.push('commit')
+        return result
+      })
+      stubMethod(t, prisma, '$queryRaw', async () => {
+        operationOrder.push('lock')
+        return [{
+          list_id: TARGET_LIST_ID,
+          user_id: null,
+          start_at: new Date('2026-07-27T00:00:00.000Z'),
+          deadline: new Date('2026-07-29T00:00:00.000Z'),
+        }]
+      })
+      stubMethod(t, prisma.card, 'findFirst', async () => {
+        throw new Error('mutation must not authorize from an unlocked card read')
+      })
+      stubMethod(t, prisma.list, 'findFirst', async () => {
+        operationOrder.push('location')
+        return list(TARGET_LIST_ID, TARGET_WORKSPACE_ID)
+      })
+      stubMethod(t, prisma.workspaceMember, 'findFirst', async () => {
+        operationOrder.push('permission')
+        return { role: 'MEMBER' }
+      })
+      stubMethod(t, prisma.card, 'findMany', async () => [])
+      stubMethod(t, prisma.card, 'update', async () => {
+        operationOrder.push('write')
+        return card({ list_id: TARGET_LIST_ID })
+      })
+
+      let publication: unknown[]
+      stubMethod(t, realtime, 'publish', (...args) => {
+        operationOrder.push('publish')
+        publication = args
+      })
+
+      await mutation.run()
+
+      assert.equal(operationOrder[0], 'lock')
+      assert.ok(
+        operationOrder.indexOf('permission') <
+          operationOrder.indexOf('write'),
+      )
+      assert.ok(
+        operationOrder.indexOf('write') <
+          operationOrder.indexOf('commit'),
+      )
+      assert.ok(
+        operationOrder.indexOf('commit') <
+          operationOrder.indexOf('publish'),
+      )
+      assert.equal(publication![0], `workspace:${TARGET_WORKSPACE_ID}`)
+      assert.equal(publication![1], 'workspace.changed')
+      const event = publication![2] as {
+        action: string
+        entity_id: string
+        list_ids: string[]
+      }
+      assert.deepEqual(
+        {
+          action: event.action,
+          entity_id: event.entity_id,
+          list_ids: event.list_ids,
+        },
+        {
+          action: mutation.action,
+          entity_id: CARD_ID,
+          list_ids: [TARGET_LIST_ID],
+        },
+      )
+    })
+  }
+})
+
+test('updateCardDates validates against dates read under the card lock', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { updateCardDates }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma, '$queryRaw', async () => [{
+    list_id: TARGET_LIST_ID,
+    user_id: null,
+    start_at: null,
+    deadline: new Date('2026-07-29T00:00:00.000Z'),
+  }])
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(TARGET_LIST_ID, TARGET_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({
+    role: 'MEMBER',
+  }))
+
+  let updateCalls = 0
+  let publishCalls = 0
+  stubMethod(t, prisma.card, 'update', async () => {
+    updateCalls += 1
+    return card()
+  })
+  stubMethod(t, realtime, 'publish', () => {
+    publishCalls += 1
+  })
+
+  await assert.rejects(
+    () =>
+      updateCardDates({
+        userId: USER_ID,
+        cardId: CARD_ID,
+        startAt: '2026-07-30T00:00:00.000Z',
+      }),
+    /start_at must be before or equal to deadline/,
+  )
+  assert.equal(updateCalls, 0)
+  assert.equal(publishCalls, 0)
 })

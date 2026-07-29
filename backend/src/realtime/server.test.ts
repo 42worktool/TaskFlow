@@ -253,6 +253,69 @@ describe('RealtimeServer', () => {
     socket.close();
   });
 
+  it('removes every user connection from a channel and can clear the channel', async () => {
+    httpServer = createServer();
+    realtimeServer = new RealtimeServer(
+      serverOptions((token) =>
+        validPrincipal(token === 'user-2-token' ? 'user-2' : 'user-1'),
+      ),
+    );
+    realtimeServer.register(
+      'workspace.subscribe',
+      z.object({ workspaceId: z.string() }),
+      (context, { workspaceId }) => {
+        context.join(`workspace:${workspaceId}`);
+      },
+    );
+    realtimeServer.attach(httpServer);
+
+    const port = await listen(httpServer);
+    const first = (await authenticatedSocket(port, 'user-1-token')).socket;
+    const second = (await authenticatedSocket(port, 'user-1-token')).socket;
+    const other = (await authenticatedSocket(port, 'user-2-token')).socket;
+
+    for (const [index, socket] of [first, second, other].entries()) {
+      const acknowledgement = nextMessage(socket);
+      socket.send(
+        JSON.stringify({
+          v: 1,
+          event: 'workspace.subscribe',
+          requestId: `subscribe-${index}`,
+          data: { workspaceId: 'workspace-1' },
+        }),
+      );
+      await acknowledgement;
+    }
+
+    const firstMessages: OutboundMessage[] = [];
+    const secondMessages: OutboundMessage[] = [];
+    const otherMessages: OutboundMessage[] = [];
+    first.on('message', (raw) => firstMessages.push(JSON.parse(raw.toString())));
+    second.on('message', (raw) => secondMessages.push(JSON.parse(raw.toString())));
+    other.on('message', (raw) => otherMessages.push(JSON.parse(raw.toString())));
+
+    realtimeServer.leaveUserChannel('user-1', 'workspace:workspace-1');
+    realtimeServer.publish('workspace:workspace-1', 'workspace.changed', {
+      id: 'change-1',
+    });
+    await delay(20);
+
+    assert.equal(firstMessages.length, 0);
+    assert.equal(secondMessages.length, 0);
+    assert.equal(otherMessages.length, 1);
+
+    realtimeServer.clearChannel('workspace:workspace-1');
+    realtimeServer.publish('workspace:workspace-1', 'workspace.changed', {
+      id: 'change-2',
+    });
+    await delay(20);
+    assert.equal(otherMessages.length, 1);
+
+    first.close();
+    second.close();
+    other.close();
+  });
+
   it('expires an authenticated connection when its access token expires', async () => {
     httpServer = createServer();
     realtimeServer = new RealtimeServer(

@@ -10,6 +10,14 @@ export const list: RequestHandler = async (req, res) => {
   res.status(200).json(lists)
 }
 
+export const getOne: RequestHandler = async (req, res) => {
+  const list = await svc.getList({
+    userId: req.user!.id,
+    listId: req.params.list_id as string,
+  })
+  res.status(200).json(list)
+}
+
 export const create: RequestHandler = async (req, res) => {
   const body = listNameSchema.parse(req.body)
   const list = await svc.createList({

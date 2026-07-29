@@ -8,6 +8,7 @@ import type {
 
 const USER_ID = '00000000-0000-4000-8000-000000000010'
 const FRIEND_ID = '00000000-0000-4000-8000-000000000011'
+const WORKSPACE_ID = '00000000-0000-4000-8000-000000000012'
 
 function setRequiredEnvironment(): void {
   Object.assign(process.env, {
@@ -99,10 +100,17 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
       resolveDelayedFriendQuery = () => resolve(friendships)
     })
   })
+  stubMethod(t, prisma.workspaceMember, 'findMany', async () => [
+    { workspace_id: WORKSPACE_ID },
+  ])
 
   const deliveries: unknown[][] = []
   stubMethod(t, realtime, 'sendToUser', (...args) => {
     deliveries.push(args)
+  })
+  const publications: unknown[][] = []
+  stubMethod(t, realtime, 'publish', (...args) => {
+    publications.push(args)
   })
   const warnings: string[] = []
   stubMethod(t, console, 'warn', (...args) => {
@@ -122,6 +130,17 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
       { user_id: USER_ID, online: true },
     ],
   ])
+  assert.deepEqual(publications, [
+    [
+      `workspace:${WORKSPACE_ID}`,
+      'workspace.member_presence_changed',
+      {
+        workspace_id: WORKSPACE_ID,
+        user_id: USER_ID,
+        online: true,
+      },
+    ],
+  ])
 
   authenticated?.(connection('connection-2'))
   disconnected?.({
@@ -131,6 +150,7 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
   })
   assert.equal(presenceState.isUserOnline(USER_ID), true)
   assert.equal(deliveries.length, 1)
+  assert.equal(publications.length, 1)
 
   disconnected?.({
     ...connection('connection-2'),
@@ -143,6 +163,15 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
     FRIEND_ID,
     'friend.presence_changed',
     { user_id: USER_ID, online: false },
+  ])
+  assert.deepEqual(publications[1], [
+    `workspace:${WORKSPACE_ID}`,
+    'workspace.member_presence_changed',
+    {
+      workspace_id: WORKSPACE_ID,
+      user_id: USER_ID,
+      online: false,
+    },
   ])
 
   delayNextFriendQuery = true
@@ -162,9 +191,11 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
     { user_id: USER_ID, online: false },
   ])
   const deliveriesBeforeStaleQuery = deliveries.length
+  const publicationsBeforeStaleQuery = publications.length
   resolveDelayedFriendQuery?.()
   await settleAsyncWork()
   assert.equal(deliveries.length, deliveriesBeforeStaleQuery)
+  assert.equal(publications.length, publicationsBeforeStaleQuery)
 
   delayNextFriendQuery = true
   authenticated?.(connection('connection-with-stuck-query'))

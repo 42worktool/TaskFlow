@@ -6,8 +6,8 @@
 
 TaskFlow is a Trello-inspired collaboration prototype for organizing work in
 role-based workspaces. It combines a Kanban board, a personal card inbox,
-calendar views, invitations, friend presence, and small realtime notifications
-in one Docker Compose application.
+calendar views, invitations, workspace chat, presence, and realtime
+synchronization in one Docker Compose application.
 
 The project intentionally favors a compact, reviewable prototype over a
 production-scale platform. Realtime transport is isolated behind a versioned
@@ -22,12 +22,14 @@ HTTP controllers or the Vue component tree.
   roles.
 - Email invitation links bound to the invited account.
 - Kanban lists and cards with drag-and-drop reordering.
+- Realtime list-level board synchronization across workspace members.
 - Editable card titles, descriptions, start dates, and deadlines.
 - A personal inbox that can receive cards from a board and return them to a
   selected list.
 - Calendar and text search views derived from workspaces the user can access.
 - Email-based friend requests with acceptance/rejection and realtime
   online/offline presence for accepted friends.
+- A persistent workspace group chat and realtime team-member online status.
 - Realtime workspace-member-joined notifications.
 - HTTPS and WSS through Nginx, backed by PostgreSQL and Redis.
 
@@ -46,10 +48,12 @@ flowchart LR
     Backend --> Google["Google OAuth"]
 ```
 
-The REST API owns durable application state. The realtime layer authenticates
-the same users and publishes ephemeral presence and notification events. Redis
+The REST API and PostgreSQL own durable application state. The realtime layer
+authenticates the same users and publishes invalidation hints, chat delivery,
+presence, and notification events. Browsers refetch only affected list
+snapshots and perform a full snapshot reconciliation after reconnecting. Redis
 stores refresh sessions, mail jobs, and invitation rate-limit counters.
-Prototype presence is intentionally held in one backend process.
+Prototype channels and presence are intentionally held in one backend process.
 
 ## Instructions
 
@@ -165,18 +169,20 @@ environment running the suite must allow loopback port binding.
 6. Invite a registered or future user by email from the workspace share menu.
 7. Send or accept a friend request, then view accepted friends' connection
    state in the Friends tab.
-8. Search cards across accessible workspaces or open Calendar for the current
+8. Open the workspace Chat tab to talk with members and see team online status
+   in the sidebar.
+9. Search cards across accessible workspaces or open Calendar for the current
    workspace.
 
 Workspace permissions are deliberately small:
 
-| Role | Read board | Edit lists/cards | Invite/manage members | Edit workspace | Delete workspace |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| Public non-member | Yes | No | No | No | No |
-| `VIEWER` | Yes | No | No | No | No |
-| `MEMBER` | Yes | Yes | No | No | No |
-| `ADMIN` | Yes | Yes | Yes | Yes | No |
-| `OWNER` | Yes | Yes | Yes | Yes | Yes |
+| Role | Read board | Workspace chat | Edit lists/cards | Invite/manage members | Edit workspace | Delete workspace |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Public non-member | Yes | No | No | No | No | No |
+| `VIEWER` | Yes | Yes | No | No | No | No |
+| `MEMBER` | Yes | Yes | Yes | No | No | No |
+| `ADMIN` | Yes | Yes | Yes | Yes | Yes | No |
+| `OWNER` | Yes | Yes | Yes | Yes | Yes | Yes |
 
 The service prevents removing or demoting the final owner.
 
@@ -217,6 +223,8 @@ erDiagram
     USER ||--o{ COMMENT : writes
     USER ||--o{ FRIENDSHIP : endpoint
     USER ||--o{ FRIEND_REQUEST : participates
+    USER ||--o{ WORKSPACE_MESSAGE : writes
+    WORKSPACE ||--o{ WORKSPACE_MESSAGE : contains
     WORKSPACE ||--o{ ACTIVITY_LOG : logical_scope
 ```
 
@@ -232,6 +240,7 @@ Prisma application model.
 | `FriendRequests` | `user_low_id UUID`, `user_high_id UUID`, `requested_by_id UUID`, `created_at DateTime` | Canonical pending pair; deleted on accept, reject, or cancel |
 | `Workspaces` | `id UUID`, `name String`, `is_public Boolean` | Parent of members, lists, and labels |
 | `WorkspaceMembers` | `workspace_id UUID`, `user_id UUID`, `role Role` | Composite key; role is `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` |
+| `WorkspaceMessages` | `id UUID`, `workspace_id UUID`, `user_id UUID`, `content Text`, `created_at DateTime` | Append-only messages for the workspace's default group chat |
 | `Lists` | `id UUID`, `workspace_id UUID`, `name String`, `sequence Float`, `is_done Boolean` | Fractional sequence supports reordering |
 | `Cards` | `id UUID`, `list_id UUID?`, `user_id UUID?`, `title String`, `description Text`, `start_at DateTime?`, `deadline DateTime?`, `sequence Float` | A null `list_id` denotes a personal inbox card |
 | `CardMembers` | `card_id UUID`, `user_id UUID` | Composite assignment relation |
@@ -260,6 +269,7 @@ guessing an identity where the repository does not prove one.
 | Calendar and search | Current-workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
 | Friends and presence | Request/accept flow, symmetric friendships, dedicated Friends tab, and online/offline events | `seankim96` |
 | Realtime foundation | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain | `seankim96` |
+| Workspace realtime and chat | Member-only channels, targeted list reconciliation, team presence, and persistent group chat | `seankim96` |
 | Infrastructure | Docker services, HTTPS/WSS Nginx proxy, migrations | `ynam` / `nyhwbh`, `yeonjunky` / `yeonjunkim` |
 | Database and activity audit | Core schema, migrations, trigger-based activity log | `injo`, `seankim96` |
 
@@ -403,8 +413,11 @@ to an AI system.
 
 ## Prototype limitations
 
-- Chat and direct messages are outside the current scope.
-- Board/card mutations are not broadcast to other clients in realtime.
+- Workspace chat has one default room and no editing, deletion, read receipts,
+  typing indicator, attachment, or additional-room lifecycle. Direct messages
+  remain outside the current scope.
+- Workspace change events are best-effort invalidation hints rather than a
+  durable event stream; reconnect performs a canonical REST snapshot refresh.
 - Notifications are session-local member-join events; they have no persistent
   history or read-state backend.
 - Presence is designed for a single backend instance, not cross-replica fanout.
@@ -422,6 +435,7 @@ to an AI system.
 
 - [Authentication and account API](docs/auth-api.md)
 - [Realtime protocol and extension points](docs/realtime.md)
+- [Workspace synchronization, chat, and team presence](docs/workspace-realtime.md)
 - [Friend API and presence events](docs/friends.md)
 - [Workspace DTO contract](docs/workspaces.dto.ts)
 - [Email invitation pipeline](docs/mail.md)

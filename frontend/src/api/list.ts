@@ -5,6 +5,9 @@ export const ListAPI = {
   listByWorkspace: (workspaceId: string) =>
     apiRequest<ListWithCards[]>(`/api/workspaces/${workspaceId}/lists`),
 
+  get: (listId: string) =>
+    apiRequest<ListWithCards>(`/api/lists/${listId}`),
+
   create: (workspaceId: string, name: string) =>
     apiRequest<List>(`/api/workspaces/${workspaceId}/lists`, {
       method: 'POST',

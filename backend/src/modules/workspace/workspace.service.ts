@@ -16,7 +16,16 @@ import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
 import { normalizeEmail } from '../auth/auth.utils'
 import { notifyWorkspaceMemberJoined } from '../notification/notification.service'
+import { isUserOnline } from '../presence/presence.state'
+import { realtime } from '../../realtime'
 import { toWorkspaceDto, workspaceInclude } from './workspace.dto'
+import {
+  publishWorkspaceChange,
+  publishWorkspacePresenceChanged,
+  revokeWorkspaceAccess,
+  revokeWorkspaceMemberAccess,
+  workspaceChannel,
+} from './workspace.realtime'
 
 const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 const WORKSPACE_INVITE_AUDIENCE = 'workspace-invite'
@@ -213,7 +222,7 @@ export async function updateWorkspace(
     isPublic?: boolean
   },
 ) {
-  return prisma.$transaction(async (tx) => {
+  const workspace = await prisma.$transaction(async (tx) => {
     await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
 
     const updated = await tx.workspace.update({
@@ -228,6 +237,16 @@ export async function updateWorkspace(
 
     return toWorkspaceDto(updated, { includeMemberEmail: true })
   })
+
+  publishWorkspaceChange({
+    workspace_id: input.workspaceId,
+    entity: 'workspace',
+    action: 'updated',
+    entity_id: input.workspaceId,
+    list_ids: [],
+    actor_user_id: input.userId,
+  })
+  return workspace
 }
 
 /**
@@ -235,7 +254,7 @@ export async function updateWorkspace(
  * hidden by active-workspace filters. Requires OWNER.
  */
 export async function deleteWorkspace(input: { userId: string; workspaceId: string }) {
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'OWNER')
 
     await tx.workspace.update({
@@ -243,6 +262,17 @@ export async function deleteWorkspace(input: { userId: string; workspaceId: stri
       data: softDeletedBy(input.userId),
     })
   })
+
+  revokeWorkspaceAccess(input.workspaceId)
+  publishWorkspaceChange({
+    workspace_id: input.workspaceId,
+    entity: 'workspace',
+    action: 'deleted',
+    entity_id: input.workspaceId,
+    list_ids: [],
+    actor_user_id: input.userId,
+  })
+  realtime.clearChannel(workspaceChannel(input.workspaceId))
 }
 
 /**
@@ -257,7 +287,7 @@ export async function changeMemberRole(
     role: Role
   },
 ) {
-  return prisma.$transaction(async (tx) => {
+  const workspace = await prisma.$transaction(async (tx) => {
     const ws = await requireManagedWorkspace(
       tx,
       input.workspaceId,
@@ -292,6 +322,16 @@ export async function changeMemberRole(
 
     return toWorkspaceDto(updated!, { includeMemberEmail: true })
   })
+
+  publishWorkspaceChange({
+    workspace_id: input.workspaceId,
+    entity: 'member',
+    action: 'updated',
+    entity_id: input.targetUserId,
+    list_ids: [],
+    actor_user_id: input.userId,
+  })
+  return workspace
 }
 
 /**
@@ -303,7 +343,7 @@ export async function removeMember(input: {
   workspaceId: string
   targetUserId: string
 }) {
-  return prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const ws = await requireManagedWorkspace(
       tx,
       input.workspaceId,
@@ -328,6 +368,20 @@ export async function removeMember(input: {
       data: softDeletedBy(input.userId),
     })
   })
+
+  revokeWorkspaceMemberAccess(input.workspaceId, input.targetUserId)
+  publishWorkspaceChange({
+    workspace_id: input.workspaceId,
+    entity: 'member',
+    action: 'deleted',
+    entity_id: input.targetUserId,
+    list_ids: [],
+    actor_user_id: input.userId,
+  })
+  realtime.leaveUserChannel(
+    input.targetUserId,
+    workspaceChannel(input.workspaceId),
+  )
 }
 
 /**
@@ -473,6 +527,22 @@ export async function acceptInvite(input: { userId: string; token: string }) {
       profileImageUrl: invitee.profile_image_url,
     },
   })
+
+  publishWorkspaceChange({
+    workspace_id: payload.workspace_id,
+    entity: 'member',
+    action: 'created',
+    entity_id: input.userId,
+    list_ids: [],
+    actor_user_id: input.userId,
+  })
+  if (isUserOnline(input.userId)) {
+    publishWorkspacePresenceChanged({
+      workspace_id: payload.workspace_id,
+      user_id: input.userId,
+      online: true,
+    })
+  }
 
   return toWorkspaceDto(updated!, { includeMemberEmail: true })
 }

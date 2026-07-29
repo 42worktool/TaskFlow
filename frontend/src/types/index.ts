@@ -22,6 +22,40 @@ export interface Workspace {
   members: WorkspaceMember[]
 }
 
+export interface WorkspaceChangedEvent {
+  event_id: UUID
+  workspace_id: UUID
+  entity: 'workspace' | 'member' | 'list' | 'card'
+  action: 'created' | 'updated' | 'deleted' | 'moved'
+  entity_id: UUID
+  list_ids: UUID[]
+  actor_user_id: UUID
+  occurred_at: ISODateString
+}
+
+export interface WorkspaceMemberPresenceEvent {
+  workspace_id: UUID
+  user_id: UUID
+  online: boolean
+}
+
+export interface WorkspaceMessage {
+  id: UUID
+  workspace_id: UUID
+  content: string
+  created_at: ISODateString
+  author: {
+    user_id: UUID
+    name: string
+    profile_image_url: string | null
+  }
+}
+
+export interface WorkspaceSubscriptionResult {
+  workspace_id: UUID
+  online_user_ids: UUID[]
+}
+
 /** Derive a stable color from a workspace id for the card color bar. */
 export function workspaceColor(_wsId: UUID): string {
   const COLORS = ['#2563EB', '#EF4444', '#F59E0B', '#10B981', '#7C3AED', '#0EA5E9']

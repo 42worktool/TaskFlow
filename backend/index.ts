@@ -5,10 +5,12 @@ import { prisma } from './src/db';
 import { closeRedis } from './src/lib/redis';
 import { startMailWorker, stopMailWorker } from './src/lib/mail-queue';
 import { startPresence } from './src/modules/presence/presence.service';
+import { startWorkspaceRealtime } from './src/modules/workspace/workspace.realtime';
 import { realtime } from './src/realtime';
 
 startMailWorker();
 const stopPresence = startPresence();
+const stopWorkspaceRealtime = startWorkspaceRealtime();
 
 const server = createServer(app);
 realtime.attach(server);
@@ -32,6 +34,7 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   console.log(`Received ${signal}, shutting down`);
   const presenceStopped = stopPresence();
+  stopWorkspaceRealtime();
 
   const drainingResults = await Promise.allSettled([
     closeHttpServer(),
