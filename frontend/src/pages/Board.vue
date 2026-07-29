@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
 import CardDetailModal from '../components/CardDetailModal.vue'
 import InboxCardsPanel from '../components/InboxCardsPanel.vue'
@@ -12,6 +12,7 @@ import type { Card, DraggableChange, ListWithCards } from '../types'
 import { neighborIds } from '../utils/ordering'
 
 const route = useRoute()
+const router = useRouter()
 const props = withDefaults(
   defineProps<{
     canEditBoard?: boolean
@@ -57,6 +58,26 @@ watch(
   () => {
     selectedCardId.value = null
     void fetchLists()
+  },
+  { immediate: true },
+)
+
+watch(
+  [
+    () => route.params.workspaceId,
+    () => route.query.card,
+    () => props.canViewCardDetails,
+    () => lists.value,
+  ],
+  ([, cardId, canViewCardDetails]) => {
+    const requestedCardId = typeof cardId === 'string' ? cardId : null
+    const belongsToBoard =
+      requestedCardId !== null &&
+      lists.value.some((list) =>
+        list.cards.some((card) => card.id === requestedCardId),
+      )
+    selectedCardId.value =
+      canViewCardDetails && belongsToBoard ? requestedCardId : null
   },
   { immediate: true },
 )
@@ -161,7 +182,22 @@ function onInboxCardMoved() {
 }
 
 function openCard(card: Card) {
-  if (props.canViewCardDetails) selectedCardId.value = card.id
+  if (!props.canViewCardDetails) return
+  selectedCardId.value = card.id
+  void router.replace({
+    query: {
+      ...route.query,
+      card: card.id,
+    },
+  })
+}
+
+function closeCard() {
+  selectedCardId.value = null
+  if (typeof route.query.card !== 'string') return
+  const query = { ...route.query }
+  delete query.card
+  void router.replace({ query })
 }
 
 function onCardSaved(saved: Card) {
@@ -229,11 +265,18 @@ async function onDeleteList(listId: string) {
               type="text"
               class="add-list-input"
               placeholder="리스트 이름 입력"
+              required
               autofocus
               @keyup.esc="cancelAddList"
               @blur="submitAddList"
             />
-            <button type="submit" class="add-list-submit-btn">추가</button>
+            <button
+              type="submit"
+              class="add-list-submit-btn"
+              :disabled="!newListName.trim()"
+            >
+              추가
+            </button>
           </form>
           <button v-else class="add-list-btn" type="button" @click="showAddList = true">
             + 리스트 추가
@@ -251,7 +294,7 @@ async function onDeleteList(listId: string) {
       :card-id="selectedCardId"
       :editable="canEditBoard"
       @saved="onCardSaved"
-      @close="selectedCardId = null"
+      @close="closeCard"
     />
   </div>
 </template>

@@ -26,7 +26,7 @@ const oauthError = computed(() => {
   const code = typeof route.query.oauth_error === 'string' ? route.query.oauth_error : ''
   const messages: Record<string, string> = {
     access_denied: 'Google 로그인이 취소되었습니다.',
-    account_link_required: '같은 이메일의 기존 계정이 있습니다. 기존 로그인 후 Google 계정을 연결해 주세요.',
+    account_link_required: '같은 이메일의 기존 계정이 있습니다. 기존 로그인 방식을 사용해 주세요.',
     invalid_oauth_state: '로그인 요청이 만료되었거나 올바르지 않습니다. 다시 시도해 주세요.',
     expired_oauth_state: '로그인 요청이 만료되었습니다. 다시 시도해 주세요.',
     invalid_oauth_nonce: '로그인 검증에 실패했습니다. 다시 시도해 주세요.',

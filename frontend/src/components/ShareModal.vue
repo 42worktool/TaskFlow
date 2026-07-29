@@ -79,14 +79,21 @@ async function handleRemoveMember(userId: string) {
           <input
             v-model="inviteEmail"
             class="invite-input"
+            type="email"
+            autocomplete="email"
             placeholder="이메일 주소 입력..."
+            required
             @keyup.enter="sendInvite"
           />
           <select v-model="inviteRole" class="role-btn">
             <option v-for="r in inviteRoles" :key="r.value" :value="r.value">{{ r.label }}</option>
           </select>
         </div>
-        <button class="send-btn" :disabled="sending" @click="sendInvite">
+        <button
+          class="send-btn"
+          :disabled="sending || !inviteEmail.trim()"
+          @click="sendInvite"
+        >
           {{ sending ? '전송 중...' : '초대 메일 보내기' }}
         </button>
         <p v-if="error" class="error-text">{{ error }}</p>

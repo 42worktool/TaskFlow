@@ -62,15 +62,6 @@
   font-weight: 600;
 }
 
-.nav-item--disabled {
-  color: #9ca3af;
-  cursor: default;
-}
-
-.nav-item--disabled:hover {
-  background: none;
-}
-
 .nav-icon {
   font-size: 14px;
   width: 18px;

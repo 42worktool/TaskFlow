@@ -52,27 +52,13 @@
   overflow: hidden;
 }
 
-.filter-row {
-  display: flex;
-  gap: 6px;
-  padding: 10px;
+.notification-panel-title {
+  margin: 0;
+  padding: 12px 14px;
   border-bottom: 1px solid #e5e7eb;
-}
-
-.filter-btn {
-  flex: 1;
-  padding: 7px 8px;
-  border: none;
-  border-radius: 6px;
-  background: #f3f4f6;
-  color: #6b7280;
   font-size: 13px;
   font-weight: 600;
-}
-
-.filter-btn--active {
-  background: #eff6ff;
-  color: #2563eb;
+  color: #374151;
 }
 
 .notification-list {
@@ -93,7 +79,9 @@
   padding: 12px 14px;
   gap: 10px;
   border-bottom: 1px solid #f3f4f6;
+  color: inherit;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .notification-item:hover {

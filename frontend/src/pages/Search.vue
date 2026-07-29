@@ -32,11 +32,9 @@ const cardResults = computed(() => {
     return list.cards
       .filter((card) => {
         const description = card.description ?? ''
-        const label = card.label ?? ''
         return (
           card.title.toLowerCase().includes(q) ||
-          description.toLowerCase().includes(q) ||
-          label.toLowerCase().includes(q)
+          description.toLowerCase().includes(q)
         )
       })
       .map((card) => ({ card, list, workspace }))
@@ -119,7 +117,10 @@ const hasResults = computed(() => workspaceResults.value.length > 0 || cardResul
             <RouterLink
               v-for="result in cardResults"
               :key="result.card.id"
-              :to="`/workspaces/${result.workspace.id}/board`"
+              :to="{
+                path: `/workspaces/${result.workspace.id}/board`,
+                query: { card: result.card.id },
+              }"
               class="result-row"
             >
               <span class="card-marker" />
@@ -129,7 +130,6 @@ const hasResults = computed(() => workspaceResults.value.length > 0 || cardResul
                   {{ result.workspace.name }} · {{ result.list?.name ?? '목록 없음' }}
                 </p>
               </div>
-              <span v-if="result.card.label" class="label-chip">{{ result.card.label }}</span>
             </RouterLink>
           </div>
           <div v-else class="section-empty">일치하는 카드가 없습니다.</div>

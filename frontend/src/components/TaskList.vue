@@ -140,11 +140,18 @@ const vFocus = {
         type="text"
         class="add-card-input"
         placeholder="카드 제목 입력"
+        required
         v-focus
         @keyup.esc="cancelAddCard"
         @blur="submitAddCard"
       />
-      <button type="submit" class="add-card-submit-btn">추가</button>
+      <button
+        type="submit"
+        class="add-card-submit-btn"
+        :disabled="!newCardTitle.trim()"
+      >
+        추가
+      </button>
     </form>
     <button
       v-else-if="canEdit"

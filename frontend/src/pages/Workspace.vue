@@ -25,14 +25,14 @@ const workspaceSections = computed(() => [
   {
     key: 'mine',
     title: '내 프로젝트',
-    description: '소속된 비공개 프로젝트',
+    description: '내가 참여 중인 프로젝트',
     workspaces: myWorkspaces.value,
     editable: true,
   },
   {
     key: 'public',
     title: '공개 프로젝트',
-    description: '누구나 참여할 수 있는 오픈 프로젝트',
+    description: '로그인 사용자가 열람할 수 있는 프로젝트',
     workspaces: openWorkspaces.value,
     editable: false,
   },
