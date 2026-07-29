@@ -18,15 +18,21 @@ test('workspace validation enforces partial updates and invitation roles', () =>
   assert.equal(updateWorkspaceSchema.parse({ is_public: true }).is_public, true)
   assert.equal(
     inviteWorkspaceMemberSchema.parse({
-      email: 'member@example.com',
+      email: ' Member@Example.COM ',
       role: 'MEMBER',
-    }).role,
-    'MEMBER',
+    }).email,
+    'member@example.com',
+  )
+  assert.throws(() =>
+    inviteWorkspaceMemberSchema.parse({
+      email: 'member@example.com',
+      role: 'OWNER',
+    }),
   )
   assert.throws(() =>
     inviteWorkspaceMemberSchema.parse({
       email: 'not-an-email',
-      role: 'OWNER',
+      role: 'MEMBER',
     }),
   )
 })

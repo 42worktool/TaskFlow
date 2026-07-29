@@ -14,6 +14,7 @@ const inviteEmail = ref('')
 const inviteRole = ref<'ADMIN' | 'MEMBER' | 'VIEWER'>('MEMBER')
 const sending = ref(false)
 const error = ref('')
+const success = ref('')
 const removing = ref<string | null>(null)
 
 const roleLabels: Record<string, string> = {
@@ -30,14 +31,17 @@ const inviteRoles: { value: 'ADMIN' | 'MEMBER' | 'VIEWER'; label: string }[] = [
 ]
 
 async function sendInvite() {
-  if (!inviteEmail.value.trim()) return
+  if (sending.value || !inviteEmail.value.trim()) return
   sending.value = true
   error.value = ''
+  success.value = ''
   try {
     await WorkspaceAPI.inviteMember(props.workspaceId, inviteEmail.value, inviteRole.value)
     inviteEmail.value = ''
-  } catch (e: any) {
-    error.value = e.message || '초대를 보내지 못했습니다.'
+    success.value = '초대 메일 전송을 요청했습니다.'
+  } catch (caught) {
+    error.value =
+      caught instanceof Error ? caught.message : '초대를 보내지 못했습니다.'
   } finally {
     sending.value = false
   }
@@ -86,6 +90,7 @@ async function handleRemoveMember(userId: string) {
           {{ sending ? '전송 중...' : '초대 메일 보내기' }}
         </button>
         <p v-if="error" class="error-text">{{ error }}</p>
+        <p v-if="success" class="success-text" role="status">{{ success }}</p>
       </div>
 
       <div class="section">

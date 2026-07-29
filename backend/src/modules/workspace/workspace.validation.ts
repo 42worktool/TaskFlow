@@ -17,7 +17,7 @@ export const updateWorkspaceSchema = z
   })
 
 export const inviteWorkspaceMemberSchema = z.object({
-  email: z.string().email().max(254),
+  email: z.string().trim().toLowerCase().email().max(254),
   role: workspaceRoleSchema,
 })
 

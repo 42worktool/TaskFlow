@@ -87,6 +87,20 @@
   background: #1d4ed8;
 }
 
+.error-text,
+.success-text {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.error-text {
+  color: #dc2626;
+}
+
+.success-text {
+  color: #047857;
+}
+
 .member-list {
   list-style: none;
   display: flex;
