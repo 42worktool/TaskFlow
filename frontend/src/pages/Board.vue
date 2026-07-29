@@ -14,6 +14,7 @@ const route = useRoute()
 const lists = ref<ListWithCards[]>([])
 const loading = ref(false)
 const error = ref('')
+const inboxRefreshKey = ref(0)
 
 const showAddList = ref(false)
 const newListName = ref('')
@@ -128,6 +129,7 @@ async function onDeleteList(listId: string) {
   try {
     await ListAPI.remove(listId)
     lists.value = lists.value.filter((l) => l.id !== listId)
+    inboxRefreshKey.value += 1
   } catch (e) {
     error.value = e instanceof Error ? e.message : '리스트를 삭제하지 못했습니다.'
   }
@@ -176,7 +178,7 @@ async function onDeleteList(listId: string) {
         </div>
       </template>
     </draggable>
-    <InboxCardsPanel />
+    <InboxCardsPanel :key="inboxRefreshKey" />
   </div>
 </template>
 

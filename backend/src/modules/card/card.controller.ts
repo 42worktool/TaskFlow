@@ -11,6 +11,11 @@ import {
   updateCardSchema,
 } from './card.validation'
 
+export const listInbox: RequestHandler = async (req, res) => {
+  const cards = await svc.listInboxCards({ userId: req.user!.id })
+  res.status(200).json(cards)
+}
+
 export const create: RequestHandler = async (req, res) => {
   const data = createCardSchema.parse(req.body)
   const card = await svc.createCard({

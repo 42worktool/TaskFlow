@@ -81,6 +81,33 @@ function list(id: string, workspaceId: string): List {
   }
 }
 
+test('listInboxCards returns only the signed-in user inbox cards', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { listInboxCards }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  let query: unknown
+  stubMethod(t, prisma.card, 'findMany', async (args) => {
+    query = args
+    return [card({ list_id: null, user_id: USER_ID })]
+  })
+
+  const cards = await listInboxCards({ userId: USER_ID })
+
+  assert.equal(cards.length, 1)
+  assert.equal(cards[0]?.list_id, null)
+  assert.deepEqual(query, {
+    where: {
+      list_id: null,
+      user_id: USER_ID,
+      deleted_at: null,
+    },
+    orderBy: { updated_at: 'desc' },
+  })
+})
+
 test('moveCard rejects a target list in another workspace', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { moveCard }] = await Promise.all([
