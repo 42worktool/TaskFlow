@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
-import InboxDrawer from '../components/InboxDrawer.vue'
 import LegalFooter from '../components/LegalFooter.vue'
 import WorkspaceFormModal from '../components/WorkspaceFormModal.vue'
 import { WorkspaceAPI } from '../api/workspace'
@@ -14,7 +13,6 @@ import {
   workspaceRoleFor,
 } from '../utils/workspacePermissions'
 
-const showInbox = ref(false)
 const showCreate = ref(false)
 const myWorkspaces = ref<Workspace[]>([])
 const openWorkspaces = ref<Workspace[]>([])
@@ -99,7 +97,7 @@ onMounted(refreshList)
 <template>
   <div class="home-shell" @click="menuOpen = null">
     <!-- Header -->
-    <AppHeader @open-inbox="showInbox = true" />
+    <AppHeader />
 
     <div class="home-body">
       <!-- Content -->
@@ -185,7 +183,6 @@ onMounted(refreshList)
       <LegalFooter variant="light" />
     </div>
 
-    <InboxDrawer :open="showInbox" @close="showInbox = false" />
     <WorkspaceFormModal
       v-if="showCreate"
       @close="showCreate = false"

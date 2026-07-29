@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import AppHeader from '../components/AppHeader.vue'
 import { FriendAPI } from '../api/friend'
 import { realtime } from '../services/realtime'
 import { parseFriendPresenceEvent } from '../services/realtime/protocol'
@@ -223,24 +222,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="friends-page">
-    <AppHeader :show-inbox="false" />
-
-    <main class="friends-main">
-      <div class="friends-heading">
-        <div>
-          <h1>친구</h1>
-          <p>요청을 수락한 사용자만 친구 목록과 온라인 상태에 표시됩니다.</p>
-        </div>
-        <button
-          type="button"
-          class="secondary-button"
-          :disabled="loading || busyAction !== null"
-          @click="loadFriendData()"
-        >
-          새로고침
-        </button>
-      </div>
+  <div class="friends-panel-content">
+    <div class="friends-heading">
+      <p>요청을 수락한 사용자만 친구 목록과 온라인 상태에 표시됩니다.</p>
+      <button
+        type="button"
+        class="secondary-button"
+        :disabled="loading || busyAction !== null"
+        @click="loadFriendData()"
+      >
+        새로고침
+      </button>
+    </div>
 
       <section class="friend-panel friend-invite-panel">
         <div>
@@ -433,8 +426,7 @@ onUnmounted(() => {
       <p v-else class="friends-loading">
         친구 정보를 표시할 수 없습니다. 새로고침해 다시 시도해 주세요.
       </p>
-    </main>
   </div>
 </template>
 
-<style scoped src="../styles/friends.css"></style>
+<style scoped src="../styles/friends-panel.css"></style>

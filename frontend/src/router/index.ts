@@ -9,7 +9,6 @@ import Calendar from '../pages/Calendar.vue'
 import WorkspaceChat from '../pages/WorkspaceChat.vue'
 import Search from '../pages/Search.vue'
 import Account from '../pages/Account.vue'
-import Friends from '../pages/Friends.vue'
 import PrivacyPolicy from '../pages/PrivacyPolicy.vue'
 import TermsOfService from '../pages/TermsOfService.vue'
 import AcceptInvite from '../pages/AcceptInvite.vue'
@@ -24,7 +23,10 @@ const router = createRouter({
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: TermsOfService },
     { path: '/account', component: Account, meta: { requiresAuth: true } },
-    { path: '/friends', component: Friends, meta: { requiresAuth: true } },
+    {
+      path: '/friends',
+      redirect: { path: '/workspaces', query: { drawer: 'friends' } },
+    },
     { path: '/workspaces', component: Workspace, meta: { requiresAuth: true } },
     { path: '/invite/:token', component: AcceptInvite, meta: { requiresAuth: true } },
     { path: '/search', component: Search, meta: { requiresAuth: true } },

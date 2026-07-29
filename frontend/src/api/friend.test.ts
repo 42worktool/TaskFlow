@@ -24,6 +24,27 @@ describe('FriendAPI', () => {
     expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/friends/requests')
   })
 
+  it('waits for an in-flight mutation before a reopened drawer reads', async () => {
+    let finishAccept: (() => void) | undefined
+    const acceptance = new Promise<void>((resolve) => {
+      finishAccept = resolve
+    })
+    const request = vi.mocked(apiRequest)
+    request
+      .mockReturnValueOnce(acceptance as never)
+      .mockResolvedValueOnce([] as never)
+
+    const acceptPromise = FriendAPI.acceptRequest('user-2')
+    const listPromise = FriendAPI.list()
+    await Promise.resolve()
+
+    expect(request).toHaveBeenCalledTimes(1)
+    finishAccept?.()
+    await expect(acceptPromise).resolves.toBeUndefined()
+    await expect(listPromise).resolves.toEqual([])
+    expect(request).toHaveBeenNthCalledWith(2, '/api/friends')
+  })
+
   it('sends a friend request by email', async () => {
     vi.mocked(apiRequest).mockResolvedValueOnce({
       id: 'user-2',

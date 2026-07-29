@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
-import InboxDrawer from '../components/InboxDrawer.vue'
 import { ListAPI } from '../api/list'
 import { WorkspaceAPI } from '../api/workspace'
 import { workspaceColor } from '../types'
@@ -10,7 +9,6 @@ import type { ListWithCards, Workspace } from '../types'
 
 const route = useRoute()
 const query = computed(() => String(route.query.q ?? '').trim())
-const showInbox = ref(false)
 const allWorkspaces = ref<Workspace[]>([])
 const lists = ref<ListWithCards[]>([])
 const loading = ref(true)
@@ -68,7 +66,7 @@ const hasResults = computed(() => workspaceResults.value.length > 0 || cardResul
 
 <template>
   <div class="search-shell">
-    <AppHeader :initial-query="query" @open-inbox="showInbox = true" />
+    <AppHeader :initial-query="query" />
 
     <main class="search-page">
       <div class="search-heading">
@@ -139,7 +137,6 @@ const hasResults = computed(() => workspaceResults.value.length > 0 || cardResul
       <div v-else class="empty-state">검색 결과가 없습니다.</div>
     </main>
 
-    <InboxDrawer :open="showInbox" @close="showInbox = false" />
   </div>
 </template>
 
