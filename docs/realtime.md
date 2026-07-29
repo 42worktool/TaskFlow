@@ -4,6 +4,14 @@ The application exposes a standard WebSocket endpoint at `/ws`. It uses a small,
 versioned event protocol rather than a feature-specific socket so presence,
 workspace synchronization, notifications, and chat can share one connection.
 
+## Prototype scope
+
+This is a toy-project foundation, not a production gateway. Keep the core
+connection lifecycle and extension points easy to review. Distributed
+rate-limiting, per-user connection quotas, broker abstractions, and a shared
+contract package should be added only when a concrete feature or deployment
+requires them.
+
 ## Connection and authentication lifecycle
 
 1. The frontend opens `wss://<current-origin>/ws` and sends
@@ -20,15 +28,20 @@ workspace synchronization, notifications, and chat can share one connection.
    performs one forced HTTP refresh and immediate reconnect for that
    authentication-failure cycle. A repeated `4401` is terminal.
 5. Transient network and server failures reconnect with exponential backoff.
+   A socket that does not produce a valid `system.ready` within the client
+   handshake deadline (15 seconds by default), or emits a transport error, is
+   abandoned so the connection lifecycle can move on to its next retry.
    Explicit logout calls `disconnect()`, closes with `1000`, clears
    session-specific subscription recovery, and does not reconnect.
 
 Tokens are never put in the URL, where proxies or access logs could retain
 them. Connections that do not authenticate within `WS_AUTH_TIMEOUT_MS` are
-closed. The expiry fallback still matters for suspended tabs and delayed
-browser timers even though proactive refresh is the normal path. A transient
-HTTP or `5xx` refresh failure preserves the current local session; only an
-invalid refresh session (`401`/`403`) clears it.
+closed. Browser upgrades must also carry the exact configured `APP_ORIGIN`;
+missing and mismatched Origin headers are rejected. The expiry fallback still
+matters for suspended tabs and delayed browser timers even though proactive
+refresh is the normal path. A transient HTTP or `5xx` refresh failure preserves
+the current local session; only an invalid refresh session (`401`/`403`) clears
+it.
 
 ## Wire format
 
@@ -48,6 +61,10 @@ receives either `system.ack` or `system.error` with the same ID. Unsolicited
 server events do not need an ID. The acknowledgement also identifies the event
 being acknowledged; the client rejects a mismatched acknowledgement. The same
 event-name rule is enforced for server publish APIs and by the frontend parser.
+The protocol reserves `auth.authenticate`, `auth.refresh`, `system.ready`,
+`system.ack`, and `system.error`; feature handlers and public publish/send APIs
+reject those names so an application event cannot be mistaken for lifecycle
+control. `system.ping` remains an ordinary typed request.
 
 `requestId` is a correlation ID, not an exactly-once guarantee. The server lets
 a handler admitted with a valid token finish and attempts its acknowledgement
@@ -114,6 +131,12 @@ realtime.publish(`workspace:${workspaceId}`, 'card.updated', event);
 realtime.sendToUser(userId, 'notification.created', notification);
 ```
 
+`publish()` and `sendToUser()` are process-local transports, and their payload
+parameter is currently `unknown`. Before a feature event is introduced, define
+its outbound Zod schema beside the owning module, validate before publishing,
+and mirror the contract in the frontend event map. A shared contract package is
+the intended next step once the Docker build contexts are consolidated.
+
 An oversized or non-serializable request result receives a correlated small
 error. If an unsolicited application event cannot be represented within the
 delivery contract, the affected connection closes with `4410` instead of
@@ -164,6 +187,10 @@ unsubscribe();
 removeRecovery();
 ```
 
+Listener invocation follows wire arrival order, but asynchronous listener
+completion is not serialized. Apply ordered state changes synchronously, or put
+cursor-bearing events through a feature-owned sequential consumer.
+
 The recovery callback runs once after each new valid `system.ready`, and also
 runs when registered on an already-connected client. It must re-subscribe and
 then recover from the last durable cursor over HTTP. Live events can interleave
@@ -202,7 +229,9 @@ HTTP cursor recovery remains the repair path.
 - The outbound buffer threshold defaults to 256 KiB. The browser rejects a new
   send while above its threshold; the server closes a slow recipient with
   `1013`.
-- The server permits 120 messages per minute per connection by default.
+- The server permits 120 messages per minute per connection by default. The
+  allowance is checked when a frame arrives, before it is appended to the
+  serialized handler chain, so that chain is bounded by the same allowance.
 - Ping/pong frames every 30 seconds detect dead connections, and Nginx keeps
   upgraded connections open beyond two heartbeat intervals.
 
@@ -212,7 +241,8 @@ Server environment configuration uses `WS_AUTH_TIMEOUT_MS`,
 `maxBufferedAmountBytes`, and `shutdownDrainTimeoutMs` are programmatic
 `RealtimeServerOptions` overrides.
 The frontend exposes corresponding client options plus reconnect cooldown,
-request timeout, and `authenticationRefreshLeadMs` overrides.
+request timeout, `handshakeTimeoutMs`, and `authenticationRefreshLeadMs`
+overrides.
 
 The `/ws` path and protocol version are shared deployment contracts. The
 backend and frontend keep separate TypeScript declarations because their Docker

@@ -6,6 +6,7 @@ import {
   authenticationDataSchema,
   eventNameSchema,
   inboundMessageSchema,
+  isRealtimeControlEvent,
   outboundMessage,
   REALTIME_CLOSE_CODE,
   REALTIME_PROTOCOL_VERSION,
@@ -317,7 +318,7 @@ export class RealtimeServer {
     }
 
     const origin = request.headers.origin;
-    if (origin && origin !== this.options.allowedOrigin) {
+    if (origin !== this.options.allowedOrigin) {
       sendHttpUpgradeError(socket, 403, 'Forbidden');
       return;
     }
@@ -369,8 +370,22 @@ export class RealtimeServer {
     });
     socket.on('message', (raw, isBinary) => {
       if (!this.isActive(connection) || this.closing) return;
+      if (isBinary) {
+        this.closeConnection(connection, 1003, 'Binary messages are not supported');
+        return;
+      }
+      if (!this.consumeMessageAllowance(connection)) {
+        this.sendError(connection, 'RATE_LIMITED', 'Too many realtime messages', true);
+        this.closeConnection(
+          connection,
+          REALTIME_CLOSE_CODE.RATE_LIMITED,
+          'Message rate limit exceeded',
+        );
+        return;
+      }
+
       connection.processing = connection.processing
-        .then(() => this.handleMessage(connection, raw, isBinary))
+        .then(() => this.handleMessage(connection, raw))
         .catch((error) => {
           if (!this.isActive(connection)) return;
           console.error(
@@ -392,27 +407,12 @@ export class RealtimeServer {
   private async handleMessage(
     connection: Connection,
     raw: RawData,
-    isBinary: boolean,
   ): Promise<void> {
     if (!this.isActive(connection) || this.closing) return;
     if (this.authenticationExpired(connection)) {
       this.expireAuthentication(connection);
       return;
     }
-    if (isBinary) {
-      this.closeConnection(connection, 1003, 'Binary messages are not supported');
-      return;
-    }
-    if (!this.consumeMessageAllowance(connection)) {
-      this.sendError(connection, 'RATE_LIMITED', 'Too many realtime messages', true);
-      this.closeConnection(
-        connection,
-        REALTIME_CLOSE_CODE.RATE_LIMITED,
-        'Message rate limit exceeded',
-      );
-      return;
-    }
-
     let decoded: unknown;
     try {
       const text = Buffer.isBuffer(raw)
@@ -656,6 +656,9 @@ export class RealtimeServer {
   private assertApplicationEventName(event: string): void {
     if (!eventNameSchema.safeParse(event).success) {
       throw new Error(`Invalid outbound realtime event name "${event}"`);
+    }
+    if (isRealtimeControlEvent(event)) {
+      throw new Error(`Realtime control event "${event}" is reserved by the protocol`);
     }
   }
 

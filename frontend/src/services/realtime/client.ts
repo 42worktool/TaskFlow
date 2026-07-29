@@ -3,6 +3,7 @@ import {
   parseRealtimeMessage,
   parseRealtimeReadyData,
   isRealtimeEventName,
+  isRealtimeControlEvent,
   REALTIME_CLOSE_CODE,
   REALTIME_PROTOCOL_VERSION,
   type RealtimeErrorData,
@@ -27,6 +28,8 @@ export interface RealtimeClientOptions {
   rateLimitCooldownMs?: number
   serverUnavailableCooldownMs?: number
   requestTimeoutMs?: number
+  /** Time from socket construction until a valid system.ready message. */
+  handshakeTimeoutMs?: number
   authenticationRefreshLeadMs?: number
   maxOutboundMessageBytes?: number
   maxBufferedAmountBytes?: number
@@ -102,6 +105,7 @@ export class RealtimeSendError extends Error {
 const DEFAULT_MAX_OUTBOUND_MESSAGE_BYTES = 64 * 1024
 const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 60_000
 const DEFAULT_SERVER_UNAVAILABLE_COOLDOWN_MS = 5_000
+const DEFAULT_HANDSHAKE_TIMEOUT_MS = 15_000
 const DEFAULT_AUTHENTICATION_REFRESH_LEAD_MS = 30_000
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 const CLIENT_CLOSE_CODE = {
@@ -164,6 +168,7 @@ export class RealtimeClient<
   private readonly pendingRequests = new Map<string, PendingRequest>()
   private socket: WebSocket | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private handshakeTimer: ReturnType<typeof setTimeout> | null = null
   private authenticationRefreshTimer: ReturnType<typeof setTimeout> | null = null
   private authenticationRefreshInFlight: Promise<void> | null = null
   private reconnectAttempt = 0
@@ -239,6 +244,7 @@ export class RealtimeClient<
     this.serverClockOffsetMs = 0
     this.subscriptionRecoveries.clear()
     this.clearReconnectTimer()
+    this.clearHandshakeTimer()
     this.clearAuthenticationRefreshTimer()
     this.authenticationRefreshInFlight = null
     this.rejectConnectionWaiter(new Error(reason))
@@ -381,6 +387,7 @@ export class RealtimeClient<
     data: ClientEvents[Event],
   ): void {
     this.assertConnected()
+    this.assertApplicationEvent(event)
     this.sendWire({ v: REALTIME_PROTOCOL_VERSION, event, data })
   }
 
@@ -388,6 +395,15 @@ export class RealtimeClient<
     event: Event,
     data: ClientEvents[Event],
   ): Promise<RequestResult<ClientRequestResults, Event>> {
+    try {
+      this.assertApplicationEvent(event)
+    } catch (error) {
+      return Promise.reject(
+        error instanceof Error
+          ? error
+          : new Error('Realtime request event is invalid'),
+      )
+    }
     return this.requestWire(event, data) as Promise<
       RequestResult<ClientRequestResults, Event>
     >
@@ -436,6 +452,7 @@ export class RealtimeClient<
         return
       }
       this.socket = socket
+      this.scheduleHandshakeTimeout(socket, generation)
 
       socket.addEventListener('open', () => {
         if (!this.isActiveSocket(socket, generation)) return
@@ -484,6 +501,7 @@ export class RealtimeClient<
         if (!this.isActiveSocket(socket, generation)) return
         this.socket = null
         this.readyData = null
+        this.clearHandshakeTimer()
         this.clearAuthenticationRefreshTimer()
         this.authenticationRefreshInFlight = null
         this.rejectPendingRequests(new Error('Realtime connection interrupted'))
@@ -541,6 +559,14 @@ export class RealtimeClient<
 
         this.scheduleReconnect(generation)
       })
+
+      socket.addEventListener('error', () => {
+        this.retryActiveConnection(
+          socket,
+          generation,
+          'Realtime transport failed',
+        )
+      })
     } finally {
       if (this.openingGeneration === generation) this.openingGeneration = null
     }
@@ -570,6 +596,7 @@ export class RealtimeClient<
         )
         return
       }
+      this.clearHandshakeTimer()
       this.reconnectAttempt = 0
       this.refreshAttempted = false
       this.readyData = ready
@@ -715,6 +742,18 @@ export class RealtimeClient<
     }
   }
 
+  private assertApplicationEvent(event: string): void {
+    if (!isRealtimeEventName(event) || isRealtimeControlEvent(event)) {
+      throw new RealtimeSendError(
+        'INVALID_EVENT',
+        isRealtimeControlEvent(event)
+          ? `Realtime control event "${event}" is reserved by the protocol`
+          : `Invalid realtime event name "${event}"`,
+        false,
+      )
+    }
+  }
+
   private scheduleReconnect(generation: number, delay?: number): void {
     if (!this.isGenerationActive(generation) || this.reconnectTimer) return
     this.reconnectAttempt += 1
@@ -728,6 +767,23 @@ export class RealtimeClient<
       this.reconnectTimer = null
       if (this.isGenerationActive(generation)) void this.openSocket(generation)
     }, delay ?? jitteredDelay)
+  }
+
+  private scheduleHandshakeTimeout(
+    socket: WebSocket,
+    generation: number,
+  ): void {
+    this.clearHandshakeTimer()
+    const timeoutMs =
+      this.options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS
+    this.handshakeTimer = setTimeout(() => {
+      this.handshakeTimer = null
+      this.retryActiveConnection(
+        socket,
+        generation,
+        'Realtime handshake timed out',
+      )
+    }, timeoutMs)
   }
 
   private scheduleAuthenticationRefresh(
@@ -793,6 +849,7 @@ export class RealtimeClient<
     this.readyData = null
     this.serverClockOffsetMs = 0
     this.clearReconnectTimer()
+    this.clearHandshakeTimer()
     this.clearAuthenticationRefreshTimer()
     this.authenticationRefreshInFlight = null
     if (clearSubscriptionRecoveries) this.subscriptionRecoveries.clear()
@@ -812,6 +869,22 @@ export class RealtimeClient<
     this.socket = null
     this.stopConnectionLifecycle(error, generation, true)
     this.closeSocket(socket, closeCode, reason)
+  }
+
+  private retryActiveConnection(
+    socket: WebSocket,
+    generation: number,
+    reason: string,
+  ): void {
+    if (!this.isActiveSocket(socket, generation)) return
+    this.socket = null
+    this.readyData = null
+    this.clearHandshakeTimer()
+    this.clearAuthenticationRefreshTimer()
+    this.authenticationRefreshInFlight = null
+    this.rejectPendingRequests(new Error(reason))
+    this.closeSocket(socket, 4000, reason)
+    this.scheduleReconnect(generation)
   }
 
   private closeSocket(socket: WebSocket, code: number, reason: string): void {
@@ -861,6 +934,12 @@ export class RealtimeClient<
     if (!this.reconnectTimer) return
     clearTimeout(this.reconnectTimer)
     this.reconnectTimer = null
+  }
+
+  private clearHandshakeTimer(): void {
+    if (!this.handshakeTimer) return
+    clearTimeout(this.handshakeTimer)
+    this.handshakeTimer = null
   }
 
   private clearAuthenticationRefreshTimer(): void {

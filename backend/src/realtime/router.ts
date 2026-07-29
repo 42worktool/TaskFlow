@@ -1,5 +1,5 @@
 import { ZodType } from 'zod';
-import { eventNameSchema } from './protocol';
+import { eventNameSchema, isRealtimeControlEvent } from './protocol';
 
 export class RealtimeError extends Error {
   constructor(
@@ -37,6 +37,9 @@ export class RealtimeRouter {
   register<T>(event: string, schema: ZodType<T>, handler: RealtimeHandler<T>): () => void {
     if (!eventNameSchema.safeParse(event).success) {
       throw new Error(`Invalid realtime event name "${event}"`);
+    }
+    if (isRealtimeControlEvent(event)) {
+      throw new Error(`Realtime control event "${event}" is reserved by the protocol`);
     }
     if (this.handlers.has(event)) {
       throw new Error(`A realtime handler is already registered for "${event}"`);

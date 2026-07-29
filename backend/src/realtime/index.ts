@@ -6,7 +6,13 @@ import { RealtimeServer } from './server';
 export { RealtimeServer };
 export { RealtimeError } from './router';
 export type { RealtimeHandlerContext } from './router';
-export { REALTIME_CLOSE_CODE, REALTIME_PROTOCOL_VERSION } from './protocol';
+export {
+  isRealtimeControlEvent,
+  REALTIME_CLIENT_CONTROL_EVENTS,
+  REALTIME_CLOSE_CODE,
+  REALTIME_PROTOCOL_VERSION,
+  REALTIME_SERVER_CONTROL_EVENTS,
+} from './protocol';
 export type { RealtimeAuthRefreshResult, RealtimeReadyData } from './protocol';
 export type {
   PublishOptions,

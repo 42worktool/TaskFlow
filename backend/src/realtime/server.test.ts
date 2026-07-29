@@ -157,6 +157,29 @@ describe('RealtimeServer', () => {
       () => realtimeServer?.sendToUser('user-1', 'also invalid', {}),
       /Invalid outbound realtime event name/,
     );
+    assert.throws(
+      () => realtimeServer?.publish('workspace:1', 'system.ready', {}),
+      /reserved by the protocol/,
+    );
+    assert.throws(
+      () => realtimeServer?.sendToUser('user-1', 'system.error', {}),
+      /reserved by the protocol/,
+    );
+  });
+
+  it('requires the configured Origin header by default', async () => {
+    httpServer = createServer();
+    realtimeServer = new RealtimeServer(serverOptions(() => validPrincipal()));
+    realtimeServer.attach(httpServer);
+
+    const port = await listen(httpServer);
+    const missingOrigin = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+    await assert.rejects(opened(missingOrigin), /Unexpected server response: 403/);
+
+    const wrongOrigin = new WebSocket(`ws://127.0.0.1:${port}/ws`, {
+      origin: 'https://attacker.test',
+    });
+    await assert.rejects(opened(wrongOrigin), /Unexpected server response: 403/);
   });
 
   it('authenticates, dispatches typed events, and publishes to joined channels', async () => {

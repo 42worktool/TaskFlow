@@ -96,4 +96,25 @@ describe('RealtimeRouter', () => {
       /Invalid realtime event name/,
     );
   });
+
+  it('prevents handlers from claiming protocol control events', () => {
+    const router = new RealtimeRouter();
+
+    for (const event of [
+      'auth.authenticate',
+      'auth.refresh',
+      'system.ready',
+      'system.ack',
+      'system.error',
+    ]) {
+      assert.throws(
+        () => router.register(event, z.object({}), () => undefined),
+        /reserved by the protocol/,
+      );
+    }
+
+    assert.doesNotThrow(() =>
+      router.register('system.ping', z.object({}), () => undefined),
+    );
+  });
 });

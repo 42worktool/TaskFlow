@@ -8,8 +8,11 @@ import type {
 
 export {
   isRealtimeEventName,
+  isRealtimeControlEvent,
+  REALTIME_CLIENT_CONTROL_EVENTS,
   REALTIME_CLOSE_CODE,
   REALTIME_PROTOCOL_VERSION,
+  REALTIME_SERVER_CONTROL_EVENTS,
 } from './protocol'
 export type {
   RealtimeAuthRefreshResult,
