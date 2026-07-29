@@ -20,6 +20,9 @@ With the Docker stack running, interactive Swagger documentation is available at
 `https://localhost:4430/api/docs/`. The raw OpenAPI document is available at
 `https://localhost:4430/api/docs.json`.
 
+The authenticated WebSocket foundation, event format, extension points, and
+channel security rules are documented in [`docs/realtime.md`](docs/realtime.md).
+
 ## Google OAuth local setup
 
 The local Docker entrypoint is `https://localhost:4430`. The backend supports the

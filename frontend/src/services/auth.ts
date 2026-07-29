@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-interface AuthUser {
+export interface AuthUser {
   id: string
   email: string
   name: string
@@ -42,11 +42,39 @@ export const authState = reactive<{
 })
 
 let initialization: Promise<void> | null = null
-let refreshInFlight: Promise<boolean> | null = null
+let authGeneration = 0
+let authAttempt = 0
+let refreshInFlight: {
+  generation: number
+  controller: AbortController
+  promise: Promise<boolean>
+} | null = null
 
 function clearAuth(): void {
   authState.user = null
   authState.accessToken = null
+}
+
+function abortRefresh(): void {
+  const currentRefresh = refreshInFlight
+  refreshInFlight = null
+  currentRefresh?.controller.abort()
+}
+
+function invalidateAuthenticatedSession(): void {
+  authGeneration += 1
+  authAttempt += 1
+  abortRefresh()
+  clearAuth()
+  authState.initialized = true
+}
+
+function rejectCurrentSession(expectedGeneration: number): void {
+  if (expectedGeneration !== authGeneration) return
+  authGeneration += 1
+  authAttempt += 1
+  clearAuth()
+  authState.initialized = true
 }
 
 async function authRequestError(response: Response, fallback: string): Promise<Error> {
@@ -58,7 +86,21 @@ async function authRequestError(response: Response, fallback: string): Promise<E
   )
 }
 
-function applyAuthenticatedSession(session: RefreshResponse): AuthUser {
+function applyAuthenticatedSession(
+  session: RefreshResponse,
+  expectedGeneration: number,
+  expectedAttempt: number,
+): AuthUser {
+  if (
+    expectedGeneration !== authGeneration ||
+    expectedAttempt !== authAttempt
+  ) {
+    throw new Error('Authentication request was superseded by a newer session')
+  }
+
+  authGeneration += 1
+  authAttempt += 1
+  abortRefresh()
   authState.user = session.user
   authState.accessToken = session.access_token
   authState.initialized = true
@@ -70,6 +112,9 @@ async function requestPasswordSession(
   payload: Record<string, string>,
   fallback: string,
 ): Promise<AuthUser> {
+  abortRefresh()
+  const generation = authGeneration
+  const attempt = ++authAttempt
   const response = await fetch(path, {
     method: 'POST',
     credentials: 'same-origin',
@@ -78,38 +123,59 @@ async function requestPasswordSession(
   })
 
   if (!response.ok) throw await authRequestError(response, fallback)
-  return applyAuthenticatedSession((await response.json()) as RefreshResponse)
+  return applyAuthenticatedSession(
+    (await response.json()) as RefreshResponse,
+    generation,
+    attempt,
+  )
 }
 
-async function requestRefresh(): Promise<boolean> {
-  if (refreshInFlight) return refreshInFlight
+async function requestRefresh(
+  expectedGeneration = authGeneration,
+): Promise<boolean> {
+  if (expectedGeneration !== authGeneration) return false
+  const generation = expectedGeneration
+  if (refreshInFlight?.generation === generation) return refreshInFlight.promise
 
-  refreshInFlight = (async () => {
+  const controller = new AbortController()
+  let promise!: Promise<boolean>
+
+  promise = (async () => {
     const response = await fetch('/api/auth/refresh', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
+      signal: controller.signal,
     })
 
-    if (!response.ok) {
-      clearAuth()
+    if (generation !== authGeneration || controller.signal.aborted) return false
+    if (response.status === 401 || response.status === 403) {
+      rejectCurrentSession(generation)
       return false
+    }
+    if (!response.ok) {
+      throw await authRequestError(
+        response,
+        '인증 세션을 갱신하지 못했습니다.',
+      )
     }
 
     const body = (await response.json()) as RefreshResponse
+    if (generation !== authGeneration || controller.signal.aborted) return false
     authState.accessToken = body.access_token
     authState.user = body.user
     return true
   })()
+    .catch((error: unknown) => {
+      if (generation !== authGeneration || controller.signal.aborted) return false
+      throw error
+    })
+    .finally(() => {
+      if (refreshInFlight?.promise === promise) refreshInFlight = null
+    })
 
-  try {
-    return await refreshInFlight
-  } catch {
-    clearAuth()
-    return false
-  } finally {
-    refreshInFlight = null
-  }
+  refreshInFlight = { generation, controller, promise }
+  return promise
 }
 
 export async function initializeAuth(): Promise<void> {
@@ -117,7 +183,11 @@ export async function initializeAuth(): Promise<void> {
   if (initialization) return initialization
 
   initialization = (async () => {
-    await requestRefresh()
+    try {
+      await requestRefresh()
+    } catch {
+      clearAuth()
+    }
     authState.initialized = true
   })()
 
@@ -126,6 +196,12 @@ export async function initializeAuth(): Promise<void> {
   } finally {
     initialization = null
   }
+}
+
+export async function getAccessToken(forceRefresh = false): Promise<string | null> {
+  await initializeAuth()
+  if (forceRefresh && !(await requestRefresh())) return null
+  return authState.accessToken
 }
 
 export function startGoogleLogin(returnTo = '/workspaces'): void {
@@ -150,8 +226,9 @@ export async function signupWithPassword(
   )
 }
 
-async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   await initializeAuth()
+  const requestGeneration = authGeneration
 
   const makeRequest = () => {
     const headers = new Headers(init.headers)
@@ -160,8 +237,17 @@ async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Prom
   }
 
   let response = await makeRequest()
-  if (response.status === 401 && (await requestRefresh())) {
-    response = await makeRequest()
+  if (response.status === 401 && requestGeneration === authGeneration) {
+    try {
+      if (
+        (await requestRefresh(requestGeneration)) &&
+        requestGeneration === authGeneration
+      ) {
+        response = await makeRequest()
+      }
+    } catch {
+      // A transient refresh failure must not erase a still-valid local session.
+    }
   }
   return response
 }
@@ -190,16 +276,14 @@ export async function apiRequest<T>(
 }
 
 export async function logout(): Promise<void> {
-  try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { Accept: 'application/json' },
-    })
-  } finally {
-    clearAuth()
-    authState.initialized = true
-  }
+  invalidateAuthenticatedSession()
+  // Local invalidation happens before the request so late refresh responses
+  // cannot restore the session while logout is in progress.
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  })
 }
 
 export async function updateAccount(name: string): Promise<AuthUser> {
@@ -215,6 +299,5 @@ export async function updateAccount(name: string): Promise<AuthUser> {
 
 export async function deleteAccount(): Promise<void> {
   await apiRequest<void>('/api/auth/account', { method: 'DELETE' })
-  clearAuth()
-  authState.initialized = true
+  invalidateAuthenticatedSession()
 }
