@@ -81,6 +81,93 @@ function list(id: string, workspaceId: string): List {
   }
 }
 
+function stubMoveLocks(
+  t: TestContext,
+  prisma: any,
+  lockedCard: { list_id: string | null; user_id: string | null },
+  targetWorkspaceId: string,
+): string[] {
+  const lockOrder: string[] = []
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma, '$queryRaw', async (strings: TemplateStringsArray) => {
+    const query = strings.join(' ')
+    if (query.includes('FROM "Lists"')) {
+      lockOrder.push('list')
+      return [{
+        id: TARGET_LIST_ID,
+        workspace_id: targetWorkspaceId,
+      }]
+    }
+    if (query.includes('FROM "Cards"')) {
+      lockOrder.push('card')
+      return [lockedCard]
+    }
+    throw new Error('Unexpected lock query')
+  })
+  return lockOrder
+}
+
+test('createCard locks an active list before inserting the card', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { createCard }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma, '$queryRaw', async () => [{ id: SOURCE_LIST_ID }])
+  stubMethod(t, prisma.card, 'aggregate', async () => ({ _max: { sequence: 2 } }))
+
+  let create: any
+  stubMethod(t, prisma.card, 'create', async (args) => {
+    create = args
+    return card({ list_id: SOURCE_LIST_ID, sequence: 3 })
+  })
+
+  const created = await createCard({
+    userId: USER_ID,
+    listId: SOURCE_LIST_ID,
+    title: 'Card',
+  })
+
+  assert.equal(created.sequence, 3)
+  assert.equal(create.data.list_id, SOURCE_LIST_ID)
+  assert.equal(create.data.sequence, 3)
+})
+
+test('createCard rejects a list deleted before its row lock', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { createCard }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma, '$queryRaw', async () => [])
+
+  let createCalls = 0
+  stubMethod(t, prisma.card, 'create', async () => {
+    createCalls += 1
+    return card()
+  })
+
+  await assert.rejects(
+    () => createCard({
+      userId: USER_ID,
+      listId: SOURCE_LIST_ID,
+      title: 'Card',
+    }),
+    /not found/i,
+  )
+  assert.equal(createCalls, 0)
+})
+
 test('listInboxCards returns only the signed-in user inbox cards', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { listInboxCards }] = await Promise.all([
@@ -115,14 +202,15 @@ test('moveCard rejects a target list in another workspace', async (t) => {
     import('./card.service'),
   ])
 
-  stubMethod(t, prisma.card, 'findFirst', async () => card())
-  stubMethod(t, prisma.list, 'findFirst', async (args) => {
-    const id = (args as { where: { id: string } }).where.id
-    return (id === SOURCE_LIST_ID
-      ? list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID)
-      : list(TARGET_LIST_ID, TARGET_WORKSPACE_ID))
-  })
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
   stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  stubMoveLocks(
+    t,
+    prisma,
+    { list_id: SOURCE_LIST_ID, user_id: null },
+    TARGET_WORKSPACE_ID,
+  )
   let findManyCalls = 0
   let updateCalls = 0
   stubMethod(t, prisma.card, 'findMany', async () => {
@@ -153,12 +241,17 @@ test('moveCard allows a member to move a card within its workspace', async (t) =
     import('./card.service'),
   ])
 
-  stubMethod(t, prisma.card, 'findFirst', async () => card())
   stubMethod(t, prisma.list, 'findFirst', async (args) => {
     const id = (args as { where: { id: string } }).where.id
     return list(id, SOURCE_WORKSPACE_ID)
   })
   stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  const lockOrder = stubMoveLocks(
+    t,
+    prisma,
+    { list_id: SOURCE_LIST_ID, user_id: null },
+    SOURCE_WORKSPACE_ID,
+  )
   stubMethod(t, prisma.card, 'findMany', async () => [])
 
   let update: unknown
@@ -174,6 +267,7 @@ test('moveCard allows a member to move a card within its workspace', async (t) =
   })
 
   assert.equal(moved.list_id, TARGET_LIST_ID)
+  assert.deepEqual(lockOrder, ['list', 'card'])
   assert.deepEqual(update, {
     where: { id: CARD_ID },
     data: {
@@ -184,9 +278,82 @@ test('moveCard allows a member to move a card within its workspace', async (t) =
   })
 })
 
-test('moveCard rejects viewers before mutating a card', async (t) => {
+test('moveCard rejects a target list deleted before its row lock', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { moveCard }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma, '$queryRaw', async () => [])
+
+  let updateCalls = 0
+  stubMethod(t, prisma.card, 'update', async () => {
+    updateCalls += 1
+    return card()
+  })
+
+  await assert.rejects(
+    () => moveCard({
+      userId: USER_ID,
+      cardId: CARD_ID,
+      targetListId: TARGET_LIST_ID,
+    }),
+    /not found/i,
+  )
+  assert.equal(updateCalls, 0)
+})
+
+test('moveCard detaches stale workspace relations from an inbox card', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { moveCard }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  stubMoveLocks(
+    t,
+    prisma,
+    { list_id: null, user_id: USER_ID },
+    TARGET_WORKSPACE_ID,
+  )
+  stubMethod(t, prisma.card, 'findMany', async () => [])
+
+  let memberUpdate: any
+  let labelUpdate: any
+  stubMethod(t, prisma.cardMember, 'updateMany', async (args) => {
+    memberUpdate = args
+    return { count: 1 }
+  })
+  stubMethod(t, prisma.cardLabel, 'updateMany', async (args) => {
+    labelUpdate = args
+    return { count: 1 }
+  })
+  stubMethod(t, prisma.card, 'update', async () =>
+    card({ list_id: TARGET_LIST_ID, user_id: USER_ID }))
+
+  await moveCard({
+    userId: USER_ID,
+    cardId: CARD_ID,
+    targetListId: TARGET_LIST_ID,
+  })
+
+  for (const update of [memberUpdate, labelUpdate]) {
+    assert.deepEqual(update.where, {
+      card_id: CARD_ID,
+      deleted_at: null,
+    })
+    assert.equal(update.data.updated_by, USER_ID)
+    assert.equal(update.data.deleted_by, USER_ID)
+    assert.ok(update.data.deleted_at instanceof Date)
+  }
+})
+
+test('moveCardToInbox detaches workspace members and labels', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { moveCardToInbox }] = await Promise.all([
     import('../../db'),
     import('./card.service'),
   ])
@@ -194,7 +361,131 @@ test('moveCard rejects viewers before mutating a card', async (t) => {
   stubMethod(t, prisma.card, 'findFirst', async () => card())
   stubMethod(t, prisma.list, 'findFirst', async () =>
     list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma, '$queryRaw', async () => [{
+    list_id: SOURCE_LIST_ID,
+    user_id: null,
+  }])
+
+  let memberUpdate: any
+  let labelUpdate: any
+  let cardUpdate: any
+  stubMethod(t, prisma.cardMember, 'updateMany', async (args) => {
+    memberUpdate = args
+    return { count: 1 }
+  })
+  stubMethod(t, prisma.cardLabel, 'updateMany', async (args) => {
+    labelUpdate = args
+    return { count: 1 }
+  })
+  stubMethod(t, prisma.card, 'update', async (args) => {
+    cardUpdate = args
+    return card({ list_id: null, user_id: USER_ID })
+  })
+
+  const moved = await moveCardToInbox({
+    userId: USER_ID,
+    cardId: CARD_ID,
+  })
+
+  assert.equal(moved.list_id, null)
+  for (const update of [memberUpdate, labelUpdate]) {
+    assert.deepEqual(update.where, {
+      card_id: CARD_ID,
+      deleted_at: null,
+    })
+    assert.equal(update.data.updated_by, USER_ID)
+    assert.equal(update.data.deleted_by, USER_ID)
+    assert.ok(update.data.deleted_at instanceof Date)
+  }
+  assert.deepEqual(cardUpdate, {
+    where: { id: CARD_ID },
+    data: {
+      list_id: null,
+      user_id: USER_ID,
+      updated_by: USER_ID,
+    },
+  })
+})
+
+test('addCardMember rejects inbox cards while holding the card lock', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { addCardMember }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma, '$queryRaw', async () => [{
+    list_id: null,
+    user_id: USER_ID,
+  }])
+
+  let createCalls = 0
+  stubMethod(t, prisma.cardMember, 'create', async () => {
+    createCalls += 1
+    return {}
+  })
+
+  await assert.rejects(
+    () => addCardMember({
+      userId: USER_ID,
+      cardId: CARD_ID,
+      targetUserId: TARGET_WORKSPACE_ID,
+    }),
+    /Cannot assign members to inbox cards/,
+  )
+  assert.equal(createCalls, 0)
+})
+
+test('moveCard rejects viewers before mutating a card', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { moveCard }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
   stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'VIEWER' }))
+  stubMoveLocks(
+    t,
+    prisma,
+    { list_id: SOURCE_LIST_ID, user_id: null },
+    SOURCE_WORKSPACE_ID,
+  )
+
+  let updateCalls = 0
+  stubMethod(t, prisma.card, 'update', async () => {
+    updateCalls += 1
+    return card()
+  })
+
+  await assert.rejects(
+    () => moveCard({
+      userId: USER_ID,
+      cardId: CARD_ID,
+      targetListId: TARGET_LIST_ID,
+    }),
+    /Forbidden/,
+  )
+  assert.equal(updateCalls, 0)
+})
+
+test('moveCard rechecks inbox ownership after locking the card', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { moveCard }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMoveLocks(
+    t,
+    prisma,
+    { list_id: null, user_id: TARGET_WORKSPACE_ID },
+    TARGET_WORKSPACE_ID,
+  )
 
   let updateCalls = 0
   stubMethod(t, prisma.card, 'update', async () => {

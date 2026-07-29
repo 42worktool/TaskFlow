@@ -24,4 +24,9 @@ export const CardAPI = {
       method: 'PUT',
       json: data,
     }),
+
+  moveToInbox: (cardId: string) =>
+    apiRequest<Card>(`/api/cards/${cardId}/inbox`, {
+      method: 'PUT',
+    }),
 }

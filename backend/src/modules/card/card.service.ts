@@ -7,7 +7,7 @@
 // ownership (user_id), not workspace role.
 // ============================================================
 import { prisma } from '../../db'
-import type { Card, List, Role } from '@prisma/client'
+import type { Card, List, Prisma, Role } from '@prisma/client'
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../errors'
 import { ROLE_RANK, getRole } from '../workspace/workspace.service'
 import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
@@ -57,24 +57,77 @@ async function getCardOrThrow(cardId: string): Promise<Card> {
   return card
 }
 
-async function getListOrThrow(listId: string): Promise<List> {
-  const list = await prisma.list.findFirst({ where: { id: listId, deleted_at: null } })
+type CardAccessClient = Pick<
+  Prisma.TransactionClient,
+  'list' | 'workspaceMember'
+>
+
+async function getListOrThrow(
+  listId: string,
+  client: CardAccessClient = prisma,
+): Promise<List> {
+  const list = await client.list.findFirst({
+    where: { id: listId, deleted_at: null },
+  })
   if (!list) throw new NotFoundError()
   return list
 }
 
 /** Write access: inbox card owner, or MEMBER+ in the card's workspace. */
-async function requireCardWrite(card: Card, userId: string): Promise<void> {
-  await requireCardRole(card, userId, 'MEMBER')
+type CardAccess = Pick<Card, 'list_id' | 'user_id'>
+
+async function lockCardOrThrow(
+  tx: Prisma.TransactionClient,
+  cardId: string,
+): Promise<CardAccess> {
+  const cards = await tx.$queryRaw<CardAccess[]>`
+    SELECT "list_id", "user_id"
+    FROM "Cards"
+    WHERE "id" = ${cardId}::uuid
+      AND "deleted_at" IS NULL
+    FOR UPDATE
+  `
+  const card = cards[0]
+  if (!card) throw new NotFoundError()
+  return card
 }
 
-async function requireCardRole(card: Card, userId: string, minRole?: Role): Promise<Role | null> {
+async function getRoleWithClient(
+  client: CardAccessClient,
+  workspaceId: string,
+  userId: string,
+): Promise<Role | null> {
+  const member = await client.workspaceMember.findFirst({
+    where: {
+      workspace_id: workspaceId,
+      user_id: userId,
+      deleted_at: null,
+      workspace: { deleted_at: null },
+    },
+  })
+  return member?.role ?? null
+}
+
+async function requireCardWrite(
+  card: CardAccess,
+  userId: string,
+  client: CardAccessClient = prisma,
+): Promise<void> {
+  await requireCardRole(card, userId, 'MEMBER', client)
+}
+
+async function requireCardRole(
+  card: CardAccess,
+  userId: string,
+  minRole?: Role,
+  client: CardAccessClient = prisma,
+): Promise<Role | null> {
   if (card.list_id === null) {
     if (card.user_id !== userId) throw new ForbiddenError()
     return null
   }
-  const list = await getListOrThrow(card.list_id)
-  const role = await getRole(list.workspace_id, userId)
+  const list = await getListOrThrow(card.list_id, client)
+  const role = await getRoleWithClient(client, list.workspace_id, userId)
   if (!role) throw new ForbiddenError()
   if (minRole && ROLE_RANK[role] < ROLE_RANK[minRole]) throw new ForbiddenError()
   return role
@@ -108,23 +161,34 @@ export async function createCard(
   const role = await getRole(list.workspace_id, input.userId)
   if (!role || ROLE_RANK[role] < ROLE_RANK.MEMBER) throw new ForbiddenError()
 
-  const agg = await prisma.card.aggregate({
-    where: { list_id: input.listId, deleted_at: null },
-    _max: { sequence: true },
-  })
+  return prisma.$transaction(async (tx) => {
+    const lockedList = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "Lists"
+      WHERE "id" = ${input.listId}::uuid
+        AND "deleted_at" IS NULL
+      FOR UPDATE
+    `
+    if (lockedList.length === 0) throw new NotFoundError()
 
-  const card = await prisma.card.create({
-    data: {
-      list_id: input.listId,
-      title: input.title,
-      description: input.description ?? '',
-      start_at: input.startAt ? new Date(input.startAt) : null,
-      deadline: input.deadline ? new Date(input.deadline) : null,
-      sequence: (agg._max.sequence ?? 0) + 1,
-      ...createdBy(input.userId),
-    },
+    const agg = await tx.card.aggregate({
+      where: { list_id: input.listId, deleted_at: null },
+      _max: { sequence: true },
+    })
+
+    const card = await tx.card.create({
+      data: {
+        list_id: input.listId,
+        title: input.title,
+        description: input.description ?? '',
+        start_at: input.startAt ? new Date(input.startAt) : null,
+        deadline: input.deadline ? new Date(input.deadline) : null,
+        sequence: (agg._max.sequence ?? 0) + 1,
+        ...createdBy(input.userId),
+      },
+    })
+    return toCardDto(card)
   })
-  return toCardDto(card)
 }
 
 export async function getCard(input: { userId: string; cardId: string }) {
@@ -205,44 +269,73 @@ export async function moveCard(
     afterCardId?: string | null
   },
 ) {
-  const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.userId)
+  return prisma.$transaction(async (tx) => {
+    const lockedTarget = await tx.$queryRaw<
+      Array<{ id: string; workspace_id: string }>
+    >`
+      SELECT "id", "workspace_id"
+      FROM "Lists"
+      WHERE "id" = ${input.targetListId}::uuid
+        AND "deleted_at" IS NULL
+      FOR UPDATE
+    `
+    const targetList = lockedTarget[0]
+    if (!targetList) throw new NotFoundError()
 
-  const targetList = await getListOrThrow(input.targetListId)
-  if (card.list_id !== null) {
-    const sourceList = await getListOrThrow(card.list_id)
-    if (sourceList.workspace_id !== targetList.workspace_id) {
-      throw new BadRequestError('Cards cannot be moved between workspaces')
+    const card = await lockCardOrThrow(tx, input.cardId)
+    await requireCardWrite(card, input.userId, tx)
+
+    if (card.list_id !== null) {
+      const sourceList = await getListOrThrow(card.list_id, tx)
+      if (sourceList.workspace_id !== targetList.workspace_id) {
+        throw new BadRequestError('Cards cannot be moved between workspaces')
+      }
     }
-  }
-  const targetRole = await getRole(targetList.workspace_id, input.userId)
-  if (!targetRole || ROLE_RANK[targetRole] < ROLE_RANK.MEMBER) {
-    throw new ForbiddenError()
-  }
+    const targetRole = await getRoleWithClient(
+      tx,
+      targetList.workspace_id,
+      input.userId,
+    )
+    if (!targetRole || ROLE_RANK[targetRole] < ROLE_RANK.MEMBER) {
+      throw new ForbiddenError()
+    }
 
-  const siblings = await prisma.card.findMany({
-    where: {
-      list_id: input.targetListId,
-      deleted_at: null,
-      id: { not: input.cardId },
-    },
-    orderBy: { sequence: 'asc' },
-  })
-  const newSequence = computeSequence(
-    siblings,
-    input.beforeCardId,
-    input.afterCardId,
-  )
+    if (card.list_id === null) {
+      const detachedRelation = softDeletedBy(input.userId)
+      await tx.cardMember.updateMany({
+        where: { card_id: input.cardId, deleted_at: null },
+        data: detachedRelation,
+      })
+      await tx.cardLabel.updateMany({
+        where: { card_id: input.cardId, deleted_at: null },
+        data: detachedRelation,
+      })
+    }
 
-  const updated = await prisma.card.update({
-    where: { id: input.cardId },
-    data: {
-      list_id: input.targetListId,
-      sequence: newSequence,
-      ...updatedBy(input.userId),
-    },
+    const siblings = await tx.card.findMany({
+      where: {
+        list_id: input.targetListId,
+        deleted_at: null,
+        id: { not: input.cardId },
+      },
+      orderBy: { sequence: 'asc' },
+    })
+    const newSequence = computeSequence(
+      siblings,
+      input.beforeCardId,
+      input.afterCardId,
+    )
+
+    const updated = await tx.card.update({
+      where: { id: input.cardId },
+      data: {
+        list_id: input.targetListId,
+        sequence: newSequence,
+        ...updatedBy(input.userId),
+      },
+    })
+    return toCardDto(updated)
   })
-  return toCardDto(updated)
 }
 
 export async function updateCardDates(
@@ -280,14 +373,29 @@ export async function updateCardDates(
 }
 
 export async function moveCardToInbox(input: { userId: string; cardId: string }) {
-  const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.userId)
+  return prisma.$transaction(async (tx) => {
+    const card = await lockCardOrThrow(tx, input.cardId)
+    await requireCardWrite(card, input.userId, tx)
 
-  const updated = await prisma.card.update({
-    where: { id: input.cardId },
-    data: { list_id: null, user_id: input.userId, ...updatedBy(input.userId) },
+    const detachedRelation = softDeletedBy(input.userId)
+    await tx.cardMember.updateMany({
+      where: { card_id: input.cardId, deleted_at: null },
+      data: detachedRelation,
+    })
+    await tx.cardLabel.updateMany({
+      where: { card_id: input.cardId, deleted_at: null },
+      data: detachedRelation,
+    })
+    const updated = await tx.card.update({
+      where: { id: input.cardId },
+      data: {
+        list_id: null,
+        user_id: input.userId,
+        ...updatedBy(input.userId),
+      },
+    })
+    return toCardDto(updated)
   })
-  return toCardDto(updated)
 }
 
 // ─── Card Members ─────────────────────────────────────────────
@@ -297,50 +405,57 @@ export async function addCardMember(input: {
   cardId: string
   targetUserId: string
 }) {
-  const card = await getCardOrThrow(input.cardId)
-  await requireCardWrite(card, input.userId)
+  return prisma.$transaction(async (tx) => {
+    const card = await lockCardOrThrow(tx, input.cardId)
+    await requireCardWrite(card, input.userId, tx)
+    if (!card.list_id) {
+      throw new BadRequestError('Cannot assign members to inbox cards')
+    }
 
-  if (card.list_id) {
-    const list = await getListOrThrow(card.list_id)
-    const targetRole = await getRole(list.workspace_id, input.targetUserId)
+    const list = await getListOrThrow(card.list_id, tx)
+    const targetRole = await getRoleWithClient(
+      tx,
+      list.workspace_id,
+      input.targetUserId,
+    )
     if (!targetRole) throw new BadRequestError('Target user is not a member of this workspace')
-  }
 
-  const existing = await prisma.cardMember.findUnique({
-    where: {
-      card_id_user_id: { card_id: input.cardId, user_id: input.targetUserId },
-    },
-  })
-  if (existing && !existing.deleted_at) {
-    throw new ConflictError('User is already assigned to this card')
-  }
-
-  if (existing) {
-    await prisma.cardMember.update({
+    const existing = await tx.cardMember.findUnique({
       where: {
         card_id_user_id: { card_id: input.cardId, user_id: input.targetUserId },
       },
-      data: restoredBy(input.userId),
     })
-  } else {
-    await prisma.cardMember.create({
-      data: {
-        card_id: input.cardId,
-        user_id: input.targetUserId,
-        ...createdBy(input.userId),
-      },
-    })
-  }
+    if (existing && !existing.deleted_at) {
+      throw new ConflictError('User is already assigned to this card')
+    }
 
-  const user = await prisma.user.findFirst({
-    where: { id: input.targetUserId, deleted_at: null },
+    if (existing) {
+      await tx.cardMember.update({
+        where: {
+          card_id_user_id: { card_id: input.cardId, user_id: input.targetUserId },
+        },
+        data: restoredBy(input.userId),
+      })
+    } else {
+      await tx.cardMember.create({
+        data: {
+          card_id: input.cardId,
+          user_id: input.targetUserId,
+          ...createdBy(input.userId),
+        },
+      })
+    }
+
+    const user = await tx.user.findFirst({
+      where: { id: input.targetUserId, deleted_at: null },
+    })
+    if (!user) throw new NotFoundError()
+    return {
+      user_id: input.targetUserId,
+      name: user.name,
+      profile_image_url: user.profile_image_url,
+    }
   })
-  if (!user) throw new NotFoundError()
-  return {
-    user_id: input.targetUserId,
-    name: user.name,
-    profile_image_url: user.profile_image_url,
-  }
 }
 
 export async function removeCardMember(input: {

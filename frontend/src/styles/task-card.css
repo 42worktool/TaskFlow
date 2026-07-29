@@ -50,6 +50,19 @@
   gap: 6px;
 }
 
+.card-inbox-btn {
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.card-inbox-btn:hover {
+  color: #2563eb;
+}
+
 .card-date {
   font-size: 12px;
   color: #6b7280;

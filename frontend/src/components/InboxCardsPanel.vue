@@ -1,39 +1,70 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import TaskCard from './TaskCard.vue'
 import { InboxAPI } from '../api/inbox'
-import type { Card } from '../types'
+import type { Card, List } from '../types'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     compact?: boolean
+    destinationLists?: Pick<List, 'id' | 'name'>[]
+    refreshToken?: number
   }>(),
   {
     compact: false,
+    destinationLists: () => [],
+    refreshToken: 0,
   },
 )
+
+const emit = defineEmits<{
+  moved: [card: Card]
+}>()
 
 const cards = ref<Card[]>([])
 const loading = ref(true)
 const error = ref('')
-let deletingCardId: string | null = null
+const destinationListId = ref('')
+const busyCardId = ref<string | null>(null)
+let inboxLoadGeneration = 0
+
+watch(
+  () => props.destinationLists.map((list) => list.id),
+  (listIds) => {
+    if (listIds.length > 0 && !listIds.includes(destinationListId.value)) {
+      destinationListId.value = listIds[0] ?? ''
+    }
+  },
+  { immediate: true },
+)
 
 async function loadInbox() {
+  const generation = ++inboxLoadGeneration
   loading.value = true
   error.value = ''
   try {
-    cards.value = await InboxAPI.list()
+    const loaded = await InboxAPI.list()
+    if (generation === inboxLoadGeneration) cards.value = loaded
   } catch (caught) {
-    error.value =
-      caught instanceof Error ? caught.message : '인박스를 불러오지 못했습니다.'
+    if (generation === inboxLoadGeneration) {
+      error.value =
+        caught instanceof Error ? caught.message : '인박스를 불러오지 못했습니다.'
+    }
   } finally {
-    loading.value = false
+    if (generation === inboxLoadGeneration) loading.value = false
   }
 }
 
+watch(
+  () => props.refreshToken,
+  () => {
+    void loadInbox()
+  },
+)
+
 async function deleteCard(cardId: string) {
-  if (deletingCardId) return
-  deletingCardId = cardId
+  if (busyCardId.value) return
+  busyCardId.value = cardId
   error.value = ''
   try {
     await InboxAPI.remove(cardId)
@@ -42,12 +73,32 @@ async function deleteCard(cardId: string) {
     error.value =
       caught instanceof Error ? caught.message : '인박스 카드를 삭제하지 못했습니다.'
   } finally {
-    deletingCardId = null
+    busyCardId.value = null
+  }
+}
+
+async function moveCardToBoard(card: Card) {
+  if (busyCardId.value || !destinationListId.value) return
+  busyCardId.value = card.id
+  error.value = ''
+  try {
+    const moved = await InboxAPI.moveToList(card.id, destinationListId.value)
+    cards.value = cards.value.filter((item) => item.id !== card.id)
+    emit('moved', moved)
+  } catch (caught) {
+    error.value =
+      caught instanceof Error ? caught.message : '카드를 보드로 옮기지 못했습니다.'
+  } finally {
+    busyCardId.value = null
   }
 }
 
 onMounted(() => {
   void loadInbox()
+})
+
+onUnmounted(() => {
+  inboxLoadGeneration += 1
 })
 </script>
 
@@ -62,6 +113,17 @@ onMounted(() => {
 
     <div class="inbox-panel-toolbar">
       <span class="card-count">카드 {{ cards.length }}개</span>
+      <select
+        v-if="destinationLists.length"
+        v-model="destinationListId"
+        class="inbox-destination-select"
+        aria-label="인박스 카드가 이동할 리스트"
+        :disabled="busyCardId !== null"
+      >
+        <option v-for="list in destinationLists" :key="list.id" :value="list.id">
+          {{ list.name }}
+        </option>
+      </select>
     </div>
 
     <p v-if="error" class="inbox-panel-state inbox-panel-state--error" role="alert">
@@ -76,6 +138,15 @@ onMounted(() => {
     <ul v-else-if="cards.length > 0" class="inbox-card-list">
       <li v-for="card in cards" :key="card.id">
         <TaskCard :card="card" @delete="deleteCard" />
+        <button
+          v-if="destinationLists.length"
+          class="inbox-card-move-btn"
+          type="button"
+          :disabled="busyCardId !== null || !destinationListId"
+          @click="moveCardToBoard(card)"
+        >
+          {{ busyCardId === card.id ? '이동 중…' : '선택한 리스트로 이동' }}
+        </button>
       </li>
     </ul>
   </section>

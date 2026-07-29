@@ -81,6 +81,11 @@
 - **카드를 inbox로 이동하면 sequence 값이 의미를 잃는다.**
   서버에서 sequence를 정리하는 처리가 필요하다.
 
+- **카드를 inbox로 이동하면 워크스페이스 전용 멤버·라벨 연결을 해제한다.**
+  개인 inbox 카드는 다른 워크스페이스의 리스트로 이동할 수 있으므로,
+  `CardMembers`와 `CardLabels`를 soft-delete해 관계 데이터가 따라가지 않게 한다.
+  리스트 삭제로 카드가 inbox에 들어가는 경우에도 같은 규칙을 적용한다.
+
 - **카드 삭제는 cascade로 CardMembers, CardLabel, Attachments, Comment가 연쇄 삭제된다.**
 
 - **첨부파일 삭제(`DELETE /cards/attachments/{attachment_id}`)는 경로에 `card_id`가 없다.**
