@@ -29,9 +29,14 @@ test('OpenAPI operation IDs are unique', () => {
 
 test('user responses identify the authentication provider', () => {
   const userSchema = openApiDocument.components.schemas.User;
+  const refreshSchema = openApiDocument.components.schemas.AccessTokenResponse;
 
   assert.ok(userSchema.required.includes('auth_provider'));
   assert.deepEqual(userSchema.properties.auth_provider.enum, ['password', 'google']);
+  assert.ok(refreshSchema.required.includes('user'));
+  assert.deepEqual(refreshSchema.properties.user, {
+    $ref: '#/components/schemas/User',
+  });
 });
 
 test('all local OpenAPI references resolve', () => {

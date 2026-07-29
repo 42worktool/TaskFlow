@@ -1,5 +1,24 @@
-# Vue 3 + TypeScript + Vite
+# TaskFlow frontend
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+The Vue 3 and TypeScript client for TaskFlow. Project setup, environment
+variables, Docker instructions, architecture, features, and contributor
+information are documented in the [root README](../README.md).
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+Use the root Docker Compose instructions for a working application. Running the
+Vite server alone starts only the UI; it expects a backend at
+`http://localhost:3000` or at `VITE_PROXY_TARGET`, and that backend's
+`APP_ORIGIN` must match the Vite browser origin.
+
+To start only that UI process:
+
+```bash
+npm ci
+npm run dev
+```
+
+Checks:
+
+```bash
+npm test
+npm run build
+```

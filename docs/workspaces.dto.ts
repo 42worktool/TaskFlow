@@ -1,91 +1,88 @@
 // ============================================================
-// workspaces.dto.ts — Workspaces & Members
+// Current Workspaces & Members HTTP contract
 // ============================================================
 import { UUID, ISODateString, Role } from './common.dto';
 
-// ------------------------------------------------------------
-// 공용: 워크스페이스 표현
-// ------------------------------------------------------------
+export interface WorkspaceMemberDto {
+  user_id: UUID;
+  role: Role;
+  user: {
+    id: UUID;
+    name: string;
+    /**
+     * Included for workspace members and management responses.
+     * Omitted when an authenticated non-member reads a public workspace.
+     */
+    email?: string;
+    profile_image_url: string | null;
+  };
+}
+
 export interface WorkspaceDto {
   id: UUID;
   name: string;
   is_public: boolean;
   created_at: ISODateString;
   updated_at: ISODateString;
-}
-
-/** 멤버 표현 (WorkspaceMembers + Users 조인 결과) */
-export interface WorkspaceMemberDto {
-  user_id: UUID;
-  name: string;
-  email: string;                       // 멤버 관리 화면에서만 노출
-  profile_image_url: string | null;
-  role: Role;
-}
-
-// ------------------------------------------------------------
-// GET /workspaces  → 200
-//   내가 속한 워크스페이스 목록
-// ------------------------------------------------------------
-export type ListWorkspacesResponse = WorkspaceDto[];
-
-// ------------------------------------------------------------
-// POST /workspaces  → 201
-//   ⚠️ 생성자는 자동으로 OWNER 로 WorkspaceMembers 에 추가되어야 한다.
-//      (DBML 에 owner_id 컬럼이 없으므로 OWNER role 로 추적하는 구조)
-//      이 처리는 서비스 계층 책임. DTO 에는 드러나지 않음.
-// ------------------------------------------------------------
-export interface CreateWorkspaceRequest {
-  name: string;
-  is_public?: boolean;   // 기본 false 권장 (안 보내면 비공개)
-}
-export type CreateWorkspaceResponse = WorkspaceDto;
-
-// ------------------------------------------------------------
-// GET /workspaces/{workspace_id}  → 200
-//   상세. 멤버 목록까지 같이 줄지 결정 필요 → 여기선 포함시킴.
-// ------------------------------------------------------------
-export interface WorkspaceDetailResponse extends WorkspaceDto {
   members: WorkspaceMemberDto[];
 }
 
-// ------------------------------------------------------------
-// PUT /workspaces/{workspace_id}  → 200
-// ------------------------------------------------------------
-export interface UpdateWorkspaceRequest {
-  name?: string;
+// GET /api/workspaces -> 200
+// `my` includes private and public workspaces the caller has joined.
+// `public` contains public workspaces the caller has not joined.
+export interface ListWorkspacesResponse {
+  my: WorkspaceDto[];
+  public: WorkspaceDto[];
+}
+
+// POST /api/workspaces -> 201
+// The creator becomes OWNER in the same transaction.
+export interface CreateWorkspaceRequest {
+  name: string;
   is_public?: boolean;
 }
+export type CreateWorkspaceResponse = WorkspaceDto;
+
+// GET /api/workspaces/{workspace_id} -> 200
+// Members can read private workspaces. Authenticated non-members can read
+// public workspaces, but nested member email addresses are omitted.
+export type GetWorkspaceResponse = WorkspaceDto;
+
+// PUT /api/workspaces/{workspace_id} -> 200, ADMIN+
+// At least one field is required; both fields may be sent together.
+export type UpdateWorkspaceRequest =
+  | { name: string; is_public?: boolean }
+  | { name?: never; is_public: boolean };
 export type UpdateWorkspaceResponse = WorkspaceDto;
 
-// ------------------------------------------------------------
-// DELETE /workspaces/{workspace_id}  → 204 (body 없음)
-//   ⚠️ cascade 로 Lists, Cards, Labels 등 연쇄 삭제됨 (DBML FK 정책).
-//      OWNER 만 가능하도록 권한 검증 필요.
-// ------------------------------------------------------------
+// DELETE /api/workspaces/{workspace_id} -> 200, OWNER
+export interface DeleteWorkspaceResponse {
+  ok: true;
+}
 
-// ------------------------------------------------------------
-// POST /workspaces/{workspace_id}/members  → 201
-//   이메일로 멤버 초대.
-//   ⚠️ 해당 이메일의 유저가 없을 수도 있음 → 서버에서 404 또는
-//      "초대 보류" 처리 정책 필요.
-// ------------------------------------------------------------
+// POST /api/workspaces/{workspace_id}/members -> 201, ADMIN+
+// Sends an expiring invitation email; it does not add the member immediately.
 export interface InviteMemberRequest {
   email: string;
-  role?: Role;   // 미지정 시 MEMBER 기본 권장
+  role: Exclude<Role, 'OWNER'>;
 }
-export type InviteMemberResponse = WorkspaceMemberDto;
+export interface InviteMemberResponse {
+  ok: true;
+}
 
-// ------------------------------------------------------------
-// PUT /workspaces/{workspace_id}/members/{user_id}  → 200
-//   멤버 권한 변경.
-//   ⚠️ OWNER 를 변경/강등할 때의 규칙(마지막 OWNER 보호)은 서비스에서 검증.
-// ------------------------------------------------------------
+// POST /api/workspaces/invite/{token} -> 200
+// The authenticated user's normalized email must match the invitation email.
+export type AcceptInviteResponse = WorkspaceDto;
+
+// PUT /api/workspaces/{workspace_id}/members/{user_id} -> 200, ADMIN+
+// The final OWNER cannot be demoted.
 export interface UpdateMemberRoleRequest {
-  role: Role;
+  role: Exclude<Role, 'OWNER'>;
 }
-export type UpdateMemberRoleResponse = WorkspaceMemberDto;
+export type UpdateMemberRoleResponse = WorkspaceDto;
 
-// ------------------------------------------------------------
-// DELETE /workspaces/{workspace_id}/members/{user_id}  → 204 (body 없음)
-// ------------------------------------------------------------
+// DELETE /api/workspaces/{workspace_id}/members/{user_id} -> 200, ADMIN+
+// The final OWNER cannot be removed.
+export interface RemoveMemberResponse {
+  ok: true;
+}

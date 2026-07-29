@@ -1,5 +1,9 @@
 # Workspace CRUD Implementation Guide
 
+> Historical planning note. The current implementation and HTTP shapes are
+> documented in `backend/src/modules/workspace`, `docs/workspaces.dto.ts`, and
+> the root `README.md`.
+
 > Owner: chakim (PM)
 > Scope: **Workspace CRUD only** (member invite/role, board, list, card are excluded)
 > Reference: `Planner.md` (API spec lines 820-848, common models 1046-1087, common responses 1037-1043)

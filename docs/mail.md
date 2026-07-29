@@ -1,106 +1,65 @@
-# Mail Setup
+# Email invitation pipeline
 
-> Owner: hozo
-> Status: lib ready — route/invitation wiring TBD
+> Owner recorded in the original note: hozo
+>
+> Status: implemented for workspace invitations
 
----
+## Current flow
 
-## 0. Current State Summary
+```text
+POST /api/workspaces/:workspaceId/members
+  -> validate ADMIN+ and recipient/role
+  -> enforce recipient rate limit in Redis
+  -> sign a seven-day, email-bound invitation JWT
+  -> enqueue the SMTP message in Redis
+  -> background mail worker sends through Nodemailer
 
-- `backend/src/lib/mailer.ts` — nodemailer transporter + `sendMail()` helper
-- `backend/src/lib/mailer.test.ts` — quick smoke test script
-- `backend/src/config/index.ts` — `config.smtp` object (host, port, user, pass, from)
-- `.env.example` — SMTP_* variables documented
-- `backend/package.json` — `nodemailer` dependency + `@types/nodemailer` devDependency
-
----
-
-## 1. Architecture
-
-```
-.env ─► config/index.ts ─► lib/mailer.ts (singleton transporter) ─► callers (invite, etc.)
-```
-
-The transporter is created once at module load time using `createTransport()`. The `sendMail()` function wraps `transporter.sendMail()` and always sets the `from` address from config.
-
----
-
-## 2. Configuration
-
-### 2.1 Environment variables
-
-| Variable     | Default             | Description                        |
-|-------------|---------------------|------------------------------------|
-| SMTP_HOST   | (required)          | SMTP server hostname               |
-| SMTP_PORT   | 587                 | SMTP port                          |
-| SMTP_USER   | (required)          | SMTP auth username                 |
-| SMTP_PASS   | (required)          | SMTP auth password / app password  |
-| SMTP_FROM   | (required)          | `From` header for all outgoing mail|
-
-### 2.2 Gmail example
-
-```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password        # Generate via Google Account > App Passwords
-SMTP_FROM="TaskFlow <noreply@yourdomain.com>"
+POST /api/workspaces/invite/:token
+  -> verify signature, issuer, audience, expiry, role, and email
+  -> require the signed-in account email to match
+  -> create or restore the workspace membership
+  -> notify already-connected workspace members
 ```
 
-Port 587 uses STARTTLS (`secure: false`). Port 465 uses implicit TLS (`secure: true` is set automatically when port is 465).
+Invitation acceptance is idempotent for an already-active member. An expired,
+malformed, or deleted-workspace token is rejected. The final workspace owner
+rules remain enforced by the normal member-management service.
 
----
+## Configuration
 
-## 3. API
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SMTP_HOST` | required | SMTP hostname |
+| `SMTP_PORT` | `587` | SMTP port |
+| `SMTP_USER` | required | SMTP username |
+| `SMTP_PASS` | required | SMTP password or app password |
+| `SMTP_FROM` | required | Sender used for all outgoing messages |
 
-### `sendMail(options: MailOptions): Promise<void>`
+The current transporter uses STARTTLS (`secure: false`), so configure a
+provider endpoint intended for that mode, such as Gmail on port 587.
 
-```ts
-interface MailOptions {
-  to: string;
-  subject: string;
-  text?: string;
-  html?: string;
-}
-```
+## Components
 
-`from` is always taken from `config.smtp.from` — callers don't set it.
+- `backend/src/lib/mailer.ts`: shared Nodemailer transporter.
+- `backend/src/lib/mail-templates.ts`: plain-text and HTML invitation template.
+- `backend/src/lib/mail-rate-limiter.ts`: five messages per recipient per hour.
+- `backend/src/lib/mail-queue.ts`: Redis list and a dedicated blocking worker
+  connection.
+- `backend/src/modules/workspace/workspace.service.ts`: authorization, token
+  generation/verification, queueing, and membership acceptance.
 
-Returns void on success, throws on failure.
+The worker starts with the backend and participates in graceful shutdown. Mail
+delivery is deliberately a small prototype queue: failed jobs are logged but
+there is no retry/dead-letter policy.
 
-### Usage example
+## Verification
 
-```ts
-import { sendMail } from '../lib/mailer';
-
-await sendMail({
-  to: 'user@example.com',
-  subject: 'Welcome to TaskFlow',
-  text: 'Your account has been created.',
-  html: '<h1>Welcome</h1><p>Your account has been created.</p>',
-});
-```
-
----
-
-## 4. Testing
+Template rendering is covered by the backend test suite:
 
 ```bash
-# Add TEST_EMAIL_TO to .env
-echo 'TEST_EMAIL_TO=you@example.com' >> .env
-
-# Run the smoke test
 cd backend
-npx tsx --env-file=.env src/lib/mailer.test.ts
+npm test
 ```
 
-Output: logs success or failure with the error details.
-
----
-
-## 5. Next Steps (out of scope for this step)
-
-- Wire `sendMail()` into workspace invite flow (`POST /api/workspaces/:id/members`)
-- Rate limiting on email sends (Redis-backed throttle)
-- Email templates (welcome, invite, password reset) — plain `text`/`html` strings for now
-- Queue system for async delivery (optional — nodemailer is already async)
+An end-to-end delivery check requires valid SMTP credentials and a recipient
+address. Never commit those credentials to the repository.
