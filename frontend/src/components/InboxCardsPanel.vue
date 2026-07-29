@@ -112,7 +112,7 @@ onUnmounted(() => {
 
 <template>
   <section class="inbox-cards-panel" :class="{ 'inbox-cards-panel--compact': compact }">
-    <div class="inbox-panel-header">
+    <div v-if="!compact" class="inbox-panel-header">
       <div>
         <h2 class="inbox-panel-title">인박스</h2>
         <p class="inbox-panel-subtitle">보드 밖에 보관 중인 내 카드</p>

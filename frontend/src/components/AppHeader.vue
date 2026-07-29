@@ -2,17 +2,18 @@
 import NotificationMenu from './NotificationMenu.vue'
 import ProfileMenu from './ProfileMenu.vue'
 import SearchInput from './SearchInput.vue'
+import {
+  toggleUtilityDrawer,
+  utilityDrawerState,
+} from '../services/utilityDrawer'
 
 withDefaults(
   defineProps<{
     workspaceName?: string
     initialQuery?: string
-    showInbox?: boolean
   }>(),
-  { workspaceName: '', initialQuery: '', showInbox: true },
+  { workspaceName: '', initialQuery: '' },
 )
-
-const emit = defineEmits<{ openInbox: [] }>()
 </script>
 
 <template>
@@ -22,15 +23,22 @@ const emit = defineEmits<{ openInbox: [] }>()
     <div class="app-topbar-main">
       <SearchInput :initial-query="initialQuery" />
       <div class="app-topbar-actions">
-        <RouterLink to="/friends" class="app-topbar-button app-topbar-link">
-          친구
-        </RouterLink>
-        <NotificationMenu />
         <button
-          v-if="showInbox"
           class="app-topbar-button"
           type="button"
-          @click="emit('openInbox')"
+          aria-controls="utility-drawer"
+          :aria-expanded="utilityDrawerState.active === 'friends'"
+          @click="toggleUtilityDrawer('friends')"
+        >
+          친구
+        </button>
+        <NotificationMenu />
+        <button
+          class="app-topbar-button"
+          type="button"
+          aria-controls="utility-drawer"
+          :aria-expanded="utilityDrawerState.active === 'inbox'"
+          @click="toggleUtilityDrawer('inbox')"
         >
           인박스
         </button>

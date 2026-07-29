@@ -167,8 +167,8 @@ environment running the suite must allow loopback port binding.
 4. Open a card to edit its details and dates.
 5. Move a card to the personal inbox and restore it to a board when ready.
 6. Invite a registered or future user by email from the workspace share menu.
-7. Send or accept a friend request, then view accepted friends' connection
-   state in the Friends tab.
+7. Open the Friends sidebar to send or accept a friend request and view
+   accepted friends' connection state.
 8. Open the workspace Chat tab to talk with members and see team online status
    in the sidebar.
 9. Search cards across accessible workspaces or open Calendar for the current
@@ -267,7 +267,7 @@ guessing an identity where the repository does not prove one.
 | Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
 | Personal inbox | API-backed cards and board/inbox round trip | `seankim96` |
 | Calendar and search | Current-workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
-| Friends and presence | Request/accept flow, symmetric friendships, dedicated Friends tab, and online/offline events | `seankim96` |
+| Friends and presence | Request/accept flow, symmetric friendships, toggleable Friends sidebar, and online/offline events | `seankim96` |
 | Realtime foundation | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain | `seankim96` |
 | Workspace realtime and chat | Member-only channels, targeted list reconciliation, team presence, and persistent group chat | `seankim96` |
 | Infrastructure | Docker services, HTTPS/WSS Nginx proxy, migrations | `ynam` / `nyhwbh`, `yeonjunky` / `yeonjunkim` |

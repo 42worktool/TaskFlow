@@ -2,7 +2,6 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
-import InboxDrawer from '../components/InboxDrawer.vue'
 import ShareModal from '../components/ShareModal.vue'
 import { WorkspaceAPI } from '../api/workspace'
 import { authState } from '../services/auth'
@@ -24,7 +23,6 @@ const workspace = ref<Workspace | null>(null)
 const loadError = ref('')
 const onlineUserIds = ref<Set<string>>(new Set())
 const workspaceSyncVersion = ref(0)
-const isBoardRoute = computed(() => route.path.endsWith('/board'))
 const isChatRoute = computed(() => route.path.endsWith('/chat'))
 const currentRole = computed(() =>
   workspace.value
@@ -40,7 +38,6 @@ const canManageMembers = computed(() =>
 )
 
 const showShareModal = ref(false)
-const showInbox = ref(false)
 
 const memberColors = ['#2563EB', '#10B981', '#7C3AED']
 const SUBSCRIPTION_ATTEMPTS = 3
@@ -315,11 +312,7 @@ onUnmounted(() => {
 <template>
   <div v-if="workspace" class="app-shell">
     <!-- Header -->
-    <AppHeader
-      :workspace-name="workspace.name"
-      :show-inbox="!isBoardRoute"
-      @open-inbox="showInbox = true"
-    />
+    <AppHeader :workspace-name="workspace.name" />
 
     <div class="content-area">
       <!-- Sidebar -->
@@ -416,10 +409,9 @@ onUnmounted(() => {
       :workspace="workspace"
       @close="showShareModal = false"
     />
-    <InboxDrawer :open="showInbox" @close="showInbox = false" />
   </div>
   <div v-else class="app-shell">
-    <AppHeader :show-inbox="false" />
+    <AppHeader />
     <main class="workspace-load-state" :role="loadError ? 'alert' : 'status'">
       {{ loadError || '워크스페이스를 불러오는 중…' }}
     </main>

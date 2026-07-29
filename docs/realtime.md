@@ -262,7 +262,7 @@ HTTP snapshot recovery remains the repair path.
 The current friend implementation follows that process-local model. A first
 connection sends `online: true` to current friends, a last disconnect sends
 `online: false`, and intermediate tab changes emit nothing. Events are
-best-effort; opening the Friends page and reconnecting both refresh the
+best-effort; opening the Friends sidebar and reconnecting both refresh the
 authoritative snapshot through `GET /api/friends`.
 
 ## Limits and configuration

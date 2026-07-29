@@ -3,13 +3,18 @@ import { onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
 import CardDetailModal from '../components/CardDetailModal.vue'
-import InboxCardsPanel from '../components/InboxCardsPanel.vue'
 import TaskList from '../components/TaskList.vue'
 import { ListAPI } from '../api/list'
 import { CardAPI } from '../api/card'
 import { InboxAPI } from '../api/inbox'
 import { realtime } from '../services/realtime'
 import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
+import {
+  clearInboxDestinations,
+  notifyInboxChanged,
+  setInboxDestinations,
+  utilityDrawerState,
+} from '../services/utilityDrawer'
 import type { Card, DraggableChange, ListWithCards } from '../types'
 import { neighborIds } from '../utils/ordering'
 
@@ -31,7 +36,6 @@ const props = withDefaults(
 const lists = ref<ListWithCards[]>([])
 const loading = ref(false)
 const error = ref('')
-const inboxRefreshKey = ref(0)
 const selectedCardId = ref<string | null>(null)
 const cardDetailRefreshToken = ref(0)
 let listLoadGeneration = 0
@@ -198,6 +202,24 @@ watch(
 
 watch(
   [
+    () => props.canEditBoard,
+    () => lists.value.map((list) => ({ id: list.id, name: list.name })),
+  ],
+  ([canEditBoard, destinations]) => {
+    setInboxDestinations(canEditBoard ? destinations : [])
+  },
+  { immediate: true },
+)
+
+watch(
+  () => utilityDrawerState.boardRefreshToken,
+  (next, previous) => {
+    if (next !== previous) queueFullRefresh()
+  },
+)
+
+watch(
+  [
     () => route.params.workspaceId,
     () => route.query.card,
     () => props.canViewCardDetails,
@@ -296,7 +318,7 @@ async function onDeleteCard(cardId: string) {
   try {
     await InboxAPI.remove(cardId)
     queueFullRefresh()
-    inboxRefreshKey.value += 1
+    notifyInboxChanged()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '카드를 삭제하지 못했습니다.'
   }
@@ -311,15 +333,11 @@ async function onMoveCardToInbox(cardId: string) {
   try {
     await InboxAPI.moveToInbox(cardId)
     queueFullRefresh()
-    inboxRefreshKey.value += 1
+    notifyInboxChanged()
   } catch (caught) {
     error.value =
       caught instanceof Error ? caught.message : '카드를 인박스로 옮기지 못했습니다.'
   }
-}
-
-function onInboxCardMoved() {
-  queueFullRefresh()
 }
 
 function openCard(card: Card) {
@@ -363,7 +381,7 @@ async function onDeleteList(listId: string) {
   try {
     await InboxAPI.removeList(listId)
     queueFullRefresh()
-    inboxRefreshKey.value += 1
+    notifyInboxChanged()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '리스트를 삭제하지 못했습니다.'
   }
@@ -429,6 +447,7 @@ const removeWorkspaceChangeListener = realtime.on(
 
 onUnmounted(() => {
   listLoadGeneration += 1
+  clearInboxDestinations()
   removeWorkspaceChangeListener()
   if (refreshTimer) clearTimeout(refreshTimer)
 })
@@ -491,11 +510,6 @@ onUnmounted(() => {
         </div>
       </template>
     </draggable>
-    <InboxCardsPanel
-      :destination-lists="canEditBoard ? lists : []"
-      :refresh-token="inboxRefreshKey"
-      @moved="onInboxCardMoved"
-    />
     <CardDetailModal
       v-if="selectedCardId"
       :card-id="selectedCardId"
