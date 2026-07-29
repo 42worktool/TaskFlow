@@ -2,7 +2,6 @@
   background: #fff;
   border-radius: 8px;
   padding: 12px;
-  cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -19,9 +18,17 @@
 }
 
 .card-title {
+  flex: 1;
+  min-width: 0;
   font-size: 14px;
   color: #111827;
   font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-title:hover {
+  color: #2563eb;
 }
 
 .card-delete-btn {
@@ -67,12 +74,4 @@
   font-size: 12px;
   color: #6b7280;
   margin-left: auto;
-}
-
-.card-assignee {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #d1d5db;
-  flex-shrink: 0;
 }

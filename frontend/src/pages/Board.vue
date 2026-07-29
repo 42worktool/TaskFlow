@@ -2,12 +2,13 @@
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import draggable from 'vuedraggable'
+import CardDetailModal from '../components/CardDetailModal.vue'
 import InboxCardsPanel from '../components/InboxCardsPanel.vue'
 import TaskList from '../components/TaskList.vue'
 import { ListAPI } from '../api/list'
 import { CardAPI } from '../api/card'
 import { InboxAPI } from '../api/inbox'
-import type { DraggableChange, ListWithCards } from '../types'
+import type { Card, DraggableChange, ListWithCards } from '../types'
 import { neighborIds } from '../utils/ordering'
 
 const route = useRoute()
@@ -16,6 +17,7 @@ const lists = ref<ListWithCards[]>([])
 const loading = ref(false)
 const error = ref('')
 const inboxRefreshKey = ref(0)
+const selectedCardId = ref<string | null>(null)
 let listLoadGeneration = 0
 
 const showAddList = ref(false)
@@ -40,7 +42,14 @@ async function fetchLists() {
   }
 }
 
-watch(() => route.params.workspaceId, fetchLists, { immediate: true })
+watch(
+  () => route.params.workspaceId,
+  () => {
+    selectedCardId.value = null
+    void fetchLists()
+  },
+  { immediate: true },
+)
 
 async function submitAddList() {
   if (isSubmittingList) return
@@ -137,6 +146,13 @@ function onInboxCardMoved() {
   void fetchLists()
 }
 
+function onCardSaved(saved: Card) {
+  lists.value = lists.value.map((list) => ({
+    ...list,
+    cards: list.cards.map((card) => (card.id === saved.id ? saved : card)),
+  }))
+}
+
 async function onRenameList(listId: string, name: string) {
   try {
     await ListAPI.rename(listId, name)
@@ -173,6 +189,7 @@ async function onDeleteList(listId: string) {
       <template #item="{ element: col }">
         <TaskList
           :list="col"
+          @open-card="selectedCardId = $event.id"
           @card-change="onCardChange"
           @add-card="onAddCard"
           @delete-card="onDeleteCard"
@@ -205,6 +222,12 @@ async function onDeleteList(listId: string) {
       :destination-lists="lists"
       :refresh-token="inboxRefreshKey"
       @moved="onInboxCardMoved"
+    />
+    <CardDetailModal
+      v-if="selectedCardId"
+      :card-id="selectedCardId"
+      @saved="onCardSaved"
+      @close="selectedCardId = null"
     />
   </div>
 </template>

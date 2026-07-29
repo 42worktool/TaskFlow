@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import CardDetailModal from '../components/CardDetailModal.vue'
 import { ListAPI } from '../api/list'
 import type { Card } from '../types'
 import { cardOccursOnDate } from '../utils/calendar'
@@ -12,6 +13,7 @@ const month = ref(now.getMonth() + 1)
 const cards = ref<Card[]>([])
 const loading = ref(false)
 const error = ref('')
+const selectedCardId = ref<string | null>(null)
 
 const todayDate = now.getDate()
 const todayMonth = now.getMonth() + 1
@@ -35,6 +37,12 @@ function nextMonth() {
 
 function isToday(date: number | null): boolean {
   return date === todayDate && month.value === todayMonth && year.value === todayYear
+}
+
+function updateSavedCard(saved: Card): void {
+  cards.value = cards.value.map((card) =>
+    card.id === saved.id ? saved : card,
+  )
 }
 
 interface CalendarCell {
@@ -79,6 +87,7 @@ watch(
     })
 
     cards.value = []
+    selectedCardId.value = null
     error.value = ''
     if (!workspaceId) return
 
@@ -144,15 +153,23 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
         >
           {{ cell.date }}
         </span>
-        <div
+        <button
           v-for="c in cell.cards"
           :key="c.id"
+          type="button"
           class="cal-card"
+          @click="selectedCardId = c.id"
         >
           {{ c.title }}
-        </div>
+        </button>
       </div>
     </div>
+    <CardDetailModal
+      v-if="selectedCardId"
+      :card-id="selectedCardId"
+      @saved="updateSavedCard"
+      @close="selectedCardId = null"
+    />
   </div>
 </template>
 

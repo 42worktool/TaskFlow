@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import draggable from 'vuedraggable'
 import TaskCard from './TaskCard.vue'
-import type { DraggableChange, ListWithCards } from '../types'
+import type { Card, DraggableChange, ListWithCards } from '../types'
 
 const props = defineProps<{
   list: ListWithCards
@@ -10,6 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'card-change': [listId: string, event: DraggableChange]
+  'open-card': [card: Card]
   'add-card': [listId: string, title: string]
   'delete-card': [cardId: string]
   'move-card-to-inbox': [cardId: string]
@@ -100,6 +101,7 @@ const vFocus = {
         <TaskCard
           :card="card"
           show-inbox-action
+          @open="emit('open-card', card)"
           @delete="emit('delete-card', card.id)"
           @move-to-inbox="emit('move-card-to-inbox', card.id)"
         />

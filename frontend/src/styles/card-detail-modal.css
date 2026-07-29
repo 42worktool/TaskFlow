@@ -1,0 +1,146 @@
+.card-detail-overlay {
+  z-index: 160;
+  padding: 20px;
+  background: rgba(17, 24, 39, 0.5);
+}
+
+.card-detail-modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  box-shadow: 0 16px 48px rgba(17, 24, 39, 0.22);
+}
+
+.card-detail-header {
+  padding: 20px 24px 0;
+}
+
+.card-detail-body {
+  padding: 20px 24px 24px;
+}
+
+.card-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.card-detail-field input,
+.card-detail-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-weight: 400;
+  outline: none;
+}
+
+.card-detail-field textarea {
+  resize: vertical;
+}
+
+.card-detail-field input:focus,
+.card-detail-field textarea:focus {
+  border-color: #2563eb;
+}
+
+.card-detail-dates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.card-detail-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f9fafb;
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.card-detail-meta-label {
+  display: inline-block;
+  min-width: 48px;
+  margin-right: 8px;
+  color: #111827;
+  font-weight: 600;
+}
+
+.card-detail-labels {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.card-detail-label {
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 12px;
+}
+
+.card-detail-state {
+  margin: 0;
+  padding: 32px 24px;
+  color: #6b7280;
+  text-align: center;
+}
+
+.card-detail-error {
+  margin: 0 0 14px;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.card-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.card-detail-btn {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.card-detail-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.card-detail-header .close-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.card-detail-btn--secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.card-detail-btn--primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+@media (max-width: 560px) {
+  .card-detail-dates {
+    grid-template-columns: 1fr;
+  }
+}
