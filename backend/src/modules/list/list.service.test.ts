@@ -39,7 +39,7 @@ function stubMethod(
   })
 }
 
-test('deleteList transfers cards to the deleting member inbox', async (t) => {
+test('deleteList detaches relations and transfers cards to the member inbox', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { deleteList }] = await Promise.all([
     import('../../db'),
@@ -53,16 +53,46 @@ test('deleteList transfers cards to the deleting member inbox', async (t) => {
   stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
 
   let cardUpdate: unknown
+  let memberUpdate: any
+  let labelUpdate: any
+  const operationOrder: string[] = []
   stubMethod(t, prisma.card, 'updateMany', (args) => {
+    operationOrder.push('cards')
     cardUpdate = args
     return Promise.resolve({ count: 2 })
   })
-  stubMethod(t, prisma.list, 'update', async () => ({ id: LIST_ID }))
-  stubMethod(t, prisma, '$transaction', async (operations: Promise<unknown>[]) =>
-    Promise.all(operations))
+  stubMethod(t, prisma.cardMember, 'updateMany', async (args) => {
+    operationOrder.push('members')
+    memberUpdate = args
+    return { count: 2 }
+  })
+  stubMethod(t, prisma.cardLabel, 'updateMany', async (args) => {
+    operationOrder.push('labels')
+    labelUpdate = args
+    return { count: 2 }
+  })
+  stubMethod(t, prisma.list, 'update', async () => {
+    operationOrder.push('list')
+    return { id: LIST_ID }
+  })
+  stubMethod(t, prisma, '$queryRaw', async () => {
+    operationOrder.push('lock')
+    return [{ id: LIST_ID }]
+  })
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
 
   await deleteList({ userId: USER_ID, listId: LIST_ID })
 
+  assert.deepEqual(operationOrder, ['list', 'lock', 'members', 'labels', 'cards'])
+  for (const update of [memberUpdate, labelUpdate]) {
+    assert.deepEqual(update.where, {
+      deleted_at: null,
+      card: { list_id: LIST_ID, deleted_at: null },
+    })
+    assert.equal(update.data.updated_by, USER_ID)
+    assert.equal(update.data.deleted_by, USER_ID)
+    assert.ok(update.data.deleted_at instanceof Date)
+  }
   assert.deepEqual(cardUpdate, {
     where: { list_id: LIST_ID, deleted_at: null },
     data: { list_id: null, user_id: USER_ID, updated_by: USER_ID },

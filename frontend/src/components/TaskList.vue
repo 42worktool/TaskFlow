@@ -12,6 +12,7 @@ const emit = defineEmits<{
   'card-change': [listId: string, event: DraggableChange]
   'add-card': [listId: string, title: string]
   'delete-card': [cardId: string]
+  'move-card-to-inbox': [cardId: string]
   'rename-list': [listId: string, name: string]
   'delete-list': [listId: string]
 }>()
@@ -96,7 +97,12 @@ const vFocus = {
       @change="(e: DraggableChange) => emit('card-change', list.id, e)"
     >
       <template #item="{ element: card }">
-        <TaskCard :card="card" @delete="emit('delete-card', card.id)" />
+        <TaskCard
+          :card="card"
+          show-inbox-action
+          @delete="emit('delete-card', card.id)"
+          @move-to-inbox="emit('move-card-to-inbox', card.id)"
+        />
       </template>
     </draggable>
 

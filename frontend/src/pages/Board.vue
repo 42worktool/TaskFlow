@@ -6,6 +6,7 @@ import InboxCardsPanel from '../components/InboxCardsPanel.vue'
 import TaskList from '../components/TaskList.vue'
 import { ListAPI } from '../api/list'
 import { CardAPI } from '../api/card'
+import { InboxAPI } from '../api/inbox'
 import type { DraggableChange, ListWithCards } from '../types'
 import { neighborIds } from '../utils/ordering'
 
@@ -15,21 +16,27 @@ const lists = ref<ListWithCards[]>([])
 const loading = ref(false)
 const error = ref('')
 const inboxRefreshKey = ref(0)
+let listLoadGeneration = 0
 
 const showAddList = ref(false)
 const newListName = ref('')
 let isSubmittingList = false
 
 async function fetchLists() {
-  const workspaceId = route.params.workspaceId as string
+  const generation = ++listLoadGeneration
+  const workspaceId = String(route.params.workspaceId ?? '')
+  lists.value = []
   loading.value = true
   error.value = ''
   try {
-    lists.value = await ListAPI.listByWorkspace(workspaceId)
+    const loaded = await ListAPI.listByWorkspace(workspaceId)
+    if (generation === listLoadGeneration) lists.value = loaded
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '보드를 불러오지 못했습니다.'
+    if (generation === listLoadGeneration) {
+      error.value = e instanceof Error ? e.message : '보드를 불러오지 못했습니다.'
+    }
   } finally {
-    loading.value = false
+    if (generation === listLoadGeneration) loading.value = false
   }
 }
 
@@ -43,8 +50,8 @@ async function submitAddList() {
   isSubmittingList = true
   const workspaceId = route.params.workspaceId as string
   try {
-    const created = await ListAPI.create(workspaceId, name)
-    lists.value.push({ ...created, cards: [] })
+    await ListAPI.create(workspaceId, name)
+    await fetchLists()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '리스트를 추가하지 못했습니다.'
   } finally {
@@ -65,7 +72,7 @@ function onListChange(event: DraggableChange) {
   ListAPI.reorder(element.id, {
     before_list_id: beforeId,
     after_list_id: afterId,
-  }).catch(fetchLists)
+  }).then(fetchLists, fetchLists)
 }
 
 function onCardChange(listId: string, event: DraggableChange) {
@@ -79,57 +86,72 @@ function onCardChange(listId: string, event: DraggableChange) {
       list_id: listId,
       before_card_id: beforeId,
       after_card_id: afterId,
-    }).catch(fetchLists)
+    }).then(fetchLists, fetchLists)
   } else if (event.moved) {
     const { element, newIndex } = event.moved
     const { beforeId, afterId } = neighborIds(list.cards, newIndex)
     CardAPI.reorder(element.id, {
       before_card_id: beforeId,
       after_card_id: afterId,
-    }).catch(fetchLists)
+    }).then(fetchLists, fetchLists)
   }
 }
 
 async function onAddCard(listId: string, title: string) {
-  const list = lists.value.find((l) => l.id === listId)
-  if (!list) return
   try {
-    const created = await CardAPI.create(listId, { title })
-    list.cards.push(created)
+    await CardAPI.create(listId, { title })
+    await fetchLists()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '카드를 추가하지 못했습니다.'
   }
 }
 
 async function onDeleteCard(cardId: string) {
-  const list = lists.value.find((l) => l.cards.some((c) => c.id === cardId))
-  if (!list) return
   try {
-    await CardAPI.remove(cardId)
-    list.cards = list.cards.filter((c) => c.id !== cardId)
+    await InboxAPI.remove(cardId)
+    const boardRefresh = fetchLists()
+    inboxRefreshKey.value += 1
+    await boardRefresh
   } catch (e) {
     error.value = e instanceof Error ? e.message : '카드를 삭제하지 못했습니다.'
   }
 }
 
-async function onRenameList(listId: string, name: string) {
-  const list = lists.value.find((l) => l.id === listId)
+async function onMoveCardToInbox(cardId: string) {
+  const list = lists.value.find((item) =>
+    item.cards.some((card) => card.id === cardId),
+  )
   if (!list) return
-  const previous = list.name
-  list.name = name
+  try {
+    await InboxAPI.moveToInbox(cardId)
+    const boardRefresh = fetchLists()
+    inboxRefreshKey.value += 1
+    await boardRefresh
+  } catch (caught) {
+    error.value =
+      caught instanceof Error ? caught.message : '카드를 인박스로 옮기지 못했습니다.'
+  }
+}
+
+function onInboxCardMoved() {
+  void fetchLists()
+}
+
+async function onRenameList(listId: string, name: string) {
   try {
     await ListAPI.rename(listId, name)
+    await fetchLists()
   } catch (e) {
-    list.name = previous
     error.value = e instanceof Error ? e.message : '리스트 이름을 변경하지 못했습니다.'
   }
 }
 
 async function onDeleteList(listId: string) {
   try {
-    await ListAPI.remove(listId)
-    lists.value = lists.value.filter((l) => l.id !== listId)
+    await InboxAPI.removeList(listId)
+    const boardRefresh = fetchLists()
     inboxRefreshKey.value += 1
+    await boardRefresh
   } catch (e) {
     error.value = e instanceof Error ? e.message : '리스트를 삭제하지 못했습니다.'
   }
@@ -154,6 +176,7 @@ async function onDeleteList(listId: string) {
           @card-change="onCardChange"
           @add-card="onAddCard"
           @delete-card="onDeleteCard"
+          @move-card-to-inbox="onMoveCardToInbox"
           @rename-list="onRenameList"
           @delete-list="onDeleteList"
         />
@@ -178,7 +201,11 @@ async function onDeleteList(listId: string) {
         </div>
       </template>
     </draggable>
-    <InboxCardsPanel :key="inboxRefreshKey" />
+    <InboxCardsPanel
+      :destination-lists="lists"
+      :refresh-token="inboxRefreshKey"
+      @moved="onInboxCardMoved"
+    />
   </div>
 </template>
 

@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import type { Card } from '../types'
 
-defineProps<{
-  card: Card
-}>()
+withDefaults(
+  defineProps<{
+    card: Card
+    showInboxAction?: boolean
+  }>(),
+  {
+    showInboxAction: false,
+  },
+)
 
 const emit = defineEmits<{
   delete: [cardId: string]
+  'move-to-inbox': [cardId: string]
 }>()
 
 function formatDate(iso: string | null) {
@@ -30,6 +37,14 @@ function formatDate(iso: string | null) {
       </button>
     </div>
     <div class="card-meta">
+      <button
+        v-if="showInboxAction"
+        class="card-inbox-btn"
+        type="button"
+        @click.stop="emit('move-to-inbox', card.id)"
+      >
+        인박스
+      </button>
       <span v-if="card.deadline" class="card-date">{{ formatDate(card.deadline) }}</span>
       <div class="card-assignee" />
     </div>

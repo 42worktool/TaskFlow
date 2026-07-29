@@ -92,20 +92,44 @@ export async function deleteList(input: { userId: string; listId: string }): Pro
   if (!list) throw new NotFoundError()
   await requireRole(list.workspace_id, input.userId, 'MEMBER')
 
-  await prisma.$transaction([
-    prisma.card.updateMany({
+  const detachedRelation = softDeletedBy(input.userId)
+  await prisma.$transaction(async (tx) => {
+    // Mark the list first so a concurrent inbox restore cannot attach a card
+    // after the card transfer has already scanned this list.
+    await tx.list.update({
+      where: { id: input.listId },
+      data: softDeletedBy(input.userId),
+    })
+    await tx.$queryRaw`
+      SELECT "id"
+      FROM "Cards"
+      WHERE "list_id" = ${input.listId}::uuid
+        AND "deleted_at" IS NULL
+      FOR UPDATE
+    `
+    await tx.cardMember.updateMany({
+      where: {
+        deleted_at: null,
+        card: { list_id: input.listId, deleted_at: null },
+      },
+      data: detachedRelation,
+    })
+    await tx.cardLabel.updateMany({
+      where: {
+        deleted_at: null,
+        card: { list_id: input.listId, deleted_at: null },
+      },
+      data: detachedRelation,
+    })
+    await tx.card.updateMany({
       where: { list_id: input.listId, deleted_at: null },
       data: {
         list_id: null,
         user_id: input.userId,
         ...updatedBy(input.userId),
       },
-    }),
-    prisma.list.update({
-      where: { id: input.listId },
-      data: softDeletedBy(input.userId),
-    }),
-  ])
+    })
+  })
 }
 
 /**
