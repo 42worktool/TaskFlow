@@ -48,6 +48,17 @@
   overflow: hidden;
 }
 
+.cal-status,
+.cal-empty {
+  margin: 0 0 12px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.cal-status--error {
+  color: #b91c1c;
+}
+
 .weekday-header {
   padding: 8px 10px;
   font-size: 13px;
@@ -92,6 +103,8 @@
 }
 
 .cal-card {
+  background: #eff6ff;
+  color: #1d4ed8;
   font-size: 12px;
   padding: 2px 6px;
   border-radius: 4px;
