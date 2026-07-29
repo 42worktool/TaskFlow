@@ -73,6 +73,10 @@ class FakeWebSocket {
     this.emit('close', { code, reason: 'server closed' })
   }
 
+  failTransport(): void {
+    this.emit('error', {})
+  }
+
   private emit(type: string, event: Record<string, unknown>): void {
     for (const listener of this.listeners.get(type) ?? []) listener(event)
   }
@@ -334,6 +338,47 @@ describe('RealtimeClient connection lifecycle', () => {
     },
   )
 
+  it('abandons a stalled handshake and reconnects without rejecting connect()', async () => {
+    const { client, sockets } = createHarness(undefined, {
+      handshakeTimeoutMs: 50,
+    })
+    const connected = client.connect()
+    await flushPromises()
+    expect(sockets).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(49)
+    expect(sockets).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(21)
+    await flushPromises()
+
+    expect(sockets[0].closeCalls[0]).toEqual({
+      code: 4000,
+      reason: 'Realtime handshake timed out',
+    })
+    expect(sockets).toHaveLength(2)
+    sockets[1].open()
+    sockets[1].receive('system.ready', ready('connection-after-timeout'))
+
+    await expect(connected).resolves.toBeUndefined()
+    expect(client.state).toBe('connected')
+    client.disconnect()
+  })
+
+  it('reconnects immediately when the transport emits an error', async () => {
+    const { client, sockets } = createHarness()
+    const connected = client.connect()
+    await flushPromises()
+    sockets[0].failTransport()
+    await vi.advanceTimersByTimeAsync(20)
+    await flushPromises()
+
+    expect(sockets).toHaveLength(2)
+    sockets[1].open()
+    sockets[1].receive('system.ready', ready('connection-after-error'))
+    await expect(connected).resolves.toBeUndefined()
+    client.disconnect()
+  })
+
   it('rejects oversized and backpressured outbound messages without silent loss', async () => {
     const { client, sockets } = createHarness(undefined, {
       maxOutboundMessageBytes: 256,
@@ -373,6 +418,20 @@ describe('RealtimeClient connection lifecycle', () => {
         code: 'INVALID_EVENT',
       }),
     )
+    expect(() =>
+      client.send('auth.refresh' as 'workspace.subscribe', {
+        workspaceId: 'workspace-1',
+      }),
+    ).toThrowError(
+      expect.objectContaining<Partial<RealtimeSendError>>({
+        code: 'INVALID_EVENT',
+      }),
+    )
+    await expect(
+      client.request('system.ready' as 'workspace.subscribe', {
+        workspaceId: 'workspace-1',
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_EVENT' })
     client.disconnect()
   })
 
