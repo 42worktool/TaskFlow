@@ -145,8 +145,12 @@ export async function listWorkspaces(input: { userId: string }) {
   ])
 
   return {
-    my: my.map(toWorkspaceDto),
-    public: public_.map(toWorkspaceDto),
+    my: my.map((workspace) =>
+      toWorkspaceDto(workspace, { includeMemberEmail: true }),
+    ),
+    public: public_.map((workspace) =>
+      toWorkspaceDto(workspace, { includeMemberEmail: false }),
+    ),
   }
 }
 
@@ -165,7 +169,7 @@ export async function getWorkspace(input: { userId: string; workspaceId: string 
   const isMember = ws.members.some((member) => member.user_id === input.userId)
   if (!isMember && !ws.is_public) throw new ForbiddenError()
 
-  return toWorkspaceDto(ws)
+  return toWorkspaceDto(ws, { includeMemberEmail: isMember })
 }
 
 /**
@@ -195,7 +199,7 @@ export async function createWorkspace(input: {
     return created
   })
 
-  return toWorkspaceDto(ws)
+  return toWorkspaceDto(ws, { includeMemberEmail: true })
 }
 
 /**
@@ -222,7 +226,7 @@ export async function updateWorkspace(
       include: workspaceInclude,
     })
 
-    return toWorkspaceDto(updated)
+    return toWorkspaceDto(updated, { includeMemberEmail: true })
   })
 }
 
@@ -286,7 +290,7 @@ export async function changeMemberRole(
       include: workspaceInclude,
     })
 
-    return toWorkspaceDto(updated!)
+    return toWorkspaceDto(updated!, { includeMemberEmail: true })
   })
 }
 
@@ -430,7 +434,7 @@ export async function acceptInvite(input: { userId: string; token: string }) {
   })
 
   if (existing?.deleted_at === null) {
-    return toWorkspaceDto(ws)
+    return toWorkspaceDto(ws, { includeMemberEmail: true })
   }
 
   if (existing) {
@@ -470,5 +474,5 @@ export async function acceptInvite(input: { userId: string; token: string }) {
     },
   })
 
-  return toWorkspaceDto(updated!)
+  return toWorkspaceDto(updated!, { includeMemberEmail: true })
 }
