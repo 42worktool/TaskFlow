@@ -115,7 +115,7 @@ onUnmounted(() => {
     <div class="inbox-panel-header">
       <div>
         <h2 class="inbox-panel-title">인박스</h2>
-        <p class="inbox-panel-subtitle">보드로 옮길 카드를 모아두는 공간</p>
+        <p class="inbox-panel-subtitle">보드 밖에 보관 중인 내 카드</p>
       </div>
     </div>
 

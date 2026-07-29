@@ -11,8 +11,6 @@ export const CardAPI = {
       json: data,
     }),
 
-  remove: (cardId: string) => apiRequest<void>(`/api/cards/${cardId}`, { method: 'DELETE' }),
-
   update: (
     cardId: string,
     data: { title?: string; description?: string | null },

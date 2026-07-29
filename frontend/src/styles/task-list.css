@@ -116,8 +116,13 @@
   cursor: pointer;
 }
 
-.add-card-submit-btn:hover {
+.add-card-submit-btn:not(:disabled):hover {
   background: #1d4ed8;
+}
+
+.add-card-submit-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .add-card-btn {

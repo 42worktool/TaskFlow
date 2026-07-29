@@ -9,8 +9,8 @@ import LegalDocumentLayout from '../layouts/LegalDocumentLayout.vue'
 
       <h2>2. 계정</h2>
       <p>
-        사용자는 본인이 이용할 권한이 있는 Google 계정으로 로그인해야 합니다. 계정과 로그인
-        세션을 안전하게 관리할 책임은 사용자에게 있습니다.
+        사용자는 본인의 이메일 또는 이용 권한이 있는 Google 계정으로 로그인해야 합니다.
+        계정과 로그인 세션을 안전하게 관리할 책임은 사용자에게 있습니다.
       </p>
 
       <h2>3. 금지 행위</h2>

@@ -94,16 +94,6 @@ watch(
               <span class="nav-icon">▦</span> 달력
             </RouterLink>
           </li>
-          <li>
-            <span class="nav-item nav-item--disabled">
-              <span class="nav-icon">⊟</span> 대시보드
-            </span>
-          </li>
-          <li>
-            <span class="nav-item nav-item--disabled">
-              <span class="nav-icon">≡</span> 타임라인
-            </span>
-          </li>
         </ul>
         <div class="sidebar-team">
           <p class="team-label">팀원</p>
@@ -149,7 +139,7 @@ watch(
     <InboxDrawer :open="showInbox" @close="showInbox = false" />
   </div>
   <div v-else class="app-shell">
-    <AppHeader />
+    <AppHeader :show-inbox="false" />
     <main class="workspace-load-state" :role="loadError ? 'alert' : 'status'">
       {{ loadError || '워크스페이스를 불러오는 중…' }}
     </main>

@@ -5,13 +5,14 @@ import LegalDocumentLayout from '../layouts/LegalDocumentLayout.vue'
 <template>
   <LegalDocumentLayout title="개인정보처리방침">
       <p>
-        TaskFlow는 학습 및 시연을 위한 프로젝트입니다. 서비스는 Google 로그인을 제공하기 위해
-        필요한 최소한의 개인정보만 처리합니다.
+        TaskFlow는 학습 및 시연을 위한 프로젝트입니다. 이메일 로그인과 Google 로그인을
+        제공하기 위해 필요한 최소한의 개인정보만 처리합니다.
       </p>
 
       <h2>1. 수집하는 정보</h2>
       <ul>
-        <li>Google 계정 식별자(sub), 이메일 주소, 표시 이름, 프로필 이미지 URL</li>
+        <li>이메일 로그인: 이메일 주소, 표시 이름, 비밀번호 해시</li>
+        <li>Google 로그인: 계정 식별자(sub), 이메일 주소, 표시 이름, 프로필 이미지 URL</li>
         <li>로그인 세션 식별자와 인증 토큰의 해시값</li>
       </ul>
 
@@ -33,7 +34,7 @@ import LegalDocumentLayout from '../layouts/LegalDocumentLayout.vue'
       <h2>5. 이용자의 권리</h2>
       <p>
         로그인 후 계정 설정에서 표시 이름을 수정하거나 계정을 삭제할 수 있습니다. 계정 삭제 시
-        연결된 OAuth 계정 정보도 함께 삭제됩니다.
+        저장된 로그인 정보도 함께 삭제됩니다.
       </p>
 
       <h2>6. 변경</h2>

@@ -48,8 +48,6 @@ export interface Card {
   deadline: ISODateString | null
   sequence: number
   created_at: ISODateString
-  label?: string
-  label_color?: string
 }
 
 export interface CardDetailMember {

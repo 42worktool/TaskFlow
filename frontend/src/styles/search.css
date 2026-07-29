@@ -120,16 +120,6 @@
   font-size: 15px;
 }
 
-.label-chip {
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: #eff6ff;
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
 .empty-state,
 .section-empty {
   padding: 18px;
