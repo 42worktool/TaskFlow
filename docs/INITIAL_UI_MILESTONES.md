@@ -110,8 +110,10 @@ Goal: workspace administration is usable enough for team workflows.
 
 - Add workspace detail/member panel using `WorkspaceDetailResponse`.
 - Invite member by email using `InviteMemberRequest`.
-- Change member role using `UpdateMemberRoleRequest`.
-- Prevent obvious last-OWNER removal/demotion in the UI.
+- Let OWNER and ADMIN change eligible non-owner roles using
+  `UpdateMemberRoleRequest`, with per-member loading and error feedback.
+- Keep OWNER membership read-only in this dialog; ownership transfer is a
+  separate workflow.
 - Add label list/create/delete and attach/detach labels on cards.
 
 Verify:

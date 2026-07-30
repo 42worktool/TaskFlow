@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test, { type TestContext } from 'node:test'
 import jwt from 'jsonwebtoken'
+import type { Role } from '@prisma/client'
 
 const USER_ID = '00000000-0000-4000-8000-000000000001'
 const WORKSPACE_ID = '00000000-0000-4000-8000-000000000002'
@@ -74,6 +75,38 @@ function workspace() {
   }
 }
 
+function workspaceForRoleChange(callerRole: Role, targetRole: Role) {
+  const base = workspace()
+  const template = base.members[0]!
+  return {
+    ...base,
+    members: [
+      {
+        ...template,
+        user_id: USER_ID,
+        role: callerRole,
+        user: {
+          ...template.user,
+          id: USER_ID,
+          name: 'Manager',
+          email: 'manager@example.com',
+        },
+      },
+      {
+        ...template,
+        user_id: OWNER_ID,
+        role: targetRole,
+        user: {
+          ...template.user,
+          id: OWNER_ID,
+          name: 'Target',
+          email: 'target@example.com',
+        },
+      },
+    ],
+  }
+}
+
 test('public workspace reads hide member email addresses', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { getWorkspace, listWorkspaces }] = await Promise.all([
@@ -132,6 +165,134 @@ test('public workspace reads hide member email addresses', async (t) => {
       'owner@example.com',
     )
   })
+})
+
+test('workspace member role changes preserve the ownership boundary', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { changeMemberRole }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./workspace.service'),
+  ])
+
+  for (const scenario of [
+    {
+      name: 'OWNER changes an eligible member to ADMIN',
+      callerRole: 'OWNER',
+      targetRole: 'MEMBER',
+      newRole: 'ADMIN',
+    },
+    {
+      name: 'ADMIN changes an eligible member to VIEWER',
+      callerRole: 'ADMIN',
+      targetRole: 'MEMBER',
+      newRole: 'VIEWER',
+    },
+  ] as const) {
+    await t.test(scenario.name, async (t) => {
+      const before = workspaceForRoleChange(
+        scenario.callerRole,
+        scenario.targetRole,
+      )
+      const after = workspaceForRoleChange(
+        scenario.callerRole,
+        scenario.newRole,
+      )
+      let readCount = 0
+      let updateArgs: unknown
+      const publications: unknown[][] = []
+
+      stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+      stubMethod(t, prisma.workspace, 'findFirst', async () => {
+        readCount += 1
+        return readCount === 1 ? before : after
+      })
+      stubMethod(t, prisma.workspaceMember, 'update', async (args) => {
+        updateArgs = args
+        return {}
+      })
+      stubMethod(t, realtime, 'publish', (...args) => {
+        publications.push(args)
+      })
+
+      const updated = await changeMemberRole({
+        userId: USER_ID,
+        workspaceId: WORKSPACE_ID,
+        targetUserId: OWNER_ID,
+        role: scenario.newRole,
+      })
+
+      assert.deepEqual(updateArgs, {
+        where: {
+          workspace_id_user_id: {
+            workspace_id: WORKSPACE_ID,
+            user_id: OWNER_ID,
+          },
+        },
+        data: {
+          role: scenario.newRole,
+          updated_by: USER_ID,
+        },
+      })
+      assert.equal(
+        updated.members.find((member) => member.user_id === OWNER_ID)?.role,
+        scenario.newRole,
+      )
+      assert.equal(publications.length, 1)
+    })
+  }
+
+  for (const scenario of [
+    {
+      name: 'ADMIN cannot change an OWNER',
+      callerRole: 'ADMIN',
+      targetRole: 'OWNER',
+      newRole: 'MEMBER',
+    },
+    {
+      name: 'OWNER membership cannot be demoted through member management',
+      callerRole: 'OWNER',
+      targetRole: 'OWNER',
+      newRole: 'ADMIN',
+    },
+    {
+      name: 'ADMIN cannot assign OWNER through a direct service call',
+      callerRole: 'ADMIN',
+      targetRole: 'MEMBER',
+      newRole: 'OWNER',
+    },
+  ] as const) {
+    await t.test(scenario.name, async (t) => {
+      const current = workspaceForRoleChange(
+        scenario.callerRole,
+        scenario.targetRole,
+      )
+      let updateCount = 0
+
+      stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+      stubMethod(t, prisma.workspace, 'findFirst', async () => current)
+      stubMethod(t, prisma.workspaceMember, 'update', async () => {
+        updateCount += 1
+        return {}
+      })
+
+      await assert.rejects(
+        () =>
+          changeMemberRole({
+            userId: USER_ID,
+            workspaceId: WORKSPACE_ID,
+            targetUserId: OWNER_ID,
+            role: scenario.newRole,
+          }),
+        (error: unknown) =>
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'FORBIDDEN',
+      )
+      assert.equal(updateCount, 0)
+    })
+  }
 })
 
 test('workspace invitation acceptance is bound to the invited email', async (t) => {

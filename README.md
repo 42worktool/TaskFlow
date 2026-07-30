@@ -206,7 +206,11 @@ Workspace permissions are deliberately small:
 | `ADMIN` | Yes | Yes | Yes | Yes | Yes | No |
 | `OWNER` | Yes | Yes | Yes | Yes | Yes | Yes |
 
-The service prevents removing or demoting the final owner.
+OWNER and ADMIN can assign `ADMIN`, `MEMBER`, or `VIEWER` to eligible
+non-owner members from the team-management dialog. The OWNER role itself is
+not editable there; ownership transfer remains a separate workflow, and an
+ADMIN cannot change an OWNER. The service also prevents removing the final
+owner.
 
 ## Technical stack
 

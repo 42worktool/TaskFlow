@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { Workspace } from '../types'
-import { hasWorkspaceRole, workspaceRoleFor } from './workspacePermissions'
+import {
+  canChangeWorkspaceMemberRole,
+  hasWorkspaceRole,
+  workspaceRoleFor,
+} from './workspacePermissions'
 
 const workspace: Workspace = {
   id: 'workspace-1',
@@ -56,4 +60,21 @@ describe('workspace permissions', () => {
     expect(hasWorkspaceRole('OWNER', 'OWNER')).toBe(true)
     expect(hasWorkspaceRole('ADMIN', 'OWNER')).toBe(false)
   })
+
+  it.each([
+    ['OWNER', 'ADMIN', true],
+    ['OWNER', 'MEMBER', true],
+    ['ADMIN', 'ADMIN', true],
+    ['ADMIN', 'VIEWER', true],
+    ['MEMBER', 'VIEWER', false],
+    ['VIEWER', 'MEMBER', false],
+    [null, 'MEMBER', false],
+    ['OWNER', 'OWNER', false],
+    ['ADMIN', 'OWNER', false],
+  ] as const)(
+    'allows %s to manage a %s role: %s',
+    (callerRole, targetRole, expected) => {
+      expect(canChangeWorkspaceMemberRole(callerRole, targetRole)).toBe(expected)
+    },
+  )
 })

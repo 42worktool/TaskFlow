@@ -163,6 +163,33 @@
   color: #374151;
 }
 
+.member-role-select {
+  min-width: 88px;
+  padding: 6px 28px 6px 9px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.member-role-select:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.member-role-select:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.member-action-status {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
 .remove-btn {
   background: none;
   border: none;

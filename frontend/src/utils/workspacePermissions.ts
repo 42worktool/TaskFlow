@@ -23,3 +23,15 @@ export function hasWorkspaceRole(
 ): boolean {
   return role !== null && ROLE_RANK[role] >= ROLE_RANK[minimum]
 }
+
+export function canChangeWorkspaceMemberRole(
+  callerRole: WorkspaceRole | null,
+  targetRole: WorkspaceRole,
+): boolean {
+  return (
+    callerRole !== null &&
+    ROLE_RANK[callerRole] >= ROLE_RANK.ADMIN &&
+    targetRole !== 'OWNER' &&
+    ROLE_RANK[targetRole] <= ROLE_RANK[callerRole]
+  )
+}
