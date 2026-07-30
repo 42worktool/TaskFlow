@@ -8,7 +8,7 @@ import {
   workspaceMessageDtoSchema,
   type WorkspaceMessageDto,
 } from './workspace-message.dto'
-import { publishWorkspaceChange, workspaceChannel } from './workspace.realtime'
+import { publishWorkspaceChange } from './workspace.realtime'
 
 const messageAuthorSelect = {
   id: true,
@@ -16,17 +16,28 @@ const messageAuthorSelect = {
   profile_image_url: true,
 } as const
 
-function publishWorkspaceMessageCreated(message: WorkspaceMessageDto): void {
+async function deliverWorkspaceMessageCreated(
+  message: WorkspaceMessageDto,
+): Promise<void> {
   try {
     const event = workspaceMessageDtoSchema.parse(message)
-    realtime.publish(
-      workspaceChannel(event.workspace_id),
-      'workspace.message_created',
-      event,
-    )
+    const members = await prisma.workspaceMember.findMany({
+      where: {
+        workspace_id: event.workspace_id,
+        deleted_at: null,
+      },
+      select: { user_id: true },
+    })
+    for (const member of members) {
+      realtime.sendToUser(
+        member.user_id,
+        'workspace.message_created',
+        event,
+      )
+    }
   } catch (error) {
     console.warn(
-      '[realtime] failed to publish "workspace.message_created"',
+      '[realtime] failed to deliver "workspace.message_created"',
       error instanceof Error ? error.message : error,
     )
   }
@@ -101,7 +112,7 @@ export async function createWorkspaceMessage(input: {
     return toWorkspaceMessageDto(message)
   })
 
-  publishWorkspaceMessageCreated(dto)
+  await deliverWorkspaceMessageCreated(dto)
   if (cardId) {
     publishWorkspaceChange({
       workspace_id: input.workspaceId,

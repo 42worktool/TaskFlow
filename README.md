@@ -39,13 +39,14 @@ HTTP controllers or the Vue component tree.
   management, and realtime online status. On desktop it toggles from the right
   and its right-side directory rail can collapse to return space to the board;
   mobile uses a full-page view above the persistent bottom bar. Session-scoped
-  workspace notifications live in the messenger, with a shared unread badge on
-  the messenger header and workspace toolbox.
+  unread counts for workspace messages, DMs, and workspace activity appear on
+  each room and on the messenger header and workspace toolbox, capped visually
+  at `99+`.
 - Card-linked workspace messages that are also stored and displayed as card
   comments, direct comment writing from card details, and realtime team-member
   online status.
-- Realtime workspace-member-joined notifications that open the related
-  workspace conversation from the messenger.
+- Realtime workspace-member-joined activity folded into the related workspace
+  room's unread count without a separate notification tab.
 - HTTPS and WSS through Nginx, backed by PostgreSQL and Redis.
 
 ## Architecture
@@ -447,11 +448,11 @@ to an AI system.
 
 - Workspace chat has one default room and optional single-card links, but no
   editing, deletion, read receipts, typing indicator, file attachment, or
-  additional-room lifecycle. Direct messages remain outside the current scope.
+  additional-room lifecycle. Direct messages share the same prototype limits.
 - Workspace change events are best-effort invalidation hints rather than a
   durable event stream; reconnect performs a canonical REST snapshot refresh.
-- Notifications are session-local member-join events; they have no persistent
-  history or read-state backend.
+- Workspace activity and message unread counts are session-local; they have no
+  separate notification history or persistent read-state backend.
 - Presence is designed for a single backend instance, not cross-replica fanout.
 - Friend requests support accept, reject, and cancel, but have no persistent
   history, blocking, or realtime request-delivery event.

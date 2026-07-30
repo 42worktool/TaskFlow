@@ -3,7 +3,7 @@ import './style.css'
 import App from './App.vue'
 import router from './router'
 import { authState } from './services/auth'
-import { clearNotifications } from './services/notifications'
+import { clearMessengerUnread } from './services/messengerUnread'
 import { realtime } from './services/realtime'
 
 let realtimeUserId: string | null = null
@@ -17,7 +17,7 @@ watch(
   ({ userId, accessToken }) => {
     if (!userId || !accessToken) {
       realtime.disconnect()
-      clearNotifications()
+      clearMessengerUnread()
       realtimeUserId = null
       realtimeAccessToken = null
       return
@@ -26,7 +26,7 @@ watch(
     const userChanged = realtimeUserId !== null && realtimeUserId !== userId
     if (userChanged) {
       realtime.disconnect()
-      clearNotifications()
+      clearMessengerUnread()
     }
 
     const operation =

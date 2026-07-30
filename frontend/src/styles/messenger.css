@@ -24,6 +24,15 @@
     visibility 0.2s step-end;
 }
 
+.messenger-unread-live {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .messenger-window--with-toolbox {
   bottom: 76px;
 }
@@ -78,7 +87,6 @@
 
 .messenger-close,
 .messenger-back,
-.messenger-notification-trigger,
 .messenger-directory-toggle {
   width: 34px;
   height: 34px;
@@ -103,50 +111,44 @@
   font-size: 24px;
 }
 
-.messenger-notification-trigger {
-  position: relative;
-  display: grid;
-  place-items: center;
+.messenger-header__title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.messenger-notification-trigger svg {
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.messenger-header__title-row > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.messenger-notification-trigger--active {
-  background: #e9f2ff;
-  color: #0c66e4;
-}
-
-.messenger-header .messenger-notification-trigger__badge {
-  position: absolute;
-  top: -2px;
-  right: -3px;
+.messenger-header .messenger-header__unread-badge,
+.messenger-room-unread-badge {
   min-width: 17px;
   height: 17px;
   margin: 0;
-  padding: 0 4px;
-  border: 2px solid #fff;
+  padding: 0 5px;
   border-radius: 999px;
   background: #dc2626;
   color: #fff;
-  display: grid;
+  display: inline-grid;
   place-items: center;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   line-height: 1;
   overflow: visible;
+  white-space: nowrap;
+}
+
+.messenger-header .messenger-header__unread-badge {
+  flex: 0 0 auto;
 }
 
 .messenger-close:hover,
 .messenger-back:hover,
-.messenger-notification-trigger:hover,
 .messenger-directory-toggle:hover {
   background: #f1f5f9;
   color: #111827;
@@ -154,7 +156,6 @@
 
 .messenger-close:focus-visible,
 .messenger-back:focus-visible,
-.messenger-notification-trigger:focus-visible,
 .messenger-directory-toggle:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 1px;
@@ -279,6 +280,22 @@
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.messenger-directory-item__title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.messenger-directory-item__title > strong {
+  min-width: 0;
+  flex: 1;
+}
+
+.messenger-room-unread-badge {
+  flex: 0 0 auto;
 }
 
 .messenger-directory-action small,

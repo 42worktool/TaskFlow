@@ -14,14 +14,14 @@ requires them.
 
 The first feature slice is `notification.created`. When an invited user joins a
 workspace, the backend sends one update notification to each currently
-connected existing member. The frontend keeps the most recent 50 events in
-memory and clears them when the session ends or changes user. These events are
-shown in the messenger instead of a separate header menu. The messenger header
-and workspace toolbox share the same unread count, and selecting an item marks
-it read before opening the related workspace conversation and board. There is
-intentionally no notification history or persisted read state yet; those
-belong in a later PostgreSQL-backed notification feature if the project needs
-them.
+connected existing member. The frontend treats the event as unread activity in
+the related workspace room rather than keeping a separate notification list.
+Realtime workspace messages and DMs use the same session-memory unread model:
+the messenger header and workspace toolbox show the total, each room shows its
+own count, and opening that room clears its count. Badge text is capped at
+`99+`. There is intentionally no notification tab, history, persisted read
+state, or multi-tab read synchronization; those belong in a later
+PostgreSQL-backed feature if the project needs them.
 
 Friend presence is the second small slice. `GET /api/friends` returns an
 in-memory online snapshot, and the server emits `friend.presence_changed` only
@@ -32,15 +32,18 @@ subscription request.
 Workspace realtime is the third slice. Active members subscribe to a
 `workspace:<id>` channel. Successful REST mutations publish a compact
 `workspace.changed` invalidation hint after the database commit, and the
-browser refetches the affected list snapshots. `workspace.message_created`
-delivers PostgreSQL-backed group-chat messages, while
-`workspace.member_presence_changed` carries first-connect/last-disconnect
-presence transitions. Public non-members can still read public boards through
-REST, but cannot subscribe to the member channel or use chat.
+browser refetches the affected list snapshots. PostgreSQL-backed group-chat
+messages are sent as `workspace.message_created` to every active member's user
+connections, so the messenger can count messages from workspaces that are not
+currently open. `workspace.member_presence_changed` carries
+first-connect/last-disconnect presence transitions. Public non-members can
+still read public boards through REST, but cannot subscribe to the member
+channel or use chat.
 
 A workspace message may carry one optional `card_id`. The REST write creates
-the message and matching card comment atomically, then publishes the message
-and a normal card invalidation hint so open card details refetch comments.
+the message and matching card comment atomically, then delivers the message to
+the workspace members and publishes a normal card invalidation hint so open
+card details refetch comments.
 
 The invalidation event is intentionally not a durable mutation stream. The
 browser treats REST as canonical and performs a full workspace/board/chat

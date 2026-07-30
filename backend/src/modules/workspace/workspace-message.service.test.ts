@@ -6,6 +6,7 @@ const WORKSPACE_ID = '00000000-0000-4000-8000-000000000002'
 const FIRST_MESSAGE_ID = '00000000-0000-4000-8000-000000000003'
 const SECOND_MESSAGE_ID = '00000000-0000-4000-8000-000000000004'
 const CARD_ID = '00000000-0000-4000-8000-000000000005'
+const OTHER_USER_ID = '00000000-0000-4000-8000-000000000006'
 
 function setRequiredEnvironment(): void {
   Object.assign(process.env, {
@@ -62,7 +63,7 @@ function message(
   }
 }
 
-test('workspace messages require membership, return history, and publish after create', async (t) => {
+test('workspace messages require membership, return history, and deliver after create', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { realtime }, service] = await Promise.all([
     import('../../db'),
@@ -99,7 +100,7 @@ test('workspace messages require membership, return history, and publish after c
     ])
   })
 
-  await t.test('publishes the persisted DTO after creation', async (t) => {
+  await t.test('sends the persisted DTO to every active member after creation', async (t) => {
     stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({
       role: 'VIEWER',
     }))
@@ -115,10 +116,16 @@ test('workspace messages require membership, return history, and publish after c
       create = args
       return message(FIRST_MESSAGE_ID, 'hello', '2026-07-29T00:00:01.000Z')
     })
-    const publications: unknown[][] = []
-    stubMethod(t, realtime, 'publish', (...args) => {
-      operationOrder.push('publish')
-      publications.push(args)
+    let memberQuery: any
+    stubMethod(t, prisma.workspaceMember, 'findMany', async (args) => {
+      operationOrder.push('members')
+      memberQuery = args
+      return [{ user_id: USER_ID }, { user_id: OTHER_USER_ID }]
+    })
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args) => {
+      operationOrder.push(`send:${args[0]}`)
+      deliveries.push(args)
     })
 
     const result = await service.createWorkspaceMessage({
@@ -130,13 +137,27 @@ test('workspace messages require membership, return history, and publish after c
     assert.equal(result.id, FIRST_MESSAGE_ID)
     assert.equal(result.card_id, null)
     assert.equal(create.data.card_id, null)
-    assert.deepEqual(operationOrder, ['create', 'commit', 'publish'])
-    assert.equal(publications[0]?.[0], `workspace:${WORKSPACE_ID}`)
-    assert.equal(publications[0]?.[1], 'workspace.message_created')
-    assert.deepEqual(publications[0]?.[2], result)
+    assert.deepEqual(memberQuery, {
+      where: {
+        workspace_id: WORKSPACE_ID,
+        deleted_at: null,
+      },
+      select: { user_id: true },
+    })
+    assert.deepEqual(operationOrder, [
+      'create',
+      'commit',
+      'members',
+      `send:${USER_ID}`,
+      `send:${OTHER_USER_ID}`,
+    ])
+    assert.deepEqual(deliveries, [
+      [USER_ID, 'workspace.message_created', result],
+      [OTHER_USER_ID, 'workspace.message_created', result],
+    ])
   })
 
-  await t.test('creates a selected-card comment atomically and publishes after commit', async (t) => {
+  await t.test('creates a selected-card comment atomically and delivers after commit', async (t) => {
     stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({
       role: 'VIEWER',
     }))
@@ -172,6 +193,24 @@ test('workspace messages require membership, return history, and publish after c
       operationOrder.push('comment create')
       commentCreate = args
       return { id: 'comment-id' }
+    })
+
+    stubMethod(t, prisma.workspaceMember, 'findMany', async (args) => {
+      operationOrder.push('members')
+      assert.deepEqual(args, {
+        where: {
+          workspace_id: WORKSPACE_ID,
+          deleted_at: null,
+        },
+        select: { user_id: true },
+      })
+      return [{ user_id: USER_ID }]
+    })
+
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args) => {
+      operationOrder.push(args[1] as string)
+      deliveries.push(args)
     })
 
     const publications: unknown[][] = []
@@ -215,19 +254,17 @@ test('workspace messages require membership, return history, and publish after c
       'message create',
       'comment create',
       'commit',
+      'members',
       'workspace.message_created',
       'workspace.changed',
     ])
-    assert.deepEqual(
-      publications.map((publication) => publication[0]),
-      [`workspace:${WORKSPACE_ID}`, `workspace:${WORKSPACE_ID}`],
-    )
-    assert.deepEqual(
-      publications.map((publication) => publication[1]),
-      ['workspace.message_created', 'workspace.changed'],
-    )
-    assert.deepEqual(publications[0]?.[2], result)
-    const cardEvent = publications[1]?.[2] as {
+    assert.deepEqual(deliveries, [
+      [USER_ID, 'workspace.message_created', result],
+    ])
+    assert.equal(publications.length, 1)
+    assert.equal(publications[0]?.[0], `workspace:${WORKSPACE_ID}`)
+    assert.equal(publications[0]?.[1], 'workspace.changed')
+    const cardEvent = publications[0]?.[2] as {
       workspace_id: string
       entity: string
       action: string
@@ -264,12 +301,16 @@ test('workspace messages require membership, return history, and publish after c
 
     let messageCreates = 0
     let commentCreates = 0
+    let deliveries = 0
     let publications = 0
     stubMethod(t, prisma.workspaceMessage, 'create', async () => {
       messageCreates += 1
     })
     stubMethod(t, prisma.comment, 'create', async () => {
       commentCreates += 1
+    })
+    stubMethod(t, realtime, 'sendToUser', () => {
+      deliveries += 1
     })
     stubMethod(t, realtime, 'publish', () => {
       publications += 1
@@ -287,10 +328,11 @@ test('workspace messages require membership, return history, and publish after c
     )
     assert.equal(messageCreates, 0)
     assert.equal(commentCreates, 0)
+    assert.equal(deliveries, 0)
     assert.equal(publications, 0)
   })
 
-  await t.test('does not publish when the linked comment write fails', async (t) => {
+  await t.test('does not deliver or publish when the linked comment write fails', async (t) => {
     stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({
       role: 'VIEWER',
     }))
@@ -307,7 +349,11 @@ test('workspace messages require membership, return history, and publish after c
       throw new Error('comment write failed')
     })
 
+    let deliveries = 0
     let publications = 0
+    stubMethod(t, realtime, 'sendToUser', () => {
+      deliveries += 1
+    })
     stubMethod(t, realtime, 'publish', () => {
       publications += 1
     })
@@ -322,6 +368,7 @@ test('workspace messages require membership, return history, and publish after c
         }),
       /comment write failed/,
     )
+    assert.equal(deliveries, 0)
     assert.equal(publications, 0)
   })
 

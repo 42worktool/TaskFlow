@@ -10,7 +10,6 @@ import {
 import { useRoute, useRouter } from 'vue-router'
 import DirectMessagePanel from './DirectMessagePanel.vue'
 import FriendsPanel from './FriendsPanel.vue'
-import MessengerNotificationsPanel from './MessengerNotificationsPanel.vue'
 import WorkspaceChatPanel from './WorkspaceChatPanel.vue'
 import { FriendAPI } from '../api/friend'
 import { WorkspaceAPI } from '../api/workspace'
@@ -25,17 +24,30 @@ import {
   resetMessenger,
   showFriendManagement,
   showMessengerDirectory,
-  showMessengerNotifications,
   toggleMessengerDirectory,
   type MessengerPane,
 } from '../services/messenger'
 import {
-  markNotificationRead,
-  unreadNotificationCount,
-} from '../services/notifications'
+  directMessageUnreadCount,
+  formatMessengerUnreadCount,
+  markDirectConversationRead,
+  markWorkspaceConversationRead,
+  parseNotificationEvent,
+  pruneMessengerUnreadRooms,
+  receiveDirectMessageUnread,
+  receiveWorkspaceActivityUnread,
+  receiveWorkspaceMessageUnread,
+  totalMessengerUnreadCount,
+  workspaceUnreadCount,
+  type VisibleMessengerRoom,
+} from '../services/messengerUnread'
 import { realtime } from '../services/realtime'
-import { parseFriendPresenceEvent } from '../services/realtime/protocol'
-import type { Friend, Notification, Workspace } from '../types'
+import {
+  parseDirectMessage,
+  parseFriendPresenceEvent,
+  parseWorkspaceMessage,
+} from '../services/realtime/protocol'
+import type { Friend, Workspace } from '../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,8 +57,6 @@ const directoryFriends = ref<Friend[]>([])
 const directoryWorkspaces = ref<Workspace[]>([])
 const directoryLoading = ref(false)
 const directoryError = ref('')
-const notificationOpeningId = ref('')
-const notificationOpenError = ref('')
 let directoryLoadGeneration = 0
 let returnFocus: HTMLElement | null = null
 
@@ -66,7 +76,6 @@ const activeDirectFriend = computed(() =>
     : null,
 )
 const activeRoomTitle = computed(() => {
-  if (messengerState.pane === 'notifications') return '알림'
   if (messengerState.pane === 'friends') return '친구 관리'
   if (messengerState.pane === 'chat' && activeWorkspaceRoom.value) {
     return activeWorkspaceRoom.value.name
@@ -76,15 +85,8 @@ const activeRoomTitle = computed(() => {
   }
   return '대화 목록'
 })
-const unreadNotificationLabel = computed(() =>
-  unreadNotificationCount.value > 99
-    ? '99+'
-    : String(unreadNotificationCount.value),
-)
-const notificationButtonLabel = computed(() =>
-  unreadNotificationCount.value === 0
-    ? '메신저 알림 열기'
-    : `메신저 알림 열기, 읽지 않은 알림 ${unreadNotificationCount.value}개`,
+const totalUnreadLabel = computed(() =>
+  formatMessengerUnreadCount(totalMessengerUnreadCount.value),
 )
 const directoryVisible = computed(
   () =>
@@ -97,18 +99,13 @@ const conversationVisible = computed(
 )
 
 function paneFromQuery(value: unknown): MessengerPane | null {
-  return value === 'notifications' ||
-    value === 'friends' ||
-    value === 'chat'
+  return value === 'friends' || value === 'chat'
     ? value
     : null
 }
 
 function clearMessengerQuery(): void {
-  if (
-    !paneFromQuery(route.query.messenger) &&
-    !paneFromQuery(route.query.drawer)
-  ) {
+  if (route.query.messenger === undefined && route.query.drawer === undefined) {
     return
   }
   const query = { ...route.query }
@@ -163,6 +160,10 @@ async function loadDirectory(): Promise<void> {
     if (generation !== directoryLoadGeneration) return
     directoryFriends.value = friends
     directoryWorkspaces.value = workspaces.my
+    pruneMessengerUnreadRooms(
+      workspaces.my.map((workspace) => workspace.id),
+      friends.map((friend) => friend.id),
+    )
 
     const activeRoom = messengerState.activeRoom
     if (activeRoom?.kind === 'dm') {
@@ -204,6 +205,73 @@ function receiveFriendPresence(value: unknown): void {
   }
 }
 
+function visibleMessengerRoom(): VisibleMessengerRoom | null {
+  if (
+    !messengerState.open ||
+    document.visibilityState !== 'visible'
+  ) {
+    return null
+  }
+  if (
+    messengerState.pane === 'chat' &&
+    messengerState.activeRoom?.kind === 'workspace'
+  ) {
+    return {
+      kind: 'workspace',
+      id: messengerState.activeRoom.workspace.id,
+    }
+  }
+  if (
+    messengerState.pane === 'dm' &&
+    messengerState.activeRoom?.kind === 'dm'
+  ) {
+    return {
+      kind: 'dm',
+      id: messengerState.activeRoom.friend.id,
+    }
+  }
+  return null
+}
+
+function markVisibleConversationRead(): void {
+  const room = visibleMessengerRoom()
+  if (room?.kind === 'workspace') {
+    markWorkspaceConversationRead(room.id)
+  } else if (room?.kind === 'dm') {
+    markDirectConversationRead(room.id)
+  }
+}
+
+function receiveWorkspaceMessage(value: unknown): void {
+  const message = parseWorkspaceMessage(value)
+  if (!message) return
+  receiveWorkspaceMessageUnread(
+    message,
+    authState.user?.id ?? null,
+    visibleMessengerRoom(),
+  )
+}
+
+function receiveDirectMessage(value: unknown): void {
+  const message = parseDirectMessage(value)
+  if (!message) return
+  receiveDirectMessageUnread(
+    message,
+    authState.user?.id ?? null,
+    visibleMessengerRoom(),
+  )
+}
+
+function receiveWorkspaceActivity(value: unknown): void {
+  const event = parseNotificationEvent(value)
+  if (!event) return
+  receiveWorkspaceActivityUnread(
+    event,
+    authState.user?.id ?? null,
+    visibleMessengerRoom(),
+  )
+}
+
 async function selectWorkspaceRoom(workspace: Workspace): Promise<void> {
   const routeWorkspace = messengerState.workspace
   openWorkspaceConversation({
@@ -235,50 +303,15 @@ function openFriendSettings(): void {
   showFriendManagement()
 }
 
-function openNotifications(): void {
-  notificationOpenError.value = ''
-  showMessengerNotifications()
-}
-
-async function selectNotification(item: Notification): Promise<void> {
-  markNotificationRead(item.id)
-  notificationOpeningId.value = item.id
-  notificationOpenError.value = ''
-
-  try {
-    const workspace =
-      directoryWorkspaces.value.find(
-        (candidate) => candidate.id === item.workspace_id,
-      ) ?? await WorkspaceAPI.get(item.workspace_id)
-    const routeWorkspace = messengerState.workspace
-    openWorkspaceConversation({
-      id: workspace.id,
-      name: workspace.name,
-      syncVersion:
-        routeWorkspace?.id === workspace.id
-          ? routeWorkspace.syncVersion
-          : 0,
-    })
-
-    const targetPath = `/workspaces/${workspace.id}/board`
-    if (route.path !== targetPath) await router.push(targetPath)
-  } catch (caught) {
-    notificationOpenError.value =
-      caught instanceof Error
-        ? caught.message
-        : '알림의 워크스페이스 대화방을 열지 못했습니다.'
-    showMessengerNotifications()
-  } finally {
-    notificationOpeningId.value = ''
-  }
-}
-
 function returnToDirectory(): void {
   showMessengerDirectory()
   void loadDirectory()
 }
 
 let removeFriendPresenceListener: (() => void) | null = null
+let removeWorkspaceMessageListener: (() => void) | null = null
+let removeDirectMessageListener: (() => void) | null = null
+let removeWorkspaceActivityListener: (() => void) | null = null
 
 watch(
   [() => messengerState.open, () => messengerState.pane],
@@ -311,7 +344,11 @@ watch(
     if (!authState.user) return
     const requested =
       paneFromQuery(messengerQuery) ?? paneFromQuery(legacyDrawer)
-    if (!requested || (requested === 'chat' && !messengerState.workspace)) return
+    if (!requested) {
+      clearMessengerQuery()
+      return
+    }
+    if (requested === 'chat' && !messengerState.workspace) return
     openMessenger(requested)
     clearMessengerQuery()
   },
@@ -339,21 +376,50 @@ onMounted(() => {
     'friend.presence_changed',
     receiveFriendPresence,
   )
+  removeWorkspaceMessageListener = realtime.on(
+    'workspace.message_created',
+    receiveWorkspaceMessage,
+  )
+  removeDirectMessageListener = realtime.on(
+    'dm.message_created',
+    receiveDirectMessage,
+  )
+  removeWorkspaceActivityListener = realtime.on(
+    'notification.created',
+    receiveWorkspaceActivity,
+  )
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('resize', handleResize)
+  document.addEventListener('visibilitychange', markVisibleConversationRead)
   if (messengerState.open) void loadDirectory()
 })
 onUnmounted(() => {
   directoryLoadGeneration += 1
   removeFriendPresenceListener?.()
+  removeWorkspaceMessageListener?.()
+  removeDirectMessageListener?.()
+  removeWorkspaceActivityListener?.()
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('resize', handleResize)
+  document.removeEventListener('visibilitychange', markVisibleConversationRead)
 })
 </script>
 
 <template>
   <Teleport to="body">
     <template v-if="authState.user">
+      <span
+        class="messenger-unread-live"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {{
+          totalMessengerUnreadCount
+            ? `읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`
+            : ''
+        }}
+      </span>
       <aside
         id="messenger-window"
         class="messenger-window"
@@ -379,31 +445,20 @@ onUnmounted(() => {
             ‹
           </button>
           <div>
-            <strong>TaskFlow 메신저</strong>
+            <div class="messenger-header__title-row">
+              <strong>TaskFlow 메신저</strong>
+              <span
+                v-if="totalMessengerUnreadCount"
+                class="messenger-header__unread-badge"
+                :aria-label="
+                  `읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`
+                "
+              >
+                {{ totalUnreadLabel }}
+              </span>
+            </div>
             <span>{{ activeRoomTitle }}</span>
           </div>
-          <button
-            class="messenger-notification-trigger"
-            :class="{
-              'messenger-notification-trigger--active':
-                messengerState.pane === 'notifications',
-            }"
-            type="button"
-            :aria-label="notificationButtonLabel"
-            :aria-pressed="messengerState.pane === 'notifications'"
-            @click="openNotifications"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-              <path d="M10 21h4" />
-            </svg>
-            <span
-              v-if="unreadNotificationCount"
-              class="messenger-notification-trigger__badge"
-            >
-              {{ unreadNotificationLabel }}
-            </span>
-          </button>
           <button
             v-if="!compactViewport"
             class="messenger-directory-toggle"
@@ -498,7 +553,24 @@ onUnmounted(() => {
               >
                 <span class="messenger-room-avatar">#</span>
                 <span>
-                  <strong>{{ workspace.name }}</strong>
+                  <span class="messenger-directory-item__title">
+                    <strong>{{ workspace.name }}</strong>
+                    <span
+                      v-if="workspaceUnreadCount(workspace.id)"
+                      class="messenger-room-unread-badge"
+                      :aria-label="
+                        `읽지 않은 메시지 및 활동 ${
+                          workspaceUnreadCount(workspace.id)
+                        }개`
+                      "
+                    >
+                      {{
+                        formatMessengerUnreadCount(
+                          workspaceUnreadCount(workspace.id),
+                        )
+                      }}
+                    </span>
+                  </span>
                   <small>워크스페이스 대화방</small>
                 </span>
               </button>
@@ -535,7 +607,24 @@ onUnmounted(() => {
                   {{ friend.name.charAt(0).toUpperCase() }}
                 </span>
                 <span>
-                  <strong>{{ friend.name }}</strong>
+                  <span class="messenger-directory-item__title">
+                    <strong>{{ friend.name }}</strong>
+                    <span
+                      v-if="directMessageUnreadCount(friend.id)"
+                      class="messenger-room-unread-badge"
+                      :aria-label="
+                        `읽지 않은 메시지 ${
+                          directMessageUnreadCount(friend.id)
+                        }개`
+                      "
+                    >
+                      {{
+                        formatMessengerUnreadCount(
+                          directMessageUnreadCount(friend.id),
+                        )
+                      }}
+                    </span>
+                  </span>
                   <small
                     class="messenger-friend-presence"
                     :class="{
@@ -566,12 +655,6 @@ onUnmounted(() => {
               v-else-if="messengerState.pane === 'friends'"
               @changed="loadDirectory"
               @open-dm="selectDirectRoom"
-            />
-            <MessengerNotificationsPanel
-              v-else-if="messengerState.pane === 'notifications'"
-              :pending-id="notificationOpeningId"
-              :error="notificationOpenError"
-              @open="selectNotification"
             />
             <WorkspaceChatPanel
               v-else-if="
