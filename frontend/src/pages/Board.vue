@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import draggable from 'vuedraggable'
 import CardDetailModal from '../components/CardDetailModal.vue'
+import InboxCardsPanel from '../components/InboxCardsPanel.vue'
 import TaskList from '../components/TaskList.vue'
 import { ListAPI } from '../api/list'
 import { CardAPI } from '../api/card'
@@ -10,9 +11,12 @@ import { InboxAPI } from '../api/inbox'
 import { realtime } from '../services/realtime'
 import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
 import {
+  clearChatCardDrop,
   clearInboxDestinations,
+  consumeChatCardDrop,
   finishCardDrag,
   messengerState,
+  notifyBoardChanged,
   notifyInboxChanged,
   setInboxDestinations,
   startCardDrag,
@@ -27,11 +31,13 @@ const props = withDefaults(
   defineProps<{
     canEditBoard?: boolean
     canViewCardDetails?: boolean
+    inboxOpen?: boolean
     workspaceSyncVersion?: number
   }>(),
   {
     canEditBoard: false,
     canViewCardDetails: false,
+    inboxOpen: false,
     workspaceSyncVersion: 0,
   },
 )
@@ -53,6 +59,12 @@ let fullRefreshRetriesRemaining = 0
 const MAX_FULL_REFRESH_RETRIES = 2
 const pendingListIds = new Set<string>()
 const pendingDeletedListIds = new Set<string>()
+const inboxAcceptingBoardCard = computed(
+  () =>
+    props.inboxOpen &&
+    props.canEditBoard &&
+    messengerState.cardDrag?.source === 'board',
+)
 
 const showAddList = ref(false)
 const newListName = ref('')
@@ -337,6 +349,10 @@ function onCardChange(listId: string, event: DraggableChange<Card>) {
 
   if (event.added) {
     const { element, newIndex } = event.added
+    if (consumeChatCardDrop(element.id)) {
+      queueFullRefresh()
+      return
+    }
     const { beforeId, afterId } = neighborIds(list.cards, newIndex)
     const movedFromInbox = element.list_id === null
     const request = movedFromInbox
@@ -361,6 +377,10 @@ function onCardChange(listId: string, event: DraggableChange<Card>) {
     )
   } else if (event.moved) {
     const { element, newIndex } = event.moved
+    if (consumeChatCardDrop(element.id)) {
+      queueFullRefresh()
+      return
+    }
     const { beforeId, afterId } = neighborIds(list.cards, newIndex)
     CardAPI.reorder(element.id, {
       before_card_id: beforeId,
@@ -399,7 +419,30 @@ function onBoardCardDragStart(card: Card): void {
 }
 
 function onBoardCardDragEnd(): void {
+  const cardId =
+    messengerState.cardDrag?.source === 'board'
+      ? messengerState.cardDrag.cardId
+      : null
   finishCardDrag()
+  if (!cardId) return
+  window.setTimeout(() => {
+    if (messengerState.cardDrag?.cardId === cardId) return
+    clearChatCardDrop(cardId)
+  }, 0)
+}
+
+function onInboxCardDragStart(card: Card): void {
+  if (!props.canEditBoard || !props.inboxOpen) return
+  startCardDrag(card.id, 'inbox')
+}
+
+function onInboxCardDragEnd(): void {
+  finishCardDrag()
+}
+
+function onInboxDropSettled(): void {
+  notifyBoardChanged()
+  notifyInboxChanged()
 }
 
 function openCard(card: Card) {
@@ -516,7 +559,8 @@ onMounted(() => {
 onUnmounted(() => {
   listLoadGeneration += 1
   clearInboxDestinations()
-  if (messengerState.cardDrag?.source === 'board') finishCardDrag()
+  if (messengerState.cardDrag) finishCardDrag()
+  clearChatCardDrop()
   removeWorkspaceChangeListener()
   stopBoardAutoScroll()
   window.removeEventListener('dragover', handleCardDragPointer)
@@ -528,20 +572,43 @@ onUnmounted(() => {
 
 <template>
   <div class="board-page">
-    <div v-if="loading" class="board-status">불러오는 중...</div>
-    <div v-else-if="error" class="board-status board-status--error">{{ error }}</div>
+    <div v-if="loading && !inboxOpen" class="board-status">불러오는 중...</div>
+    <div
+      v-else-if="error && !inboxOpen"
+      class="board-status board-status--error"
+    >
+      {{ error }}
+    </div>
     <draggable
       v-else
       ref="boardColumns"
       v-model="lists"
       item-key="id"
-      :disabled="!canEditBoard"
+      :disabled="!canEditBoard || loading || Boolean(error)"
       handle=".list-header"
       class="board-columns"
+      :class="{ 'board-columns--inbox-open': inboxOpen }"
       @start="setDragging(true)"
       @end="setDragging(false)"
       @change="onListChange"
     >
+      <template #header>
+        <div
+          v-if="inboxOpen"
+          id="workspace-inbox-panel"
+          class="board-inbox-column"
+        >
+          <InboxCardsPanel
+            board-column
+            :destination-lists="messengerState.inboxDestinations"
+            :refresh-token="messengerState.inboxRefreshToken"
+            :accepting-drop="inboxAcceptingBoardCard"
+            @drop-settled="onInboxDropSettled"
+            @drag-start="onInboxCardDragStart"
+            @drag-end="onInboxCardDragEnd"
+          />
+        </div>
+      </template>
       <template #item="{ element: col }">
         <TaskList
           :list="col"
@@ -558,7 +625,13 @@ onUnmounted(() => {
         />
       </template>
       <template #footer>
-        <div v-if="canEditBoard" class="add-list-column">
+        <div v-if="loading" class="board-inline-status">
+          보드를 불러오는 중…
+        </div>
+        <div v-else-if="error" class="board-inline-status board-status--error">
+          {{ error }}
+        </div>
+        <div v-else-if="canEditBoard" class="add-list-column">
           <form v-if="showAddList" class="add-list-form" @submit.prevent="submitAddList">
             <input
               v-model="newListName"

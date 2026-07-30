@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import ShareModal from '../components/ShareModal.vue'
+import WorkspaceMembersMenu from '../components/WorkspaceMembersMenu.vue'
+import WorkspaceToolbox from '../components/WorkspaceToolbox.vue'
 import { WorkspaceAPI } from '../api/workspace'
 import { authState } from '../services/auth'
 import {
   clearMessengerWorkspace,
+  messengerState,
   setMessengerWorkspace,
 } from '../services/messenger'
 import { realtime, RealtimeRequestError } from '../services/realtime'
@@ -23,6 +26,9 @@ import {
 const route = useRoute()
 const router = useRouter()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
+const isBoardRoute = computed(
+  () => route.path === `/workspaces/${workspaceId.value}/board`,
+)
 const workspace = ref<Workspace | null>(null)
 const loadError = ref('')
 const onlineUserIds = ref<Set<string>>(new Set())
@@ -41,8 +47,33 @@ const canManageMembers = computed(() =>
 )
 
 const showShareModal = ref(false)
+const inboxOpen = ref(false)
 
-const memberColors = ['#2563EB', '#10B981', '#7C3AED']
+function closeInbox(): void {
+  if (messengerState.cardDrag) return
+  inboxOpen.value = false
+}
+
+async function toggleInbox(): Promise<void> {
+  if (messengerState.cardDrag) return
+  if (inboxOpen.value) {
+    closeInbox()
+    return
+  }
+
+  const targetWorkspaceId = workspaceId.value
+  const boardPath = `/workspaces/${targetWorkspaceId}/board`
+  if (route.path !== boardPath) {
+    await router.push(boardPath)
+  }
+  if (
+    workspaceId.value === targetWorkspaceId &&
+    route.path === boardPath
+  ) {
+    inboxOpen.value = true
+  }
+}
+
 const SUBSCRIPTION_ATTEMPTS = 3
 const SUBSCRIPTION_RETRY_DELAY_MS = 250
 let workspaceLoadGeneration = 0
@@ -280,12 +311,17 @@ const removeWorkspacePresenceListener = realtime.on(
 watch(
   workspaceId,
   (id) => {
+    inboxOpen.value = false
     stopWorkspaceSubscription()
     workspaceLoadGeneration += 1
     void loadWorkspace(id, true)
   },
   { immediate: true },
 )
+
+watch(isBoardRoute, (boardRouteActive) => {
+  if (!boardRouteActive) inboxOpen.value = false
+})
 
 watch(
   [workspaceId, currentRole],
@@ -330,80 +366,29 @@ onUnmounted(() => {
 
 <template>
   <div v-if="workspace" class="app-shell">
-    <!-- Header -->
-    <AppHeader :workspace-name="workspace.name" />
+    <AppHeader :workspace-name="workspace.name">
+      <template #workspace-actions>
+        <WorkspaceMembersMenu
+          :members="workspace.members"
+          :online-user-ids="onlineUserIds"
+          :can-manage="canManageMembers"
+          @manage="showShareModal = true"
+        />
+      </template>
+    </AppHeader>
 
     <div class="content-area">
-      <!-- Sidebar -->
-      <nav class="sidebar">
-        <p class="sidebar-workspace-name">{{ workspace.name }}</p>
-        <ul class="sidebar-nav">
-          <li>
-            <RouterLink
-              :to="`/workspaces/${workspaceId}/board`"
-              class="nav-item"
-              active-class="nav-item--active"
-            >
-              <span class="nav-icon">⊞</span> 보드
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink
-              :to="`/workspaces/${workspaceId}/calendar`"
-              class="nav-item"
-              active-class="nav-item--active"
-            >
-              <span class="nav-icon">▦</span> 달력
-            </RouterLink>
-          </li>
-        </ul>
-        <div class="sidebar-team">
-          <p class="team-label">팀원</p>
-          <ul class="team-list">
-            <li v-for="(m, i) in workspace.members" :key="m.user_id" class="team-member">
-              <div class="team-avatar-wrap">
-                <div
-                  class="team-avatar"
-                  :style="{ background: memberColors[i % memberColors.length] }"
-                >
-                  {{ m.user.name[0] }}
-                </div>
-                <span
-                  v-if="currentRole"
-                  class="team-presence-dot"
-                  :class="{
-                    'team-presence-dot--online': onlineUserIds.has(m.user_id),
-                  }"
-                  :aria-label="
-                    onlineUserIds.has(m.user_id) ? '온라인' : '오프라인'
-                  "
-                  :title="
-                    onlineUserIds.has(m.user_id) ? '온라인' : '오프라인'
-                  "
-                />
-              </div>
-              <div class="team-member-copy">
-                <span class="team-name">{{ m.user.name }}</span>
-                <span v-if="currentRole" class="team-presence-label">
-                  {{ onlineUserIds.has(m.user_id) ? '온라인' : '오프라인' }}
-                </span>
-              </div>
-            </li>
-          </ul>
-          <div v-if="canManageMembers" class="sidebar-actions">
-            <button
-              class="sidebar-action-btn sidebar-action-btn--primary"
-              type="button"
-              @click="showShareModal = true"
-            >
-              팀원 관리
-            </button>
-          </div>
-        </div>
-      </nav>
-
       <RouterView v-slot="{ Component }">
         <component
+          v-if="isBoardRoute"
+          :is="Component"
+          :can-edit-board="canEditBoard"
+          :can-view-card-details="canViewCardDetails"
+          :workspace-sync-version="workspaceSyncVersion"
+          :inbox-open="inboxOpen"
+        />
+        <component
+          v-else
           :is="Component"
           :can-edit-board="canEditBoard"
           :can-view-card-details="canViewCardDetails"
@@ -411,6 +396,13 @@ onUnmounted(() => {
         />
       </RouterView>
     </div>
+
+    <WorkspaceToolbox
+      :workspace-id="workspaceId"
+      :inbox-open="inboxOpen"
+      @toggle-inbox="toggleInbox"
+      @close-inbox="closeInbox"
+    />
 
     <ShareModal
       v-if="showShareModal && canManageMembers"

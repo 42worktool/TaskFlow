@@ -63,14 +63,21 @@ never participate in presence notifications.
 
 ## UI
 
-The bottom-right messenger combines Friends, Inbox, and the current workspace
-chat. Its Friends pane supports:
+The movable floating messenger combines Friends and the current workspace
+chat. The personal Inbox is separate from conversation controls: it appears as
+a normal board list on desktop and a focused full-page view on mobile. Its
+Friends pane supports:
 
 - sending a request by email;
 - accepting or rejecting received requests;
 - cancelling sent requests;
 - listing and removing accepted friends;
 - observing accepted friends' realtime online status.
+
+On narrow screens, the workspace bottom bar replaces the separate floating
+launcher for chat and opens the messenger as a full-page view above that bar.
+Outside a workspace, the launcher remains available above the persistent
+workspace-selection bar so the Friends pane is still reachable.
 
 Request received/accepted events are not pushed in this slice. The pane reloads
 when first opened and after WebSocket reconnection, and also provides a

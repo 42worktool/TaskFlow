@@ -24,14 +24,18 @@ HTTP controllers or the Vue component tree.
 - Kanban lists and cards with drag-and-drop reordering.
 - Realtime list-level board synchronization across workspace members.
 - Editable card titles, descriptions, start dates, and deadlines.
-- A personal inbox with direct drag-and-drop between the inbox and board lists,
-  including horizontal edge scrolling.
+- A personal Inbox controlled from the workspace toolbox, rendered as a normal
+  board list on desktop and a focused full-page view on mobile. Desktop supports
+  direct drag-and-drop between Inbox and board lists, including horizontal edge
+  scrolling.
 - A calendar that renders card start/deadline ranges as continuous weekly bars,
   plus text search across workspaces the user can access.
 - Email-based friend requests with acceptance/rejection and realtime
   online/offline presence for accepted friends.
-- A floating messenger that combines friends, the personal inbox, and the
-  current workspace group chat.
+- A movable floating messenger for friends and the current workspace group
+  chat, with independently draggable launcher and window positions on desktop.
+  Mobile opens the workspace messenger as a full-page view above the persistent
+  bottom bar.
 - Card-linked workspace messages that are also stored and displayed as card
   comments, plus realtime team-member online status.
 - Realtime workspace-member-joined notifications.
@@ -169,15 +173,18 @@ environment running the suite must allow loopback port binding.
 2. Create a private or public workspace.
 3. Add lists and cards, then drag them to reorder or move them.
 4. Open a card to edit its details and dates.
-5. Drag a card onto the floating Inbox target and drag it back to a board list
-   when ready.
+5. Open Inbox from the bottom workspace toolbox. On desktop, drag cards between
+   its board-style list and the other board lists; on mobile, use the focused
+   Inbox view.
 6. Invite a registered or future user by email from the workspace share menu.
-7. Open the bottom-right messenger to manage friends, Inbox cards, and the
-   current workspace chat.
-8. Optionally connect one card before sending a workspace message to also
-   record that text in the card's comments.
-9. See team online status in the workspace sidebar, search accessible cards, or
-   open Calendar to view card date ranges.
+7. Open or reposition the floating messenger to manage friends and the current
+   workspace chat. On mobile, open its full-page view from the workspace bottom
+   bar.
+8. Select a card, or drop a board card onto the open chat, before sending a
+   workspace message to also record that text in the card's comments.
+9. See team online status and member management from the workspace top bar,
+   search accessible cards, or use the bottom toolbox to switch between the
+   board, Calendar, and workspace list.
 
 Workspace permissions are deliberately small:
 

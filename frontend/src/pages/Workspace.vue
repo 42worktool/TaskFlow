@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import LegalFooter from '../components/LegalFooter.vue'
 import WorkspaceFormModal from '../components/WorkspaceFormModal.vue'
+import WorkspaceToolbox from '../components/WorkspaceToolbox.vue'
 import { WorkspaceAPI } from '../api/workspace'
 import { authState } from '../services/auth'
 import { workspaceColor } from '../types'
@@ -182,6 +183,8 @@ onMounted(refreshList)
     <div class="home-footer">
       <LegalFooter variant="light" />
     </div>
+
+    <WorkspaceToolbox />
 
     <WorkspaceFormModal
       v-if="showCreate"

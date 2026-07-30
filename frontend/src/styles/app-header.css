@@ -46,6 +46,12 @@
   min-width: 0;
 }
 
+.app-topbar-workspace-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
 .app-topbar-button {
   padding: 7px 14px;
   background: rgba(255, 255, 255, 0.15);
@@ -86,6 +92,10 @@
 
   .app-topbar-actions {
     gap: 6px;
+  }
+
+  .app-topbar-workspace-actions {
+    margin-right: 1px;
   }
 
   .app-topbar-button {

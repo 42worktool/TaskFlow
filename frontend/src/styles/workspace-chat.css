@@ -1,9 +1,43 @@
 .workspace-chat-panel {
+  position: relative;
   min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: #f8fafc;
+}
+
+.workspace-chat-card-drop-hint {
+  position: absolute;
+  inset: 8px;
+  z-index: 5;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 5px;
+  padding: 20px;
+  border: 2px dashed #60a5fa;
+  border-radius: 12px;
+  background: rgba(239, 246, 255, 0.94);
+  color: #1d4ed8;
+  text-align: center;
+  pointer-events: none;
+}
+
+.workspace-chat-card-drop-hint strong {
+  font-size: 14px;
+}
+
+.workspace-chat-card-drop-hint span {
+  color: #475569;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.workspace-chat-panel--card-drop-over .workspace-chat-card-drop-hint {
+  border-color: #2563eb;
+  background: rgba(219, 234, 254, 0.97);
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.12);
 }
 
 .workspace-chat-room {
@@ -160,6 +194,13 @@
   padding: 10px 12px 12px;
   border-top: 1px solid #e5e7eb;
   background: #fff;
+}
+
+.workspace-chat-card-link-error {
+  margin: 0 0 7px;
+  color: #b91c1c;
+  font-size: 10px;
+  line-height: 1.4;
 }
 
 .workspace-chat-composer textarea {
