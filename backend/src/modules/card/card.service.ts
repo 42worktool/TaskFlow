@@ -2,16 +2,19 @@
 // card.service.ts — Card (+ members, attachments, comments) business logic
 //
 // Mirrors workspace.service.ts conventions: Prisma singleton, soft delete
-// via deleted_at, role checks via workspace ROLE_RANK. Cards with
+// via deleted_at, role checks via the shared workspace helper. Cards with
 // list_id === null are personal inbox cards; access to those is by
 // ownership (user_id), not workspace role.
 // ============================================================
 import { prisma } from '../../db'
 import type { Card, List, Prisma, Role } from '@prisma/client'
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../errors'
-import { ROLE_RANK, getRole } from '../workspace/workspace.service'
 import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
+import {
+  getWorkspaceRole,
+  requireWorkspaceRole,
+} from '../../lib/workspace-permissions'
 import {
   toAttachmentDto,
   toCardDetailDto,
@@ -110,22 +113,6 @@ async function lockCardOrThrow(
   return card
 }
 
-async function getRoleWithClient(
-  client: CardAccessClient,
-  workspaceId: string,
-  userId: string,
-): Promise<Role | null> {
-  const member = await client.workspaceMember.findFirst({
-    where: {
-      workspace_id: workspaceId,
-      user_id: userId,
-      deleted_at: null,
-      workspace: { deleted_at: null },
-    },
-  })
-  return member?.role ?? null
-}
-
 async function requireCardWrite(
   card: CardAccess,
   userId: string,
@@ -145,9 +132,11 @@ async function requireCardRole(
     return null
   }
   const list = await getListOrThrow(card.list_id, client)
-  const role = await getRoleWithClient(client, list.workspace_id, userId)
+  if (minRole) {
+    return requireWorkspaceRole(list.workspace_id, userId, minRole, client)
+  }
+  const role = await getWorkspaceRole(list.workspace_id, userId, client)
   if (!role) throw new ForbiddenError()
-  if (minRole && ROLE_RANK[role] < ROLE_RANK[minRole]) throw new ForbiddenError()
   return role
 }
 
@@ -206,8 +195,7 @@ export async function createCard(
   },
 ) {
   const list = await getListOrThrow(input.listId)
-  const role = await getRole(list.workspace_id, input.userId)
-  if (!role || ROLE_RANK[role] < ROLE_RANK.MEMBER) throw new ForbiddenError()
+  await requireWorkspaceRole(list.workspace_id, input.userId, 'MEMBER')
 
   const created = await prisma.$transaction(async (tx) => {
     const lockedList = await tx.$queryRaw<Array<{ id: string }>>`
@@ -399,14 +387,12 @@ export async function moveCard(
       }
       sourceListId = sourceList.id
     }
-    const targetRole = await getRoleWithClient(
-      tx,
+    await requireWorkspaceRole(
       targetList.workspace_id,
       input.userId,
+      'MEMBER',
+      tx,
     )
-    if (!targetRole || ROLE_RANK[targetRole] < ROLE_RANK.MEMBER) {
-      throw new ForbiddenError()
-    }
 
     if (card.list_id === null) {
       const detachedRelation = softDeletedBy(input.userId)
@@ -606,10 +592,10 @@ export async function addCardMember(input: {
     }
 
     const list = await getListOrThrow(card.list_id, tx)
-    const targetRole = await getRoleWithClient(
-      tx,
+    const targetRole = await getWorkspaceRole(
       list.workspace_id,
       input.targetUserId,
+      tx,
     )
     if (!targetRole) throw new BadRequestError('Target user is not a member of this workspace')
 
@@ -827,8 +813,7 @@ export async function deleteComment(input: {
   if (comment.user_id !== input.userId) {
     if (!card.list_id) throw new ForbiddenError()
     const list = await getListOrThrow(card.list_id)
-    const role = await getRole(list.workspace_id, input.userId)
-    if (!role || ROLE_RANK[role] < ROLE_RANK.ADMIN) throw new ForbiddenError()
+    await requireWorkspaceRole(list.workspace_id, input.userId, 'ADMIN')
   }
   const location = await workspaceLocationForCard(card)
 

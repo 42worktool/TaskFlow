@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:realtime-tests": "tsc -p src/realtime/tsconfig.test.json",
-    "test": "npm run typecheck:realtime-tests && tsx --test src/app.integration.test.ts src/modules/auth/*.test.ts src/modules/card/*.test.ts src/modules/dashboard/*.test.ts src/modules/friend/*.test.ts src/modules/list/*.test.ts src/modules/notification/*.test.ts src/modules/presence/*.test.ts src/modules/workspace/*.test.ts src/lib/mail-templates.test.ts src/lib/ordering.test.ts src/docs/*.test.ts src/realtime/*.test.ts",
+    "test": "npm run typecheck:realtime-tests && tsx --test src/app.integration.test.ts src/modules/auth/*.test.ts src/modules/card/*.test.ts src/modules/dashboard/*.test.ts src/modules/friend/*.test.ts src/modules/list/*.test.ts src/modules/notification/*.test.ts src/modules/presence/*.test.ts src/modules/workspace/*.test.ts src/lib/*.test.ts src/docs/*.test.ts src/realtime/*.test.ts",
     "db:generate": "prisma generate --schema ./prisma",
     "db:migrate": "prisma migrate deploy --schema ./prisma",
     "migrate": "prisma migrate deploy --schema ./prisma",
