@@ -1,61 +1,153 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+  type CSSProperties,
+} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FriendsPanel from './FriendsPanel.vue'
-import InboxCardsPanel from './InboxCardsPanel.vue'
-import InboxDropTarget from './InboxDropTarget.vue'
 import WorkspaceChatPanel from './WorkspaceChatPanel.vue'
 import { authState } from '../services/auth'
 import {
+  clampFloatingPosition,
   closeMessenger,
-  finishCardDrag,
+  exceedsDragThreshold,
   messengerState,
-  notifyBoardChanged,
-  notifyInboxChanged,
   openMessenger,
   resetMessenger,
-  startCardDrag,
   toggleMessenger,
+  type FloatingPosition,
   type MessengerPane,
 } from '../services/messenger'
+
+type FloatingTarget = 'launcher' | 'window'
+
+interface ActivePointerDrag {
+  target: FloatingTarget
+  pointerId: number
+  start: FloatingPosition
+  origin: FloatingPosition
+  moved: boolean
+}
 
 const route = useRoute()
 const router = useRouter()
 const closeButton = ref<HTMLButtonElement | null>(null)
 const launcher = ref<HTMLButtonElement | null>(null)
+const messengerWindow = ref<HTMLElement | null>(null)
+const launcherPosition = ref<FloatingPosition | null>(null)
+const windowPosition = ref<FloatingPosition | null>(null)
+const activeDrag = ref<ActivePointerDrag | null>(null)
+const compactViewport = ref(false)
 const visited = ref<Record<MessengerPane, boolean>>({
   friends: false,
-  inbox: false,
   chat: false,
 })
+let suppressLauncherClick = false
 let returnFocus: HTMLElement | null = null
 
-const inboxCardDragging = computed(
-  () => messengerState.cardDrag?.source === 'inbox',
+const mobileWorkspaceIndex = computed(
+  () => compactViewport.value && route.path === '/workspaces',
 )
-const boardCardDragging = computed(
-  () => messengerState.cardDrag?.source === 'board',
+const launcherStyle = computed(() =>
+  mobileWorkspaceIndex.value ? {} : positionStyle(launcherPosition.value),
 )
-const openInboxAcceptingDrop = computed(
-  () =>
-    messengerState.open &&
-    messengerState.pane === 'inbox' &&
-    boardCardDragging.value,
+const mobilePageMode = computed(
+  () => compactViewport.value && Boolean(messengerState.workspace),
 )
-const shellVisible = computed(
-  () =>
-    messengerState.open &&
-    !inboxCardDragging.value &&
-    !(boardCardDragging.value && messengerState.pane !== 'inbox'),
-)
-const edgeDropActive = computed(
-  () => boardCardDragging.value && !openInboxAcceptingDrop.value,
+const windowStyle = computed(() =>
+  mobilePageMode.value ? {} : positionStyle(windowPosition.value),
 )
 
 function paneFromQuery(value: unknown): MessengerPane | null {
-  return value === 'friends' || value === 'inbox' || value === 'chat'
-    ? value
-    : null
+  return value === 'friends' || value === 'chat' ? value : null
+}
+
+function positionStyle(position: FloatingPosition | null): CSSProperties {
+  if (!position) return {}
+  return {
+    left: `${position.x}px`,
+    top: `${position.y}px`,
+    right: 'auto',
+    bottom: 'auto',
+  }
+}
+
+function elementFor(target: FloatingTarget): HTMLElement | null {
+  return target === 'launcher' ? launcher.value : messengerWindow.value
+}
+
+function positionFor(target: FloatingTarget): FloatingPosition | null {
+  return target === 'launcher'
+    ? launcherPosition.value
+    : windowPosition.value
+}
+
+function setPosition(target: FloatingTarget, position: FloatingPosition): void {
+  if (target === 'launcher') {
+    launcherPosition.value = position
+  } else {
+    windowPosition.value = position
+  }
+}
+
+function clampPosition(
+  target: FloatingTarget,
+  position: FloatingPosition,
+): FloatingPosition {
+  const element = elementFor(target)
+  if (!element) return position
+  const bounds = element.getBoundingClientRect()
+  return clampFloatingPosition(
+    position,
+    { width: bounds.width, height: bounds.height },
+    { width: window.innerWidth, height: window.innerHeight },
+  )
+}
+
+function syncPosition(target: FloatingTarget): void {
+  const element = elementFor(target)
+  if (!element) return
+  const current = positionFor(target)
+  const bounds = element.getBoundingClientRect()
+  setPosition(
+    target,
+    clampPosition(
+      target,
+      current ?? {
+        x: bounds.left,
+        y: bounds.top,
+      },
+    ),
+  )
+}
+
+async function syncFloatingPositions(): Promise<void> {
+  await nextTick()
+  if (mobilePageMode.value) return
+  syncPosition('launcher')
+  syncPosition('window')
+}
+
+async function resetDesktopFloatingPositions(): Promise<void> {
+  await nextTick()
+  for (const target of ['launcher', 'window'] as const) {
+    const element = elementFor(target)
+    if (!element) continue
+    const bounds = element.getBoundingClientRect()
+    const bottom = target === 'launcher' ? 20 : 84
+    setPosition(
+      target,
+      clampPosition(target, {
+        x: window.innerWidth - bounds.width - 20,
+        y: window.innerHeight - bounds.height - bottom,
+      }),
+    )
+  }
 }
 
 function clearMessengerQuery(): void {
@@ -76,42 +168,140 @@ function selectPane(pane: MessengerPane): void {
   openMessenger(pane)
 }
 
+function cancelPointerDrag(): void {
+  if (activeDrag.value?.target === 'launcher') {
+    suppressLauncherClick = true
+  }
+  activeDrag.value = null
+}
+
 function closeWindow(): void {
-  if (messengerState.cardDrag) return
+  cancelPointerDrag()
   closeMessenger()
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && messengerState.open && !messengerState.cardDrag) {
-    closeWindow()
+  if (event.key === 'Escape' && messengerState.open) closeWindow()
+}
+
+function startPointerDrag(
+  event: PointerEvent,
+  target: FloatingTarget,
+): void {
+  if (mobilePageMode.value) return
+  if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) {
+    return
+  }
+  if (
+    target === 'window' &&
+    event.target instanceof Element &&
+    event.target.closest('button')
+  ) {
+    return
+  }
+
+  syncPosition(target)
+  const origin = positionFor(target)
+  if (!origin) return
+
+  if (target === 'launcher') suppressLauncherClick = false
+  activeDrag.value = {
+    target,
+    pointerId: event.pointerId,
+    start: { x: event.clientX, y: event.clientY },
+    origin: { ...origin },
+    moved: false,
+  }
+  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  event.preventDefault()
+}
+
+function movePointerDrag(
+  event: PointerEvent,
+  target: FloatingTarget,
+): void {
+  const drag = activeDrag.value
+  if (
+    !drag ||
+    drag.target !== target ||
+    drag.pointerId !== event.pointerId
+  ) {
+    return
+  }
+
+  const current = { x: event.clientX, y: event.clientY }
+  if (!drag.moved && !exceedsDragThreshold(drag.start, current)) return
+  drag.moved = true
+  setPosition(
+    target,
+    clampPosition(target, {
+      x: drag.origin.x + current.x - drag.start.x,
+      y: drag.origin.y + current.y - drag.start.y,
+    }),
+  )
+  event.preventDefault()
+}
+
+function finishPointerDrag(
+  event: PointerEvent,
+  target: FloatingTarget,
+): void {
+  const drag = activeDrag.value
+  if (
+    !drag ||
+    drag.target !== target ||
+    drag.pointerId !== event.pointerId
+  ) {
+    return
+  }
+
+  if (target === 'launcher' && drag.moved) suppressLauncherClick = true
+  activeDrag.value = null
+  const element = event.currentTarget as HTMLElement
+  if (element.hasPointerCapture(event.pointerId)) {
+    element.releasePointerCapture(event.pointerId)
   }
 }
 
-function handleInboxDragStart(card: { id: string }): void {
-  startCardDrag(card.id, 'inbox')
+function cancelPointerDragFor(
+  event: PointerEvent,
+  target: FloatingTarget,
+): void {
+  const drag = activeDrag.value
+  if (
+    !drag ||
+    drag.target !== target ||
+    drag.pointerId !== event.pointerId
+  ) {
+    return
+  }
+  activeDrag.value = null
+  if (target === 'launcher') suppressLauncherClick = false
 }
 
-function handleInboxDragEnd(movedToBoard: boolean): void {
-  finishCardDrag()
-  if (movedToBoard) closeMessenger()
+function handleLauncherClick(event: MouseEvent): void {
+  if (suppressLauncherClick) {
+    suppressLauncherClick = false
+    event.preventDefault()
+    return
+  }
+  toggleMessenger()
 }
 
-function handleInboxDropSettled(): void {
-  notifyBoardChanged()
-  notifyInboxChanged()
-}
-
-function handleEdgeDropSettled(stored: boolean): void {
-  notifyBoardChanged()
-  notifyInboxChanged()
-  if (stored) openMessenger('inbox')
+function handleResize(): void {
+  compactViewport.value = window.matchMedia('(max-width: 760px)').matches
+  if (mobilePageMode.value) {
+    cancelPointerDrag()
+    return
+  }
+  syncPosition('launcher')
+  syncPosition('window')
 }
 
 watch(
   [() => messengerState.open, () => messengerState.pane],
   async ([open, pane], [previousOpen]) => {
     if (open) visited.value[pane] = true
-    if (messengerState.cardDrag) return
 
     if (open && !previousOpen) {
       const focused = document.activeElement
@@ -120,6 +310,7 @@ watch(
           ? focused
           : null
       await nextTick()
+      if (!mobilePageMode.value) syncPosition('window')
       closeButton.value?.focus()
     } else if (!open && previousOpen) {
       await nextTick()
@@ -149,42 +340,63 @@ watch(
 
 watch(
   () => authState.user?.id,
-  (userId, previousUserId) => {
+  async (userId, previousUserId) => {
     if (previousUserId && userId !== previousUserId) {
       resetMessenger()
-      visited.value = { friends: false, inbox: false, chat: false }
+      visited.value = { friends: false, chat: false }
     }
+    if (userId) await syncFloatingPositions()
   },
 )
 
-onMounted(() => window.addEventListener('keydown', handleKeydown))
+watch(mobilePageMode, async (enabled, previousEnabled) => {
+  if (enabled) {
+    cancelPointerDrag()
+    return
+  }
+  if (previousEnabled) {
+    await resetDesktopFloatingPositions()
+  }
+})
+
+onMounted(() => {
+  compactViewport.value = window.matchMedia('(max-width: 760px)').matches
+  window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('resize', handleResize)
+  void syncFloatingPositions()
+})
 onUnmounted(() => {
-  finishCardDrag()
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
 <template>
   <Teleport to="body">
     <template v-if="authState.user">
-      <InboxDropTarget
-        :enabled="messengerState.inboxDestinations.length > 0"
-        :active="edgeDropActive"
-        @settled="handleEdgeDropSettled"
-      />
-
       <aside
         id="messenger-window"
+        ref="messengerWindow"
         class="messenger-window"
         :class="{
-          'messenger-window--open': shellVisible,
-          'messenger-window--drag-hidden':
-            messengerState.open && !shellVisible,
+          'messenger-window--open': messengerState.open,
+          'messenger-window--moving': activeDrag?.target === 'window',
+          'messenger-window--workspace-context': messengerState.workspace,
         }"
-        :aria-hidden="shellVisible ? 'false' : 'true'"
+        :style="windowStyle"
+        :aria-hidden="messengerState.open ? 'false' : 'true'"
         aria-label="메신저"
       >
-        <header class="messenger-header">
+        <header
+          class="messenger-header"
+          :title="
+            mobilePageMode ? undefined : '드래그하여 메신저 이동'
+          "
+          @pointerdown="startPointerDrag($event, 'window')"
+          @pointermove="movePointerDrag($event, 'window')"
+          @pointerup="finishPointerDrag($event, 'window')"
+          @pointercancel="cancelPointerDragFor($event, 'window')"
+        >
           <div>
             <strong>TaskFlow 메신저</strong>
             <span v-if="messengerState.workspace">
@@ -212,13 +424,6 @@ onUnmounted(() => {
           </button>
           <button
             type="button"
-            :class="{ 'messenger-tab--active': messengerState.pane === 'inbox' }"
-            @click="selectPane('inbox')"
-          >
-            인박스
-          </button>
-          <button
-            type="button"
             :disabled="!messengerState.workspace"
             :title="
               messengerState.workspace
@@ -241,21 +446,6 @@ onUnmounted(() => {
             <FriendsPanel />
           </div>
           <div
-            v-if="visited.inbox"
-            v-show="messengerState.pane === 'inbox'"
-            class="messenger-pane"
-          >
-            <InboxCardsPanel
-              compact
-              :destination-lists="messengerState.inboxDestinations"
-              :refresh-token="messengerState.inboxRefreshToken"
-              :accepting-drop="openInboxAcceptingDrop"
-              @drop-settled="handleInboxDropSettled"
-              @drag-start="handleInboxDragStart"
-              @drag-end="handleInboxDragEnd"
-            />
-          </div>
-          <div
             v-if="visited.chat && messengerState.workspace"
             v-show="messengerState.pane === 'chat'"
             class="messenger-pane"
@@ -271,14 +461,23 @@ onUnmounted(() => {
       </aside>
 
       <button
-        v-show="!edgeDropActive"
         ref="launcher"
         class="messenger-launcher"
+        :class="{
+          'messenger-launcher--moving': activeDrag?.target === 'launcher',
+          'messenger-launcher--workspace-context': messengerState.workspace,
+          'messenger-launcher--above-toolbox': mobileWorkspaceIndex,
+        }"
+        :style="launcherStyle"
         type="button"
-        aria-label="메신저 열기"
+        :aria-label="messengerState.open ? '메신저 닫기' : '메신저 열기'"
         aria-controls="messenger-window"
         :aria-expanded="messengerState.open"
-        @click="toggleMessenger()"
+        @pointerdown="startPointerDrag($event, 'launcher')"
+        @pointermove="movePointerDrag($event, 'launcher')"
+        @pointerup="finishPointerDrag($event, 'launcher')"
+        @pointercancel="cancelPointerDragFor($event, 'launcher')"
+        @click="handleLauncherClick"
       >
         <span aria-hidden="true">●</span>
         <span aria-hidden="true">💬</span>

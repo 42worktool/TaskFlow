@@ -1,9 +1,12 @@
 .home-shell {
+  --workspace-index-toolbox-space: 76px;
   height: 100vh;
   display: flex;
   flex-direction: column;
+  padding-bottom: var(--workspace-index-toolbox-space);
   overflow: hidden;
   background: #f3f4f6;
+  box-sizing: border-box;
 }
 
 .home-body {
@@ -207,4 +210,11 @@
   padding: 14px 20px 18px;
   background: #f3f4f6;
   flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .home-shell {
+    --workspace-index-toolbox-space:
+      calc(62px + env(safe-area-inset-bottom, 0px));
+  }
 }

@@ -4,17 +4,20 @@ import draggable from 'vuedraggable'
 import CardDetailModal from './CardDetailModal.vue'
 import TaskCard from './TaskCard.vue'
 import { InboxAPI } from '../api/inbox'
+import { consumeChatCardDrop } from '../services/messenger'
 import type { Card, DraggableChange, List } from '../types'
 
 const props = withDefaults(
   defineProps<{
     compact?: boolean
+    boardColumn?: boolean
     destinationLists?: Pick<List, 'id' | 'name'>[]
     refreshToken?: number
     acceptingDrop?: boolean
   }>(),
   {
     compact: false,
+    boardColumn: false,
     destinationLists: () => [],
     refreshToken: 0,
     acceptingDrop: false,
@@ -80,6 +83,11 @@ async function deleteCard(cardId: string) {
 async function handleCardChange(event: DraggableChange<Card>) {
   if (!event.added || busyCardId.value) return
   const card = event.added.element
+  if (consumeChatCardDrop(card.id)) {
+    cards.value = cards.value.filter((item) => item.id !== card.id)
+    emit('drop-settled')
+    return
+  }
   inboxLoadGeneration += 1
   loading.value = false
   busyCardId.value = card.id
@@ -126,15 +134,28 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="inbox-cards-panel" :class="{ 'inbox-cards-panel--compact': compact }">
-    <div v-if="!compact" class="inbox-panel-header">
+  <section
+    class="inbox-cards-panel"
+    :class="{
+      'inbox-cards-panel--compact': compact,
+      'inbox-cards-panel--board-column': boardColumn,
+    }"
+  >
+    <header v-if="boardColumn" class="inbox-board-column-header">
+      <div>
+        <strong>내 인박스</strong>
+        <span>보드 밖에 보관 중인 카드</span>
+      </div>
+      <span class="inbox-board-column-count">{{ cards.length }}</span>
+    </header>
+    <div v-else-if="!compact" class="inbox-panel-header">
       <div>
         <h2 class="inbox-panel-title">인박스</h2>
         <p class="inbox-panel-subtitle">보드 밖에 보관 중인 내 카드</p>
       </div>
     </div>
 
-    <div class="inbox-panel-toolbar">
+    <div v-if="!boardColumn" class="inbox-panel-toolbar">
       <span class="card-count">카드 {{ cards.length }}개</span>
       <span v-if="destinationLists.length" class="inbox-drag-hint">
         카드를 보드 리스트로 드래그하세요

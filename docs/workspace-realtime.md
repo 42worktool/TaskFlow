@@ -84,9 +84,12 @@ transaction. After commit it publishes both the message and the normal
 `workspace.changed` card invalidation hint. Opening the linked card therefore
 shows the same text in its comment list.
 
-The Vue UI exposes the current workspace room inside the global bottom-right
-messenger beside Friends and Inbox. Leaving the workspace removes the room
-context while keeping the other two panes available.
+The Vue UI exposes the current workspace room inside the movable floating
+messenger beside Friends. Leaving the workspace removes the room context while
+keeping Friends available. Dropping a board card onto the open room selects
+that card for the next message; the drop itself does not create an empty
+message or comment. Desktop keeps the draggable launcher, while mobile opens
+the same room as a full-page messenger above the workspace bottom bar.
 
 Message editing/deletion, read receipts, typing indicators, file attachments,
 pagination, extra rooms, and direct messages are outside this slice.

@@ -4,9 +4,17 @@ import { useRouter } from 'vue-router'
 import { ChatAPI } from '../api/chat'
 import { ListAPI } from '../api/list'
 import { authState } from '../services/auth'
+import {
+  markCardDragConsumedByChat,
+  messengerState,
+} from '../services/messenger'
 import { realtime } from '../services/realtime'
 import { parseWorkspaceMessage } from '../services/realtime/protocol'
 import type { Card, WorkspaceMessage } from '../types'
+import {
+  findDroppedCard,
+  getBoardCardDropId,
+} from '../utils/chatCardDrop'
 
 interface CardOption extends Card {
   listName: string
@@ -32,8 +40,13 @@ const cardsLoading = ref(false)
 const sending = ref(false)
 const error = ref('')
 const messageList = ref<HTMLElement | null>(null)
+const composerInput = ref<HTMLTextAreaElement | null>(null)
+const cardDropOver = ref(false)
+const cardDropPending = ref(false)
+const cardLinkError = ref('')
 let loadGeneration = 0
 let cardLoadGeneration = 0
+let cardDragDepth = 0
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 const BACKGROUND_REFRESH_RETRIES = 2
 const BACKGROUND_RETRY_DELAY_MS = 250
@@ -43,6 +56,9 @@ const selectedCard = computed(
 )
 const cardTitles = computed(
   () => new Map(cards.value.map((card) => [card.id, card.title])),
+)
+const acceptsCardDrop = computed(
+  () => getBoardCardDropId(messengerState.cardDrag) !== null,
 )
 
 function mergeMessages(incoming: readonly WorkspaceMessage[]): void {
@@ -103,30 +119,33 @@ async function loadMessages(
   }
 }
 
-async function loadCards(): Promise<void> {
+async function loadCards(): Promise<CardOption[] | null> {
   const workspaceId = props.workspaceId
   const generation = ++cardLoadGeneration
-  if (!workspaceId) return
+  if (!workspaceId) return null
   cardsLoading.value = true
   try {
     const lists = await ListAPI.listByWorkspace(workspaceId)
+    const loadedCards = lists.flatMap((list) =>
+      list.cards.map((card) => ({ ...card, listName: list.name })),
+    )
     if (
       generation !== cardLoadGeneration ||
       workspaceId !== props.workspaceId
     ) {
-      return
+      return null
     }
-    cards.value = lists.flatMap((list) =>
-      list.cards.map((card) => ({ ...card, listName: list.name })),
-    )
+    cards.value = loadedCards
     if (
       selectedCardId.value &&
       !cards.value.some((card) => card.id === selectedCardId.value)
     ) {
       selectedCardId.value = null
     }
+    return loadedCards
   } catch {
     if (generation === cardLoadGeneration) cards.value = []
+    return null
   } finally {
     if (generation === cardLoadGeneration) cardsLoading.value = false
   }
@@ -135,7 +154,7 @@ async function loadCards(): Promise<void> {
 async function sendMessage(): Promise<void> {
   const workspaceId = props.workspaceId
   const nextContent = content.value.trim()
-  const cardId = selectedCardId.value
+  const cardId = selectedCard.value?.id ?? null
   if (!workspaceId || !nextContent || sending.value) return
 
   sending.value = true
@@ -158,12 +177,68 @@ async function sendMessage(): Promise<void> {
 
 function chooseCard(cardId: string): void {
   selectedCardId.value = cardId
+  cardLinkError.value = ''
   pickerOpen.value = false
 }
 
 function toggleCardPicker(): void {
   pickerOpen.value = !pickerOpen.value
   if (pickerOpen.value) void loadCards()
+}
+
+function handleCardDragEnter(event: DragEvent): void {
+  if (!acceptsCardDrop.value) return
+  event.preventDefault()
+  cardDragDepth += 1
+  cardDropOver.value = true
+}
+
+function handleCardDragOver(event: DragEvent): void {
+  if (!acceptsCardDrop.value) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'link'
+  cardDropOver.value = true
+}
+
+function handleCardDragLeave(): void {
+  cardDragDepth = Math.max(0, cardDragDepth - 1)
+  if (cardDragDepth === 0) cardDropOver.value = false
+}
+
+async function handleCardDrop(event: DragEvent): Promise<void> {
+  const cardId = getBoardCardDropId(messengerState.cardDrag)
+  if (!cardId) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  markCardDragConsumedByChat(cardId)
+  const workspaceId = props.workspaceId
+  cardDragDepth = 0
+  cardDropOver.value = false
+  cardDropPending.value = true
+  cardLinkError.value = ''
+
+  try {
+    const refreshedCards = await loadCards()
+    if (workspaceId !== props.workspaceId) return
+
+    const card = refreshedCards
+      ? findDroppedCard(refreshedCards, cardId)
+      : null
+    if (!card) {
+      cardLinkError.value = refreshedCards
+        ? '이 워크스페이스에서 더 이상 사용할 수 없는 카드입니다.'
+        : '카드를 확인하지 못했습니다. 잠시 후 다시 놓아 주세요.'
+      return
+    }
+
+    selectedCardId.value = card.id
+    pickerOpen.value = false
+    await nextTick()
+    composerInput.value?.focus()
+  } finally {
+    if (workspaceId === props.workspaceId) cardDropPending.value = false
+  }
 }
 
 function openLinkedCard(cardId: string): void {
@@ -199,6 +274,10 @@ watch(
     content.value = ''
     selectedCardId.value = null
     pickerOpen.value = false
+    cardDropOver.value = false
+    cardDropPending.value = false
+    cardLinkError.value = ''
+    cardDragDepth = 0
     error.value = ''
     loading.value = true
     sending.value = false
@@ -221,6 +300,15 @@ watch(
   },
 )
 
+watch(
+  () => messengerState.cardDrag,
+  (drag) => {
+    if (drag?.source === 'board') return
+    cardDragDepth = 0
+    cardDropOver.value = false
+  },
+)
+
 onUnmounted(() => {
   loadGeneration += 1
   cardLoadGeneration += 1
@@ -230,7 +318,34 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="workspace-chat-panel" aria-label="워크스페이스 채팅">
+  <section
+    class="workspace-chat-panel"
+    :class="{
+      'workspace-chat-panel--card-drop-ready': acceptsCardDrop,
+      'workspace-chat-panel--card-drop-over': cardDropOver,
+    }"
+    aria-label="워크스페이스 채팅"
+    @dragenter="handleCardDragEnter"
+    @dragover="handleCardDragOver"
+    @dragleave="handleCardDragLeave"
+    @drop="handleCardDrop"
+  >
+    <div
+      v-if="acceptsCardDrop || cardDropPending"
+      class="workspace-chat-card-drop-hint"
+      role="status"
+    >
+      <strong>
+        {{ cardDropPending ? '카드를 확인하는 중…' : '카드를 댓글에 연결' }}
+      </strong>
+      <span>
+        {{
+          cardDropPending
+            ? '현재 워크스페이스의 카드인지 확인하고 있습니다.'
+            : '여기에 놓고 메시지를 보내면 카드 댓글에도 기록됩니다.'
+        }}
+      </span>
+    </div>
     <div class="workspace-chat-room">
       <div>
         <strong># {{ workspaceName || '워크스페이스' }}</strong>
@@ -301,6 +416,13 @@ onUnmounted(() => {
     </p>
 
     <form class="workspace-chat-composer" @submit.prevent="sendMessage">
+      <p
+        v-if="cardLinkError"
+        class="workspace-chat-card-link-error"
+        role="alert"
+      >
+        {{ cardLinkError }}
+      </p>
       <div v-if="selectedCard" class="workspace-chat-selected-card">
         <span>▣ {{ selectedCard.title }}</span>
         <button
@@ -313,6 +435,7 @@ onUnmounted(() => {
         <small>이 메시지는 카드 댓글에도 기록됩니다.</small>
       </div>
       <textarea
+        ref="composerInput"
         v-model="content"
         rows="2"
         maxlength="1000"

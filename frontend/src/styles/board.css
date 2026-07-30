@@ -15,6 +15,24 @@
   overflow-x: auto;
 }
 
+.board-inbox-column {
+  width: 280px;
+  min-width: 280px;
+  max-height: 100%;
+  flex: 0 0 280px;
+  display: flex;
+  min-height: 0;
+}
+
+.board-inline-status {
+  width: 280px;
+  flex: 0 0 280px;
+  display: grid;
+  place-items: center;
+  color: #6b7280;
+  font-size: 13px;
+}
+
 .board-status {
   flex: 1;
   display: flex;
@@ -84,4 +102,23 @@
 .add-list-submit-btn:disabled {
   cursor: default;
   opacity: 0.55;
+}
+
+@media (max-width: 760px) {
+  .board-columns--inbox-open {
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  .board-columns--inbox-open > :not(.board-inbox-column) {
+    display: none !important;
+  }
+
+  .board-inbox-column {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 100%;
+    flex: 1 1 auto;
+  }
 }

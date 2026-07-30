@@ -26,12 +26,6 @@
   visibility: visible;
 }
 
-.messenger-window--drag-hidden {
-  opacity: 0;
-  pointer-events: none;
-  visibility: visible;
-}
-
 .messenger-header {
   min-height: 58px;
   padding: 0 13px 0 17px;
@@ -40,6 +34,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.messenger-window--moving .messenger-header {
+  cursor: grabbing;
 }
 
 .messenger-header strong,
@@ -67,6 +68,7 @@
   color: #64748b;
   font-size: 24px;
   line-height: 1;
+  cursor: pointer;
 }
 
 .messenger-close:hover {
@@ -79,7 +81,7 @@
   padding: 6px 8px;
   border-bottom: 1px solid #e5e7eb;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
   background: #fff;
 }
@@ -135,11 +137,18 @@
   display: grid;
   place-items: center;
   font-size: 23px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
-.messenger-launcher:hover {
+.messenger-launcher:hover:not(.messenger-launcher--moving) {
   background: #1d4ed8;
   transform: translateY(-1px);
+}
+
+.messenger-launcher--moving {
+  cursor: grabbing;
 }
 
 .messenger-launcher > span:first-child {
@@ -150,8 +159,39 @@
   font-size: 8px;
 }
 
+@media (max-width: 760px) {
+  .messenger-window--workspace-context {
+    top: 0 !important;
+    right: 0 !important;
+    bottom: calc(62px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 0 !important;
+    width: 100%;
+    height: auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overscroll-behavior: contain;
+  }
+
+  .messenger-window--workspace-context .messenger-header {
+    cursor: default;
+    touch-action: auto;
+  }
+
+  .messenger-launcher--workspace-context {
+    display: none;
+  }
+
+  .messenger-launcher.messenger-launcher--above-toolbox {
+    right: 16px;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    left: auto;
+    top: auto;
+  }
+}
+
 @media (max-width: 560px) {
-  .messenger-window {
+  .messenger-window:not(.messenger-window--workspace-context) {
     right: 12px;
     bottom: 82px;
     width: calc(100vw - 24px);
