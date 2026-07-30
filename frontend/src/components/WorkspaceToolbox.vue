@@ -15,7 +15,10 @@ import {
   setExternalCardDropHover,
   showMessengerDirectory,
 } from '../services/messenger'
-import { unreadNotificationCount } from '../services/notifications'
+import {
+  formatMessengerUnreadCount,
+  totalMessengerUnreadCount,
+} from '../services/messengerUnread'
 
 const props = withDefaults(
   defineProps<{
@@ -59,10 +62,8 @@ const dashboardPath = computed(
 const hasWorkspaceContext = computed(() => Boolean(props.workspaceId))
 const workspaceActive = computed(() => route.path === '/workspaces')
 const chatOpen = computed(() => messengerState.open)
-const unreadNotificationLabel = computed(() =>
-  unreadNotificationCount.value > 99
-    ? '99+'
-    : String(unreadNotificationCount.value),
+const totalUnreadLabel = computed(() =>
+  formatMessengerUnreadCount(totalMessengerUnreadCount.value),
 )
 const draggedBoardCardId = computed(() =>
   messengerState.cardDrag?.source === 'board'
@@ -525,11 +526,13 @@ onBeforeUnmount(() => {
           <path d="M8 10h8M8 13h5" />
         </svg>
         <span
-          v-if="unreadNotificationCount"
+          v-if="totalMessengerUnreadCount"
           class="workspace-toolbox__badge"
-          :aria-label="`읽지 않은 알림 ${unreadNotificationCount}개`"
+          :aria-label="
+            `읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`
+          "
         >
-          {{ unreadNotificationLabel }}
+          {{ totalUnreadLabel }}
         </span>
         <span>채팅</span>
       </button>

@@ -21,13 +21,18 @@ import {
   setMessengerWorkspace,
   showFriendManagement,
   showMessengerDirectory,
-  showMessengerNotifications,
   startCardDrag,
   setExternalCardDropHover,
   takePendingChatCardAttachment,
   toggleMessengerDirectory,
   toggleMessenger,
 } from './messenger'
+import {
+  directMessageUnreadCount,
+  receiveDirectMessageUnread,
+  receiveWorkspaceMessageUnread,
+  workspaceUnreadCount,
+} from './messengerUnread'
 
 describe('messenger state', () => {
   afterEach(() => {
@@ -100,6 +105,60 @@ describe('messenger state', () => {
     })
   })
 
+  it('marks only the conversation being opened as read', () => {
+    receiveWorkspaceMessageUnread(
+      {
+        id: 'workspace-message-1',
+        workspace_id: 'workspace-1',
+        card_id: null,
+        content: 'workspace hello',
+        created_at: '2026-07-30T00:00:00.000Z',
+        author: {
+          user_id: 'member-1',
+          name: 'Member',
+          profile_image_url: null,
+        },
+      },
+      'current-user',
+      null,
+    )
+    receiveDirectMessageUnread(
+      {
+        id: 'direct-message-1',
+        content: 'dm hello',
+        created_at: '2026-07-30T00:00:00.000Z',
+        author: {
+          user_id: 'friend-1',
+          name: 'Jamie',
+          profile_image_url: null,
+        },
+        recipient: {
+          user_id: 'current-user',
+          name: 'Current user',
+          profile_image_url: null,
+        },
+      },
+      'current-user',
+      null,
+    )
+
+    openWorkspaceConversation({
+      id: 'workspace-1',
+      name: 'Alpha',
+      syncVersion: 1,
+    })
+    expect(workspaceUnreadCount('workspace-1')).toBe(0)
+    expect(directMessageUnreadCount('friend-1')).toBe(1)
+
+    openDirectConversation({
+      id: 'friend-1',
+      name: 'Jamie',
+      profile_image_url: null,
+      online: false,
+    })
+    expect(directMessageUnreadCount('friend-1')).toBe(0)
+  })
+
   it('returns to the directory without discarding the selected conversation', () => {
     openDirectConversation({
       id: 'friend-1',
@@ -113,14 +172,6 @@ describe('messenger state', () => {
     expect(messengerState.open).toBe(true)
     expect(messengerState.pane).toBe('directory')
     expect(messengerState.activeRoom?.kind).toBe('dm')
-  })
-
-  it('opens session notifications as a messenger pane', () => {
-    showMessengerNotifications()
-
-    expect(messengerState.open).toBe(true)
-    expect(messengerState.pane).toBe('notifications')
-    expect(messengerState.activeRoom).toBeNull()
   })
 
   it('collapses and restores the desktop directory rail', () => {

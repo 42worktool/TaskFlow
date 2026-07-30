@@ -171,10 +171,6 @@ export interface NotificationEvent {
   }
 }
 
-export interface Notification extends NotificationEvent {
-  read: boolean
-}
-
 export interface Friend {
   id: UUID
   name: string

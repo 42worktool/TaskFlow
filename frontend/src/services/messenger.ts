@@ -1,9 +1,13 @@
 import { reactive } from 'vue'
 import type { Friend, List } from '../types'
+import {
+  clearMessengerUnread,
+  markDirectConversationRead,
+  markWorkspaceConversationRead,
+} from './messengerUnread'
 
 export type MessengerPane =
   | 'directory'
-  | 'notifications'
   | 'friends'
   | 'chat'
   | 'dm'
@@ -116,6 +120,12 @@ export function openMessenger(pane: MessengerPane = messengerState.pane): void {
   if (pane === 'dm' && messengerState.activeRoom?.kind !== 'dm') return
   messengerState.pane = pane
   messengerState.open = true
+  if (pane === 'chat' && messengerState.activeRoom?.kind === 'workspace') {
+    markWorkspaceConversationRead(messengerState.activeRoom.workspace.id)
+  }
+  if (pane === 'dm' && messengerState.activeRoom?.kind === 'dm') {
+    markDirectConversationRead(messengerState.activeRoom.friend.id)
+  }
 }
 
 export function toggleMessenger(pane: MessengerPane = messengerState.pane): void {
@@ -144,11 +154,6 @@ export function showFriendManagement(): void {
   messengerState.open = true
 }
 
-export function showMessengerNotifications(): void {
-  messengerState.pane = 'notifications'
-  messengerState.open = true
-}
-
 export function openWorkspaceConversation(
   workspace: MessengerWorkspace,
 ): void {
@@ -158,6 +163,7 @@ export function openWorkspaceConversation(
   }
   messengerState.pane = 'chat'
   messengerState.open = true
+  markWorkspaceConversationRead(workspace.id)
 }
 
 export function openDirectConversation(
@@ -169,6 +175,7 @@ export function openDirectConversation(
   }
   messengerState.pane = 'dm'
   messengerState.open = true
+  markDirectConversationRead(friend.id)
 }
 
 export function setMessengerWorkspace(workspace: MessengerWorkspace): void {
@@ -217,6 +224,7 @@ export function resetMessenger(): void {
   messengerState.externalCardDrop = null
   messengerState.pendingChatCardAttachment = null
   messengerState.inboxDestinations = []
+  clearMessengerUnread()
 }
 
 export function startCardDrag(cardId: string, source: CardDragSource): void {
@@ -317,6 +325,7 @@ export function requestChatCardAttachment(
   }
   messengerState.pane = 'chat'
   messengerState.open = true
+  markWorkspaceConversationRead(workspace.id)
   return true
 }
 
