@@ -21,6 +21,7 @@ import {
   setMessengerWorkspace,
   showFriendManagement,
   showMessengerDirectory,
+  showMessengerNotifications,
   startCardDrag,
   setExternalCardDropHover,
   takePendingChatCardAttachment,
@@ -112,6 +113,14 @@ describe('messenger state', () => {
     expect(messengerState.open).toBe(true)
     expect(messengerState.pane).toBe('directory')
     expect(messengerState.activeRoom?.kind).toBe('dm')
+  })
+
+  it('opens session notifications as a messenger pane', () => {
+    showMessengerNotifications()
+
+    expect(messengerState.open).toBe(true)
+    expect(messengerState.pane).toBe('notifications')
+    expect(messengerState.activeRoom).toBeNull()
   })
 
   it('collapses and restores the desktop directory rail', () => {

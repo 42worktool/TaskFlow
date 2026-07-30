@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import NotificationMenu from './NotificationMenu.vue'
 import ProfileMenu from './ProfileMenu.vue'
 import SearchInput from './SearchInput.vue'
 
@@ -25,7 +24,6 @@ withDefaults(
         >
           <slot name="workspace-actions" />
         </div>
-        <NotificationMenu />
         <ProfileMenu />
       </div>
     </div>

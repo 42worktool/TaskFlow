@@ -10,6 +10,7 @@ import {
 import { useRoute, useRouter } from 'vue-router'
 import DirectMessagePanel from './DirectMessagePanel.vue'
 import FriendsPanel from './FriendsPanel.vue'
+import MessengerNotificationsPanel from './MessengerNotificationsPanel.vue'
 import WorkspaceChatPanel from './WorkspaceChatPanel.vue'
 import { FriendAPI } from '../api/friend'
 import { WorkspaceAPI } from '../api/workspace'
@@ -24,12 +25,17 @@ import {
   resetMessenger,
   showFriendManagement,
   showMessengerDirectory,
+  showMessengerNotifications,
   toggleMessengerDirectory,
   type MessengerPane,
 } from '../services/messenger'
+import {
+  markNotificationRead,
+  unreadNotificationCount,
+} from '../services/notifications'
 import { realtime } from '../services/realtime'
 import { parseFriendPresenceEvent } from '../services/realtime/protocol'
-import type { Friend, Workspace } from '../types'
+import type { Friend, Notification, Workspace } from '../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,6 +45,8 @@ const directoryFriends = ref<Friend[]>([])
 const directoryWorkspaces = ref<Workspace[]>([])
 const directoryLoading = ref(false)
 const directoryError = ref('')
+const notificationOpeningId = ref('')
+const notificationOpenError = ref('')
 let directoryLoadGeneration = 0
 let returnFocus: HTMLElement | null = null
 
@@ -58,6 +66,7 @@ const activeDirectFriend = computed(() =>
     : null,
 )
 const activeRoomTitle = computed(() => {
+  if (messengerState.pane === 'notifications') return '알림'
   if (messengerState.pane === 'friends') return '친구 관리'
   if (messengerState.pane === 'chat' && activeWorkspaceRoom.value) {
     return activeWorkspaceRoom.value.name
@@ -67,6 +76,16 @@ const activeRoomTitle = computed(() => {
   }
   return '대화 목록'
 })
+const unreadNotificationLabel = computed(() =>
+  unreadNotificationCount.value > 99
+    ? '99+'
+    : String(unreadNotificationCount.value),
+)
+const notificationButtonLabel = computed(() =>
+  unreadNotificationCount.value === 0
+    ? '메신저 알림 열기'
+    : `메신저 알림 열기, 읽지 않은 알림 ${unreadNotificationCount.value}개`,
+)
 const directoryVisible = computed(
   () =>
     compactViewport.value
@@ -78,7 +97,11 @@ const conversationVisible = computed(
 )
 
 function paneFromQuery(value: unknown): MessengerPane | null {
-  return value === 'friends' || value === 'chat' ? value : null
+  return value === 'notifications' ||
+    value === 'friends' ||
+    value === 'chat'
+    ? value
+    : null
 }
 
 function clearMessengerQuery(): void {
@@ -212,6 +235,44 @@ function openFriendSettings(): void {
   showFriendManagement()
 }
 
+function openNotifications(): void {
+  notificationOpenError.value = ''
+  showMessengerNotifications()
+}
+
+async function selectNotification(item: Notification): Promise<void> {
+  markNotificationRead(item.id)
+  notificationOpeningId.value = item.id
+  notificationOpenError.value = ''
+
+  try {
+    const workspace =
+      directoryWorkspaces.value.find(
+        (candidate) => candidate.id === item.workspace_id,
+      ) ?? await WorkspaceAPI.get(item.workspace_id)
+    const routeWorkspace = messengerState.workspace
+    openWorkspaceConversation({
+      id: workspace.id,
+      name: workspace.name,
+      syncVersion:
+        routeWorkspace?.id === workspace.id
+          ? routeWorkspace.syncVersion
+          : 0,
+    })
+
+    const targetPath = `/workspaces/${workspace.id}/board`
+    if (route.path !== targetPath) await router.push(targetPath)
+  } catch (caught) {
+    notificationOpenError.value =
+      caught instanceof Error
+        ? caught.message
+        : '알림의 워크스페이스 대화방을 열지 못했습니다.'
+    showMessengerNotifications()
+  } finally {
+    notificationOpeningId.value = ''
+  }
+}
+
 function returnToDirectory(): void {
   showMessengerDirectory()
   void loadDirectory()
@@ -321,6 +382,28 @@ onUnmounted(() => {
             <strong>TaskFlow 메신저</strong>
             <span>{{ activeRoomTitle }}</span>
           </div>
+          <button
+            class="messenger-notification-trigger"
+            :class="{
+              'messenger-notification-trigger--active':
+                messengerState.pane === 'notifications',
+            }"
+            type="button"
+            :aria-label="notificationButtonLabel"
+            :aria-pressed="messengerState.pane === 'notifications'"
+            @click="openNotifications"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+              <path d="M10 21h4" />
+            </svg>
+            <span
+              v-if="unreadNotificationCount"
+              class="messenger-notification-trigger__badge"
+            >
+              {{ unreadNotificationLabel }}
+            </span>
+          </button>
           <button
             v-if="!compactViewport"
             class="messenger-directory-toggle"
@@ -483,6 +566,12 @@ onUnmounted(() => {
               v-else-if="messengerState.pane === 'friends'"
               @changed="loadDirectory"
               @open-dm="selectDirectRoom"
+            />
+            <MessengerNotificationsPanel
+              v-else-if="messengerState.pane === 'notifications'"
+              :pending-id="notificationOpeningId"
+              :error="notificationOpenError"
+              @open="selectNotification"
             />
             <WorkspaceChatPanel
               v-else-if="

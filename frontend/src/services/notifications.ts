@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import { realtime } from './realtime'
 import type { Notification, NotificationEvent } from '../types'
 
@@ -7,6 +7,10 @@ const MAX_RECENT_NOTIFICATIONS = 50
 export const notificationState = reactive({
   items: [] as Notification[],
 })
+
+export const unreadNotificationCount = computed(
+  () => notificationState.items.filter((item) => !item.read).length,
+)
 
 export function parseNotificationEvent(value: unknown): NotificationEvent | null {
   if (!value || typeof value !== 'object') return null

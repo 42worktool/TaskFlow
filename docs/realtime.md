@@ -15,7 +15,10 @@ requires them.
 The first feature slice is `notification.created`. When an invited user joins a
 workspace, the backend sends one update notification to each currently
 connected existing member. The frontend keeps the most recent 50 events in
-memory and clears them when the session ends or changes user. There is
+memory and clears them when the session ends or changes user. These events are
+shown in the messenger instead of a separate header menu. The messenger header
+and workspace toolbox share the same unread count, and selecting an item marks
+it read before opening the related workspace conversation and board. There is
 intentionally no notification history or persisted read state yet; those
 belong in a later PostgreSQL-backed notification feature if the project needs
 them.

@@ -38,11 +38,14 @@ HTTP controllers or the Vue component tree.
 - A full messenger with workspace rooms, accepted-friend DMs, friend
   management, and realtime online status. On desktop it toggles from the right
   and its right-side directory rail can collapse to return space to the board;
-  mobile uses a full-page view above the persistent bottom bar.
+  mobile uses a full-page view above the persistent bottom bar. Session-scoped
+  workspace notifications live in the messenger, with a shared unread badge on
+  the messenger header and workspace toolbox.
 - Card-linked workspace messages that are also stored and displayed as card
   comments, direct comment writing from card details, and realtime team-member
   online status.
-- Realtime workspace-member-joined notifications.
+- Realtime workspace-member-joined notifications that open the related
+  workspace conversation from the messenger.
 - HTTPS and WSS through Nginx, backed by PostgreSQL and Redis.
 
 ## Architecture
