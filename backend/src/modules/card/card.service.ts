@@ -86,7 +86,7 @@ async function getListOrThrow(
 /** Write access: inbox card owner, or MEMBER+ in the card's workspace. */
 type CardAccess = Pick<
   Card,
-  'list_id' | 'user_id' | 'start_at' | 'deadline'
+  'list_id' | 'user_id' | 'is_completed' | 'start_at' | 'deadline'
 >
 
 interface WorkspaceCardLocation {
@@ -99,7 +99,7 @@ async function lockCardOrThrow(
   cardId: string,
 ): Promise<CardAccess> {
   const cards = await tx.$queryRaw<CardAccess[]>`
-    SELECT "list_id", "user_id", "start_at", "deadline"
+    SELECT "list_id", "user_id", "is_completed", "start_at", "deadline"
     FROM "Cards"
     WHERE "id" = ${cardId}::uuid
       AND "deleted_at" IS NULL
@@ -513,6 +513,42 @@ export async function updateCardDates(
     action: 'updated',
     listIds: result.location ? [result.location.listId] : [],
   })
+  return result.card
+}
+
+export async function updateCardCompletion(input: {
+  userId: string
+  cardId: string
+  isCompleted: boolean
+}) {
+  const result = await prisma.$transaction(async (tx) => {
+    const card = await lockCardOrThrow(tx, input.cardId)
+    await requireCardWrite(card, input.userId, tx)
+    const location = await workspaceLocationForCard(card, tx)
+
+    const updated = await tx.card.update({
+      where: { id: input.cardId },
+      data: {
+        is_completed: input.isCompleted,
+        ...updatedBy(input.userId),
+      },
+    })
+    return {
+      card: toCardDto(updated),
+      location,
+      changed: card.is_completed !== input.isCompleted,
+    }
+  })
+
+  if (result.changed) {
+    publishCardChange({
+      userId: input.userId,
+      cardId: input.cardId,
+      location: result.location,
+      action: 'updated',
+      listIds: result.location ? [result.location.listId] : [],
+    })
+  }
   return result.card
 }
 

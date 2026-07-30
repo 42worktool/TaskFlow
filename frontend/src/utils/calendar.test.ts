@@ -12,6 +12,7 @@ function card(overrides: Partial<Card> = {}): Card {
     list_id: 'list-1',
     title: 'Prototype',
     description: null,
+    is_completed: false,
     start_at: null,
     deadline: null,
     sequence: 1,

@@ -98,4 +98,24 @@ describe('CardAPI', () => {
       json: { comment_str: 'Direct comment' },
     })
   })
+
+  it('updates completion without moving the card to another list', async () => {
+    const completed = {
+      id: 'card-1',
+      list_id: 'list-1',
+      is_completed: true,
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(completed)
+
+    await expect(
+      CardAPI.updateCompletion('card-1', true),
+    ).resolves.toEqual(completed)
+    expect(apiRequest).toHaveBeenCalledWith(
+      '/api/cards/card-1/completion',
+      {
+        method: 'PATCH',
+        json: { is_completed: true },
+      },
+    )
+  })
 })

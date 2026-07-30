@@ -6,6 +6,7 @@ export function toCardDto(card: Card) {
     list_id: card.list_id,
     title: card.title,
     description: card.description,
+    is_completed: card.is_completed,
     start_at: card.start_at,
     deadline: card.deadline,
     sequence: card.sequence,

@@ -166,7 +166,19 @@ WHERE "id" = '30000000-0000-4000-8000-000000000001';
 
 UPDATE "Cards"
 SET
+    "is_completed" = true,
+    "updated_by" = '00000000-0000-4000-8000-000000000002'
+WHERE "id" = '30000000-0000-4000-8000-000000000001';
+
+UPDATE "Cards"
+SET
     "list_id" = '20000000-0000-4000-8000-000000000002',
+    "updated_by" = '00000000-0000-4000-8000-000000000002'
+WHERE "id" = '30000000-0000-4000-8000-000000000001';
+
+UPDATE "Cards"
+SET
+    "is_completed" = false,
     "updated_by" = '00000000-0000-4000-8000-000000000002'
 WHERE "id" = '30000000-0000-4000-8000-000000000001';
 
@@ -323,7 +335,7 @@ BEGIN
                 ('LIST_DELETED',         'UPDATE', 0),
                 ('CARD_CREATED',         'INSERT', 2),
                 ('CARD_UPDATED',         'UPDATE', 1),
-                ('CARD_MOVED',           'UPDATE', 1),
+                ('CARD_MOVED',           'UPDATE', 3),
                 ('CARD_COMPLETED',       'UPDATE', 1),
                 ('CARD_REOPENED',        'UPDATE', 1),
                 ('CARD_DELETED',         'UPDATE', 1),
@@ -358,8 +370,8 @@ BEGIN
     FROM "ActivityLogs"
     WHERE "workspace_id" = '10000000-0000-4000-8000-000000000001';
 
-    IF total_count <> 21 THEN
-        RAISE EXCEPTION 'unexpected total activity count: expected 21, got %', total_count;
+    IF total_count <> 23 THEN
+        RAISE EXCEPTION 'unexpected total activity count: expected 23, got %', total_count;
     END IF;
 END;
 $assert$;

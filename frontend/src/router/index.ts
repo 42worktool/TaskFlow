@@ -6,6 +6,7 @@ import Workspace from '../pages/Workspace.vue'
 import WorkspaceLayout from '../layouts/WorkspaceLayout.vue'
 import Board from '../pages/Board.vue'
 import Calendar from '../pages/Calendar.vue'
+import Dashboard from '../pages/Dashboard.vue'
 import Search from '../pages/Search.vue'
 import Account from '../pages/Account.vue'
 import PrivacyPolicy from '../pages/PrivacyPolicy.vue'
@@ -37,6 +38,7 @@ const router = createRouter({
         { path: '', redirect: 'board' },
         { path: 'board', component: Board },
         { path: 'calendar', component: Calendar },
+        { path: 'dashboard', component: Dashboard },
         {
           path: 'chat',
           redirect: (to) => ({

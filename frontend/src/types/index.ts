@@ -88,6 +88,7 @@ export interface List {
   workspace_id: UUID
   name: string
   sequence: number
+  is_done: boolean
 }
 
 export interface Card {
@@ -97,6 +98,7 @@ export interface Card {
   description: string | null
   start_at: ISODateString | null
   deadline: ISODateString | null
+  is_completed: boolean
   sequence: number
   created_at: ISODateString
 }
@@ -196,4 +198,95 @@ export interface FriendRequestLists {
 export interface FriendPresenceEvent {
   user_id: UUID
   online: boolean
+}
+
+export interface DashboardSummary {
+  current_total: number
+  current_done: number
+  current_not_done: number
+  created_in_period: number
+  completed_in_period: number
+  reopened_in_period: number
+  activity_in_period: number
+  completion_rate: number
+  has_cards: boolean
+}
+
+export type DashboardPeriod = 7 | 30 | 90 | 365
+
+export interface DashboardDailyActivity {
+  date: string
+  count: number
+  log_count: number
+}
+
+export interface DashboardDailyFlow {
+  date: string
+  created: number
+  completed: number
+  reopened: number
+}
+
+export interface DashboardListStatus {
+  list_id: UUID
+  name: string
+  is_done: boolean
+  card_count: number
+  completed_card_count: number
+}
+
+export type DashboardTargetType =
+  | 'WORKSPACE'
+  | 'MEMBER'
+  | 'LIST'
+  | 'CARD'
+  | 'COMMENT'
+
+export interface DashboardActivityBreakdown {
+  target_type: DashboardTargetType
+  count: number
+}
+
+export type DashboardActivityEventType =
+  | 'WORKSPACE_UPDATED'
+  | 'WORKSPACE_DELETED'
+  | 'MEMBER_ADDED'
+  | 'MEMBER_REMOVED'
+  | 'MEMBER_ROLE_CHANGED'
+  | 'LIST_CREATED'
+  | 'LIST_UPDATED'
+  | 'LIST_MOVED'
+  | 'LIST_DELETED'
+  | 'CARD_CREATED'
+  | 'CARD_UPDATED'
+  | 'CARD_MOVED'
+  | 'CARD_COMPLETED'
+  | 'CARD_REOPENED'
+  | 'CARD_DELETED'
+  | 'COMMENT_CREATED'
+  | 'COMMENT_UPDATED'
+  | 'COMMENT_DELETED'
+
+export interface DashboardRecentActivity {
+  event_type: DashboardActivityEventType
+  target_type: DashboardTargetType
+  operation: 'INSERT' | 'UPDATE' | 'DELETE'
+  target_id: string
+  created_at: ISODateString
+  actor: {
+    user_id: UUID
+    name: string
+    profile_image_url: string | null
+  } | null
+}
+
+export interface WorkspaceDashboard {
+  generated_at: ISODateString
+  period_days: DashboardPeriod
+  summary: DashboardSummary
+  daily_activity: DashboardDailyActivity[]
+  daily_flow: DashboardDailyFlow[]
+  lists: DashboardListStatus[]
+  activity_breakdown: DashboardActivityBreakdown[]
+  recent_activity: DashboardRecentActivity[]
 }

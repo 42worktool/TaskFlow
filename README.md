@@ -30,6 +30,9 @@ HTTP controllers or the Vue component tree.
   lists, including horizontal edge scrolling.
 - A calendar that renders card start/deadline ranges as continuous weekly bars,
   plus text search across workspaces the user can access.
+- A workspace activity dashboard with selectable 7/30/90/365-day ranges,
+  date-labelled contribution and issue-flow charts, current completion
+  metrics, activity breakdowns, and a recent activity feed.
 - Email-based friend requests with acceptance/rejection and realtime
   online/offline presence for accepted friends.
 - A movable full messenger with workspace rooms, accepted-friend DMs, friend
@@ -242,8 +245,8 @@ erDiagram
 ```
 
 The Prisma models map to plural PostgreSQL table names. `ActivityLogs` is
-created by SQL migration and populated by database triggers, so it is not a
-Prisma application model.
+created and populated by a SQL trigger migration, then exposed through a
+read-only Prisma model for dashboard aggregation.
 
 | Table | Important fields and types | Relationship or rule |
 | --- | --- | --- |
@@ -255,8 +258,8 @@ Prisma application model.
 | `Workspaces` | `id UUID`, `name String`, `is_public Boolean` | Parent of members, lists, and labels |
 | `WorkspaceMembers` | `workspace_id UUID`, `user_id UUID`, `role Role` | Composite key; role is `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` |
 | `WorkspaceMessages` | `id UUID`, `workspace_id UUID`, `user_id UUID`, `card_id UUID?`, `content Text`, `created_at DateTime` | Append-only default-room messages; an optional card link is cleared if the card is deleted |
-| `Lists` | `id UUID`, `workspace_id UUID`, `name String`, `sequence Float`, `is_done Boolean` | Fractional sequence supports reordering |
-| `Cards` | `id UUID`, `list_id UUID?`, `user_id UUID?`, `title String`, `description Text`, `start_at DateTime?`, `deadline DateTime?`, `sequence Float` | A null `list_id` denotes a personal inbox card |
+| `Lists` | `id UUID`, `workspace_id UUID`, `name String`, `sequence Float`, `is_done Boolean` | Fractional sequence supports reordering; `is_done` is a visual workflow marker |
+| `Cards` | `id UUID`, `list_id UUID?`, `user_id UUID?`, `title String`, `description Text`, `is_completed Boolean`, `start_at DateTime?`, `deadline DateTime?`, `sequence Float` | A null `list_id` denotes a personal inbox card; completion is independent from list position |
 | `CardMembers` | `card_id UUID`, `user_id UUID` | Composite assignment relation |
 | `Labels` | `id UUID`, `workspace_id UUID`, `label_name String`, `label_color String` | Labels are workspace-scoped |
 | `CardLabels` | `label_id UUID`, `card_id UUID` | Composite card-to-label relation |
@@ -281,6 +284,7 @@ guessing an identity where the repository does not prove one.
 | Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
 | Personal inbox | API-backed cards, board/inbox drag round trip, and edge scrolling | `seankim96` |
 | Calendar and search | Range-bar workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
+| Activity dashboard | Selectable-period trigger-backed contribution heatmap, dated activity feed, issue flow, completion metrics, and list/activity charts | `seankim96` |
 | Friends, DMs, and presence | Request/accept flow, symmetric friendships, direct messages, unified messenger, and online/offline events | `seankim96` |
 | Realtime foundation | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain | `seankim96` |
 | Workspace realtime and chat | Member-only channels, targeted list reconciliation, team presence, and persistent group chat | `seankim96` |
@@ -332,11 +336,12 @@ acceptance and scoring remain the evaluator's decision.
 | Use an ORM | Minor | 1 | Prisma schema, relations, transactions, and migrations over PostgreSQL | `injo`, `Saususge`, `KHR416` |
 | OAuth 2.0 authentication | Minor | 1 | Google Authorization Code flow with state, nonce, ID-token verification, and account linking policy | `Sean Kim` |
 | Organization system | Major | 2 | Isolated workspaces, memberships, roles, invitations, and board resources | `Saususge`, `injo`, `KHR416`, `seankim96` |
-| **Currently defensible total** |  | **8** | Does not count incomplete planned modules |  |
+| Advanced realtime data visualization | Major | 2 | Trigger-backed activity analytics with live invalidation, a contribution heatmap, issue-flow charts, and current completion metrics | `seankim96` |
+| **Currently defensible total** |  | **10** | Does not count incomplete planned modules |  |
 
 The planning document also considered chat/user interaction, full profile
 management, advanced permission administration, realtime collaboration,
-analytics, advanced search, file upload, and a public API. They are not claimed
+advanced search, file upload, and a public API. They are not claimed
 because the current prototype does not implement their complete subject
 requirements.
 
@@ -452,6 +457,7 @@ to an AI system.
 - [Realtime protocol and extension points](docs/realtime.md)
 - [Workspace synchronization, chat, and team presence](docs/workspace-realtime.md)
 - [Friend API and presence events](docs/friends.md)
+- [Workspace activity dashboard metrics](docs/dashboard.md)
 - [Workspace DTO contract](docs/workspaces.dto.ts)
 - [Email invitation pipeline](docs/mail.md)
 - [Design decisions and tradeoffs](docs/CONSIDERATIONS.md)

@@ -39,6 +39,10 @@ export const cardDatesSchema = z
     message: 'either start_at or deadline is required',
   })
 
+export const cardCompletionSchema = z.object({
+  is_completed: z.boolean(),
+})
+
 export const addCardMemberSchema = z.object({ user_id: z.string().uuid() })
 
 export const addAttachmentSchema = z.object({

@@ -1,6 +1,10 @@
 import type { List, ListWithCards } from '../types'
 import { apiRequest } from '../services/auth'
 
+export type UpdateListInput =
+  | { name: string; is_done?: boolean }
+  | { name?: string; is_done: boolean }
+
 export const ListAPI = {
   listByWorkspace: (workspaceId: string) =>
     apiRequest<ListWithCards[]>(`/api/workspaces/${workspaceId}/lists`),
@@ -14,11 +18,14 @@ export const ListAPI = {
       json: { name },
     }),
 
-  rename: (listId: string, name: string) =>
+  update: (listId: string, patch: UpdateListInput) =>
     apiRequest<List>(`/api/lists/${listId}`, {
       method: 'PUT',
-      json: { name },
+      json: patch,
     }),
+
+  rename: (listId: string, name: string) =>
+    ListAPI.update(listId, { name }),
 
   remove: (listId: string) => apiRequest<void>(`/api/lists/${listId}`, { method: 'DELETE' }),
 

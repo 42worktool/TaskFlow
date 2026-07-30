@@ -51,6 +51,7 @@ function card(overrides: Partial<Card> = {}): Card {
     user_id: null,
     title: 'Card',
     description: '',
+    is_completed: false,
     start_at: null,
     deadline: null,
     sequence: 1,
@@ -224,6 +225,90 @@ test('listInboxCards returns only the signed-in user inbox cards', async (t) => 
     },
     orderBy: { updated_at: 'desc' },
   })
+})
+
+test('updateCardCompletion toggles the card flag without moving lists', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { updateCardCompletion }] =
+    await Promise.all([
+      import('../../db'),
+      import('../../realtime'),
+      import('./card.service'),
+    ])
+
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  let storedCompleted = false
+  stubMethod(t, prisma, '$queryRaw', async () => [{
+    list_id: SOURCE_LIST_ID,
+    user_id: null,
+    is_completed: storedCompleted,
+    start_at: null,
+    deadline: null,
+  }])
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+
+  const updates: any[] = []
+  stubMethod(t, prisma.card, 'update', async (args) => {
+    updates.push(args)
+    storedCompleted = args.data.is_completed
+    return card({ is_completed: storedCompleted })
+  })
+  const publications: unknown[][] = []
+  stubMethod(t, realtime, 'publish', (...args) => {
+    publications.push(args)
+  })
+
+  const completed = await updateCardCompletion({
+    userId: USER_ID,
+    cardId: CARD_ID,
+    isCompleted: true,
+  })
+  const unchanged = await updateCardCompletion({
+    userId: USER_ID,
+    cardId: CARD_ID,
+    isCompleted: true,
+  })
+
+  assert.equal(completed.is_completed, true)
+  assert.equal(unchanged.is_completed, true)
+  assert.equal(completed.list_id, SOURCE_LIST_ID)
+  assert.deepEqual(updates[0], {
+    where: { id: CARD_ID },
+    data: {
+      is_completed: true,
+      updated_by: USER_ID,
+    },
+  })
+  assert.equal(publications.length, 1)
+  assert.equal(publications[0]?.[0], `workspace:${SOURCE_WORKSPACE_ID}`)
+  const event = publications[0]?.[2] as {
+    workspace_id: string
+    entity: string
+    action: string
+    entity_id: string
+    list_ids: string[]
+    actor_user_id: string
+  }
+  assert.deepEqual(
+    {
+      workspace_id: event.workspace_id,
+      entity: event.entity,
+      action: event.action,
+      entity_id: event.entity_id,
+      list_ids: event.list_ids,
+      actor_user_id: event.actor_user_id,
+    },
+    {
+      workspace_id: SOURCE_WORKSPACE_ID,
+      entity: 'card',
+      action: 'updated',
+      entity_id: CARD_ID,
+      list_ids: [SOURCE_LIST_ID],
+      actor_user_id: USER_ID,
+    },
+  )
 })
 
 test('moveCard rejects a target list in another workspace', async (t) => {
