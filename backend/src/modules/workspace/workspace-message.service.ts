@@ -1,8 +1,8 @@
 import { prisma } from '../../db'
 import { NotFoundError } from '../../errors'
 import { createdBy } from '../../lib/audit'
+import { requireWorkspaceRole } from '../../lib/workspace-permissions'
 import { realtime } from '../../realtime'
-import { requireRole } from './workspace.service'
 import {
   toWorkspaceMessageDto,
   workspaceMessageDtoSchema,
@@ -36,7 +36,7 @@ export async function listWorkspaceMessages(input: {
   userId: string
   workspaceId: string
 }) {
-  await requireRole(input.workspaceId, input.userId, 'VIEWER')
+  await requireWorkspaceRole(input.workspaceId, input.userId, 'VIEWER')
 
   const messages = await prisma.workspaceMessage.findMany({
     where: { workspace_id: input.workspaceId },
@@ -57,7 +57,7 @@ export async function createWorkspaceMessage(input: {
   content: string
   cardId?: string | null
 }) {
-  await requireRole(input.workspaceId, input.userId, 'VIEWER')
+  await requireWorkspaceRole(input.workspaceId, input.userId, 'VIEWER')
 
   const cardId = input.cardId ?? null
   const dto = await prisma.$transaction(async (tx) => {

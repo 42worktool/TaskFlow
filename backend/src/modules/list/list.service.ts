@@ -3,16 +3,19 @@
 //
 // Lists belong directly to a Workspace (Workspace *is* the board).
 // Mirrors workspace.service.ts conventions: Prisma singleton,
-// soft delete via deleted_at, role checks via workspace ROLE_RANK.
+// soft delete via deleted_at, role checks via the shared workspace helper.
 // ============================================================
 import { prisma } from '../../db'
 import {
   ForbiddenError,
   NotFoundError,
 } from '../../errors'
-import { getRole, requireRole } from '../workspace/workspace.service'
 import { createdBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
+import {
+  getWorkspaceRole,
+  requireWorkspaceRole,
+} from '../../lib/workspace-permissions'
 import { toBoardListDto, toListDto } from './list.dto'
 import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 
@@ -20,7 +23,7 @@ async function assertReadAccess(userId: string, workspaceId: string): Promise<vo
   const ws = await prisma.workspace.findFirst({ where: { id: workspaceId, deleted_at: null } })
   if (!ws) throw new NotFoundError()
   if (ws.is_public) return
-  const role = await getRole(workspaceId, userId)
+  const role = await getWorkspaceRole(workspaceId, userId)
   if (!role) throw new ForbiddenError()
 }
 
@@ -70,7 +73,7 @@ export async function createList(input: {
   name: string
   isDone?: boolean
 }) {
-  await requireRole(input.workspaceId, input.userId, 'MEMBER')
+  await requireWorkspaceRole(input.workspaceId, input.userId, 'MEMBER')
 
   const agg = await prisma.list.aggregate({
     where: { workspace_id: input.workspaceId, deleted_at: null },
@@ -109,7 +112,7 @@ export async function updateList(input: {
 }) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, input.userId, 'MEMBER')
+  await requireWorkspaceRole(list.workspace_id, input.userId, 'MEMBER')
 
   const updated = await prisma.list.update({
     where: { id: input.listId },
@@ -139,7 +142,7 @@ export async function updateList(input: {
 export async function deleteList(input: { userId: string; listId: string }): Promise<void> {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, input.userId, 'MEMBER')
+  await requireWorkspaceRole(list.workspace_id, input.userId, 'MEMBER')
 
   const detachedRelation = softDeletedBy(input.userId)
   await prisma.$transaction(async (tx) => {
@@ -204,7 +207,7 @@ export async function reorderList(
 ) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
-  await requireRole(list.workspace_id, input.userId, 'MEMBER')
+  await requireWorkspaceRole(list.workspace_id, input.userId, 'MEMBER')
 
   const siblings = await prisma.list.findMany({
     where: { workspace_id: list.workspace_id, deleted_at: null, id: { not: input.listId } },

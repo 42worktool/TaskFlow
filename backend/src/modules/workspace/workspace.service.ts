@@ -11,6 +11,10 @@ import { config } from '../../config'
 import { AppError, ForbiddenError, NotFoundError } from '../../errors'
 import type { Prisma, WorkspaceMember, Role } from '@prisma/client'
 import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
+import {
+  hasMinimumWorkspaceRole,
+  requireWorkspaceRole,
+} from '../../lib/workspace-permissions'
 import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
@@ -62,36 +66,6 @@ class InviteEmailMismatchError extends AppError {
   }
 }
 
-// ------------------------------------------------------------
-// Role helpers
-// ------------------------------------------------------------
-export const ROLE_RANK: Record<Role, number> = {
-  VIEWER: 1,
-  MEMBER: 2,
-  ADMIN: 3,
-  OWNER: 4,
-}
-
-export async function getRole(wsId: string, userId: string): Promise<Role | null> {
-  const m = await prisma.workspaceMember.findFirst({
-    where: {
-      workspace_id: wsId,
-      user_id: userId,
-      deleted_at: null,
-      workspace: { deleted_at: null },
-    },
-  })
-  return m?.role ?? null
-}
-
-/** Throw ForbiddenError if the user's role is below the required minimum. */
-export async function requireRole(wsId: string, userId: string, minRole: Role): Promise<void> {
-  const role = await getRole(wsId, userId)
-  if (!role || ROLE_RANK[role] < ROLE_RANK[minRole]) {
-    throw new ForbiddenError()
-  }
-}
-
 async function requireManagedWorkspace(
   tx: Prisma.TransactionClient,
   wsId: string,
@@ -105,7 +79,7 @@ async function requireManagedWorkspace(
   if (!workspace) throw new NotFoundError()
 
   const callerRole = workspace.members.find((member) => member.user_id === callerId)?.role
-  if (!callerRole || ROLE_RANK[callerRole] < ROLE_RANK[minRole]) {
+  if (!callerRole || !hasMinimumWorkspaceRole(callerRole, minRole)) {
     throw new ForbiddenError()
   }
   return workspace
@@ -441,7 +415,7 @@ export async function inviteWorkspaceMember(input: {
     userId: input.userId,
     workspaceId: input.workspaceId,
   })
-  await requireRole(input.workspaceId, input.userId, 'ADMIN')
+  await requireWorkspaceRole(input.workspaceId, input.userId, 'ADMIN')
 
   const token = generateInviteToken(
     input.workspaceId,
