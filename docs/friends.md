@@ -23,6 +23,11 @@ canonical pair. Accepting a request deletes the pending row and creates the
 friendship in one transaction. Rejecting or cancelling simply deletes the
 pending row; this Toy prototype does not retain request history.
 
+`DirectMessages` stores append-only 1:1 messages. There is no separate
+conversation row or read-receipt state in this prototype. Removing a
+friendship keeps existing rows for data integrity but immediately blocks their
+API access.
+
 ## HTTP API
 
 All endpoints require a Bearer access token.
@@ -34,6 +39,9 @@ POST   /api/friends/requests
        { "email": "friend@example.com" }
 POST   /api/friends/requests/:friendUserId/accept
 DELETE /api/friends/requests/:friendUserId
+GET    /api/friends/:friendUserId/messages
+POST   /api/friends/:friendUserId/messages
+       { "content": "message, 1 to 1000 characters" }
 DELETE /api/friends/:friendUserId
 ```
 
@@ -63,10 +71,14 @@ never participate in presence notifications.
 
 ## UI
 
-The movable floating messenger combines Friends and the current workspace
-chat. The personal Inbox is separate from conversation controls: it appears as
-a normal board list on desktop and a focused full-page view on mobile. Its
-Friends pane supports:
+The movable messenger has a conversation directory for the user's accepted
+friends and joined workspaces. Selecting a friend opens a DM. Selecting a
+workspace room also navigates to that workspace so its normal realtime
+subscription is active. The personal Inbox remains separate from conversation
+controls: it appears as a left split sidebar beside Board or Calendar on
+desktop and a focused full-page view on mobile.
+
+Friend management supports:
 
 - sending a request by email;
 - accepting or rejecting received requests;
@@ -74,13 +86,17 @@ Friends pane supports:
 - listing and removing accepted friends;
 - observing accepted friends' realtime online status.
 
+`dm.message_created` is delivered to both participants' active connections.
+The sender merges the REST response and WebSocket echo by message ID.
+
 On narrow screens, the workspace bottom bar replaces the separate floating
 launcher for chat and opens the messenger as a full-page view above that bar.
-Outside a workspace, the launcher remains available above the persistent
-workspace-selection bar so the Friends pane is still reachable.
+The workspace list also keeps its Chat bottom-bar item active, so the full
+directory remains reachable without entering a workspace first.
 
 Request received/accepted events are not pushed in this slice. The pane reloads
 when first opened and after WebSocket reconnection, and also provides a
 manual refresh button. The legacy `/friends` URL redirects to `/workspaces`
-with the Friends pane open instead of rendering a separate page. Blocking and
-request history remain outside the Toy scope.
+with friend management open instead of rendering a separate page. Blocking,
+request history, read receipts, typing indicators, and attachments remain
+outside the Toy scope.

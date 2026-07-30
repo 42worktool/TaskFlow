@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  parseDirectMessage,
   parseFriendPresenceEvent,
   parseWorkspaceChangedEvent,
   parseWorkspaceMemberPresenceEvent,
@@ -11,6 +12,7 @@ const USER_ID = '00000000-0000-4000-8000-000000000002'
 const ENTITY_ID = '00000000-0000-4000-8000-000000000003'
 const EVENT_ID = '00000000-0000-4000-8000-000000000004'
 const MESSAGE_ID = '00000000-0000-4000-8000-000000000005'
+const FRIEND_ID = '00000000-0000-4000-8000-000000000006'
 const OCCURRED_AT = '2026-07-29T00:00:00.000Z'
 
 describe('friend presence protocol', () => {
@@ -32,6 +34,47 @@ describe('friend presence protocol', () => {
     ).toBeNull()
     expect(
       parseFriendPresenceEvent({ user_id: '', online: false }),
+    ).toBeNull()
+  })
+})
+
+describe('direct message realtime protocol', () => {
+  const message = {
+    id: MESSAGE_ID,
+    content: '안녕하세요',
+    created_at: OCCURRED_AT,
+    author: {
+      user_id: USER_ID,
+      name: 'Sean',
+      profile_image_url: null,
+    },
+    recipient: {
+      user_id: FRIEND_ID,
+      name: 'Friend',
+      profile_image_url: null,
+    },
+  }
+
+  it('accepts a direct message between two users', () => {
+    expect(parseDirectMessage(message)).toEqual(message)
+  })
+
+  it('rejects malformed direct messages', () => {
+    expect(parseDirectMessage({ ...message, content: '' })).toBeNull()
+    expect(
+      parseDirectMessage({ ...message, content: 'x'.repeat(1001) }),
+    ).toBeNull()
+    expect(
+      parseDirectMessage({
+        ...message,
+        recipient: { ...message.recipient, user_id: 'friend-1' },
+      }),
+    ).toBeNull()
+    expect(
+      parseDirectMessage({
+        ...message,
+        recipient: { ...message.recipient, user_id: USER_ID },
+      }),
     ).toBeNull()
   })
 })

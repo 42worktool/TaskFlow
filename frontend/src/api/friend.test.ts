@@ -24,6 +24,28 @@ describe('FriendAPI', () => {
     expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/friends/requests')
   })
 
+  it('loads and sends direct messages with an accepted friend', async () => {
+    vi.mocked(apiRequest)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({ id: 'message-1' })
+
+    await FriendAPI.listMessages('user-2')
+    await FriendAPI.sendMessage('user-2', '안녕하세요')
+
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      1,
+      '/api/friends/user-2/messages',
+    )
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      2,
+      '/api/friends/user-2/messages',
+      {
+        method: 'POST',
+        json: { content: '안녕하세요' },
+      },
+    )
+  })
+
   it('waits for an in-flight mutation before a reopened drawer reads', async () => {
     let finishAccept: (() => void) | undefined
     const acceptance = new Promise<void>((resolve) => {

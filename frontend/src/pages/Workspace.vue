@@ -120,6 +120,7 @@ onMounted(refreshList)
               <RouterLink
                 :to="`/workspaces/${ws.id}/board`"
                 class="project-card"
+                :class="{ 'project-card--with-menu': hasWorkspaceMenu(ws) }"
               >
                 <div class="card-color-bar" :style="{ background: workspaceColor(ws.id) }" />
                 <div class="card-body">
@@ -138,6 +139,8 @@ onMounted(refreshList)
                 v-if="hasWorkspaceMenu(ws)"
                 class="card-menu-btn"
                 type="button"
+                :aria-label="`${ws.name} 프로젝트 메뉴`"
+                :aria-expanded="menuOpen === ws.id"
                 @click.stop="toggleMenu(ws.id)"
               >
                 ⋯
@@ -165,16 +168,17 @@ onMounted(refreshList)
                 </button>
               </div>
             </div>
-            <div
+            <button
               v-if="section.editable"
               class="project-card project-card--new"
+              type="button"
               @click="showCreate = true"
             >
               <div class="new-card-inner">
                 <span class="new-icon">+</span>
                 <span class="new-label">새 프로젝트 추가</span>
               </div>
-            </div>
+            </button>
           </div>
         </section>
       </main>

@@ -4,7 +4,6 @@ import {
   clearChatCardDrop,
   clearInboxDestinations,
   clearMessengerWorkspace,
-  closeMessenger,
   consumeChatCardDrop,
   exceedsDragThreshold,
   finishCardDrag,
@@ -12,10 +11,14 @@ import {
   messengerState,
   notifyBoardChanged,
   notifyInboxChanged,
+  openDirectConversation,
   openMessenger,
+  openWorkspaceConversation,
   resetMessenger,
   setInboxDestinations,
   setMessengerWorkspace,
+  showFriendManagement,
+  showMessengerDirectory,
   startCardDrag,
   toggleMessenger,
 } from './messenger'
@@ -24,18 +27,20 @@ describe('messenger state', () => {
   afterEach(() => {
     finishCardDrag()
     clearChatCardDrop()
-    closeMessenger()
     clearInboxDestinations()
-    clearMessengerWorkspace()
+    resetMessenger()
   })
 
   it('opens one pane at a time and toggles the current pane closed', () => {
-    openMessenger('friends')
+    showFriendManagement()
     expect(messengerState.open).toBe(true)
     expect(messengerState.pane).toBe('friends')
 
-    setMessengerWorkspace({ id: 'workspace-1', name: 'Alpha', syncVersion: 2 })
-    toggleMessenger('chat')
+    openWorkspaceConversation({
+      id: 'workspace-1',
+      name: 'Alpha',
+      syncVersion: 2,
+    })
     expect(messengerState.open).toBe(true)
     expect(messengerState.pane).toBe('chat')
 
@@ -43,7 +48,7 @@ describe('messenger state', () => {
     expect(messengerState.open).toBe(false)
   })
 
-  it('only opens chat while an accessible workspace is active', () => {
+  it('opens the current route workspace when chat has no selected room', () => {
     openMessenger('chat')
     expect(messengerState.open).toBe(false)
 
@@ -51,13 +56,57 @@ describe('messenger state', () => {
     openMessenger('chat')
     expect(messengerState.pane).toBe('chat')
     expect(messengerState.open).toBe(true)
+    expect(messengerState.activeRoom).toEqual({
+      kind: 'workspace',
+      workspace: { id: 'workspace-1', name: 'Alpha', syncVersion: 2 },
+    })
 
     clearMessengerWorkspace('another-workspace')
     expect(messengerState.workspace?.id).toBe('workspace-1')
 
     clearMessengerWorkspace('workspace-1')
     expect(messengerState.workspace).toBeNull()
-    expect(messengerState.pane).toBe('friends')
+    expect(messengerState.activeRoom).toBeNull()
+    expect(messengerState.pane).toBe('directory')
+  })
+
+  it('keeps direct messages independent from route workspace context', () => {
+    setMessengerWorkspace({ id: 'workspace-1', name: 'Alpha', syncVersion: 1 })
+    openDirectConversation({
+      id: 'friend-1',
+      name: 'Jamie',
+      profile_image_url: null,
+      online: true,
+    })
+
+    clearMessengerWorkspace('workspace-1')
+
+    expect(messengerState.workspace).toBeNull()
+    expect(messengerState.pane).toBe('dm')
+    expect(messengerState.activeRoom).toEqual({
+      kind: 'dm',
+      friend: {
+        id: 'friend-1',
+        name: 'Jamie',
+        profile_image_url: null,
+        online: true,
+      },
+    })
+  })
+
+  it('returns to the directory without discarding the selected conversation', () => {
+    openDirectConversation({
+      id: 'friend-1',
+      name: 'Jamie',
+      profile_image_url: null,
+      online: false,
+    })
+
+    showMessengerDirectory()
+
+    expect(messengerState.open).toBe(true)
+    expect(messengerState.pane).toBe('directory')
+    expect(messengerState.activeRoom?.kind).toBe('dm')
   })
 
   it('shares only the small inbox context needed by the active board', () => {
@@ -76,7 +125,7 @@ describe('messenger state', () => {
   })
 
   it('tracks inbox card dragging without coupling it to a messenger pane', () => {
-    openMessenger('friends')
+    showFriendManagement()
     startCardDrag('card-1', 'inbox')
 
     expect(messengerState.open).toBe(true)
@@ -121,7 +170,8 @@ describe('messenger state', () => {
     resetMessenger()
 
     expect(messengerState.open).toBe(false)
-    expect(messengerState.pane).toBe('friends')
+    expect(messengerState.pane).toBe('directory')
+    expect(messengerState.activeRoom).toBeNull()
     expect(messengerState.workspace).toBeNull()
     expect(messengerState.cardDrag).toBeNull()
     expect(messengerState.chatDropConsumedCardId).toBeNull()

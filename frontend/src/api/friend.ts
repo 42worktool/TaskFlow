@@ -1,5 +1,10 @@
 import { apiRequest } from '../services/auth'
-import type { Friend, FriendRequest, FriendRequestLists } from '../types'
+import type {
+  DirectMessage,
+  Friend,
+  FriendRequest,
+  FriendRequestLists,
+} from '../types'
 
 // A newly opened drawer must not read ahead of a mutation started by the
 // previous drawer instance.
@@ -24,6 +29,15 @@ export const FriendAPI = {
     await friendMutations
     return apiRequest<FriendRequestLists>('/api/friends/requests')
   },
+
+  listMessages: (friendUserId: string) =>
+    apiRequest<DirectMessage[]>(`/api/friends/${friendUserId}/messages`),
+
+  sendMessage: (friendUserId: string, content: string) =>
+    apiRequest<DirectMessage>(`/api/friends/${friendUserId}/messages`, {
+      method: 'POST',
+      json: { content },
+    }),
 
   sendRequest: (email: string) =>
     queueFriendMutation(() =>

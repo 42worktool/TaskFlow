@@ -1,91 +1,10 @@
 .inbox-cards-panel {
-  width: 330px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
   background: #fff;
-  border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.inbox-cards-panel--compact {
-  width: 100%;
-  height: 100%;
-  border-left: none;
-}
-
-.inbox-cards-panel--board-column {
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
-  padding: 12px;
-  border: 0;
-  border-radius: 10px;
-  background: #e9ebee;
-}
-
-.inbox-board-column-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.inbox-board-column-header div {
-  min-width: 0;
-}
-
-.inbox-board-column-header strong,
-.inbox-board-column-header div > span {
-  display: block;
-}
-
-.inbox-board-column-header strong {
-  color: #374151;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.inbox-board-column-header div > span {
-  margin-top: 2px;
-  overflow: hidden;
-  color: #6b7280;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.inbox-board-column-count {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 5px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: #2563eb;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.inbox-cards-panel--board-column .inbox-card-list {
-  margin: 0;
-  padding: 0;
-  gap: 8px;
-  border-radius: 7px;
-  background: transparent;
-}
-
-.inbox-cards-panel--board-column .inbox-card-list--drop-active {
-  padding: 6px;
-  background: #eff6ff;
-}
-
-.inbox-cards-panel--board-column
-  .inbox-card-list
-  > .inbox-panel-state {
-  min-height: 96px;
 }
 
 .inbox-panel-header {

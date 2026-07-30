@@ -74,4 +74,28 @@ describe('CardAPI', () => {
       },
     })
   })
+
+  it('creates a comment directly on a card', async () => {
+    const created = {
+      id: 'comment-1',
+      card_id: 'card-1',
+      author: {
+        user_id: 'user-1',
+        name: 'User',
+        profile_image_url: null,
+      },
+      comment_str: 'Direct comment',
+      created_at: '2026-07-30T00:00:00.000Z',
+      updated_at: '2026-07-30T00:00:00.000Z',
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(created)
+
+    await expect(
+      CardAPI.createComment('card-1', 'Direct comment'),
+    ).resolves.toEqual(created)
+    expect(apiRequest).toHaveBeenCalledWith('/api/cards/card-1/comments', {
+      method: 'POST',
+      json: { comment_str: 'Direct comment' },
+    })
+  })
 })

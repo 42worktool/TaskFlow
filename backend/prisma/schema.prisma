@@ -40,16 +40,18 @@ model User {
   deleted_at        DateTime? @db.Timestamptz(3)
   deleted_by        String?   @db.Uuid
 
-  oauth_accounts       OAuthAccount[]
-  memberships          WorkspaceMember[]
-  cards                Card[]
-  card_members         CardMember[]
-  comments             Comment[]
-  friendships_low      Friendship[]       @relation("FriendshipLow")
-  friendships_high     Friendship[]       @relation("FriendshipHigh")
-  friend_requests_low  FriendRequest[]    @relation("FriendRequestLow")
-  friend_requests_high FriendRequest[]    @relation("FriendRequestHigh")
-  workspace_messages   WorkspaceMessage[]
+  oauth_accounts           OAuthAccount[]
+  memberships              WorkspaceMember[]
+  cards                    Card[]
+  card_members             CardMember[]
+  comments                 Comment[]
+  friendships_low          Friendship[]       @relation("FriendshipLow")
+  friendships_high         Friendship[]       @relation("FriendshipHigh")
+  friend_requests_low      FriendRequest[]    @relation("FriendRequestLow")
+  friend_requests_high     FriendRequest[]    @relation("FriendRequestHigh")
+  workspace_messages       WorkspaceMessage[]
+  sent_direct_messages     DirectMessage[]    @relation("DirectMessageSender")
+  received_direct_messages DirectMessage[]    @relation("DirectMessageRecipient")
 
   @@map("Users")
 }
@@ -84,6 +86,23 @@ model FriendRequest {
   @@id([user_low_id, user_high_id])
   @@index([user_high_id])
   @@map("FriendRequests")
+}
+
+// 수락된 친구 사이의 1:1 메시지. Toy 프로토타입에서는 별도 대화방이나
+// 읽음 상태를 두지 않고 발신자/수신자 방향을 메시지 행에 직접 저장한다.
+model DirectMessage {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sender_user_id    String   @db.Uuid
+  recipient_user_id String   @db.Uuid
+  content           String   @db.Text
+  created_at        DateTime @default(now()) @db.Timestamptz(3)
+
+  sender    User @relation("DirectMessageSender", fields: [sender_user_id], references: [id], onDelete: Cascade)
+  recipient User @relation("DirectMessageRecipient", fields: [recipient_user_id], references: [id], onDelete: Cascade)
+
+  @@index([sender_user_id, recipient_user_id, created_at, id])
+  @@index([recipient_user_id, sender_user_id, created_at, id])
+  @@map("DirectMessages")
 }
 
 // 유저에 연결된 OAuth 계정. (provider, provider_id) 조합으로

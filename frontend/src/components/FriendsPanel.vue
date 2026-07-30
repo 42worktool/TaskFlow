@@ -5,6 +5,11 @@ import { realtime } from '../services/realtime'
 import { parseFriendPresenceEvent } from '../services/realtime/protocol'
 import type { Friend, FriendRequest } from '../types'
 
+const emit = defineEmits<{
+  changed: []
+  'open-dm': [friend: Friend]
+}>()
+
 const friends = ref<Friend[]>([])
 const incomingRequests = ref<FriendRequest[]>([])
 const outgoingRequests = ref<FriendRequest[]>([])
@@ -137,6 +142,7 @@ async function acceptRequest(request: FriendRequest): Promise<void> {
       (item) => item.id !== request.id,
     )
     message.value = `${friend.name}님과 친구가 되었습니다.`
+    emit('changed')
   } catch (caught) {
     error.value =
       caught instanceof Error
@@ -190,6 +196,7 @@ async function removeFriend(friend: Friend): Promise<void> {
     await FriendAPI.remove(friend.id)
     friends.value = friends.value.filter((item) => item.id !== friend.id)
     message.value = `${friend.name}님을 친구 목록에서 삭제했습니다.`
+    emit('changed')
   } catch (caught) {
     error.value =
       caught instanceof Error ? caught.message : '친구를 삭제하지 못했습니다.'
@@ -406,18 +413,28 @@ onUnmounted(() => {
                 </span>
                 <span>{{ formatDate(friend.friends_since) }}부터 친구</span>
               </div>
-              <button
-                type="button"
-                class="text-button text-button--danger"
-                :disabled="busyAction !== null"
-                @click="removeFriend(friend)"
-              >
-                {{
-                  busyAction === `remove:${friend.id}`
-                    ? '삭제 중…'
-                    : '친구 삭제'
-                }}
-              </button>
+              <div class="person-actions">
+                <button
+                  type="button"
+                  class="primary-button primary-button--small"
+                  :disabled="busyAction !== null"
+                  @click="emit('open-dm', friend)"
+                >
+                  메시지
+                </button>
+                <button
+                  type="button"
+                  class="text-button text-button--danger"
+                  :disabled="busyAction !== null"
+                  @click="removeFriend(friend)"
+                >
+                  {{
+                    busyAction === `remove:${friend.id}`
+                      ? '삭제 중…'
+                      : '친구 삭제'
+                  }}
+                </button>
+              </div>
             </li>
           </ul>
         </section>

@@ -129,6 +129,80 @@
   font-weight: 700;
 }
 
+.card-detail-comment-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.card-detail-comment-composer > label {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.card-detail-comment-composer textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  outline: none;
+}
+
+.card-detail-comment-composer textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.card-detail-comment-composer textarea:disabled {
+  background: #f8fafc;
+  cursor: default;
+  opacity: 0.7;
+}
+
+.card-detail-comment-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-detail-comment-composer-actions small {
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.card-detail-comment-composer-actions button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 11px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.card-detail-comment-composer-actions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.card-detail-comment-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
 .card-detail-comments-empty {
   margin: 0;
   padding: 13px;

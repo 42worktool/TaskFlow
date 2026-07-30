@@ -1,4 +1,5 @@
 import type {
+  DirectMessage,
   FriendPresenceEvent,
   NotificationEvent,
   WorkspaceChangedEvent,
@@ -70,6 +71,7 @@ export interface RealtimeServerEvents {
   'system.error': RealtimeErrorData
   'notification.created': NotificationEvent
   'friend.presence_changed': FriendPresenceEvent
+  'dm.message_created': DirectMessage
   'workspace.changed': WorkspaceChangedEvent
   'workspace.member_presence_changed': WorkspaceMemberPresenceEvent
   'workspace.message_created': WorkspaceMessage
@@ -169,6 +171,38 @@ export function parseFriendPresenceEvent(
     return null
   }
   return candidate as FriendPresenceEvent
+}
+
+export function parseDirectMessage(value: unknown): DirectMessage | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<DirectMessage>
+  const author = candidate.author
+  const recipient = candidate.recipient
+  if (
+    !isUuid(candidate.id) ||
+    typeof candidate.content !== 'string' ||
+    candidate.content.length === 0 ||
+    candidate.content.length > 1000 ||
+    !isIsoDate(candidate.created_at) ||
+    !author ||
+    typeof author !== 'object' ||
+    !isUuid(author.user_id) ||
+    typeof author.name !== 'string' ||
+    author.name.length === 0 ||
+    (author.profile_image_url !== null &&
+      typeof author.profile_image_url !== 'string') ||
+    !recipient ||
+    typeof recipient !== 'object' ||
+    !isUuid(recipient.user_id) ||
+    typeof recipient.name !== 'string' ||
+    recipient.name.length === 0 ||
+    (recipient.profile_image_url !== null &&
+      typeof recipient.profile_image_url !== 'string') ||
+    author.user_id === recipient.user_id
+  ) {
+    return null
+  }
+  return candidate as DirectMessage
 }
 
 export function parseWorkspaceChangedEvent(

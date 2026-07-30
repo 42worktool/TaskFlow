@@ -24,20 +24,21 @@ HTTP controllers or the Vue component tree.
 - Kanban lists and cards with drag-and-drop reordering.
 - Realtime list-level board synchronization across workspace members.
 - Editable card titles, descriptions, start dates, and deadlines.
-- A personal Inbox controlled from the workspace toolbox, rendered as a normal
-  board list on desktop and a focused full-page view on mobile. Desktop supports
-  direct drag-and-drop between Inbox and board lists, including horizontal edge
-  scrolling.
+- A personal Inbox controlled from the workspace toolbox, rendered as a left
+  split sidebar beside Board or Calendar on desktop and a focused full-page
+  view on mobile. Desktop supports direct drag-and-drop between Inbox and board
+  lists, including horizontal edge scrolling.
 - A calendar that renders card start/deadline ranges as continuous weekly bars,
   plus text search across workspaces the user can access.
 - Email-based friend requests with acceptance/rejection and realtime
   online/offline presence for accepted friends.
-- A movable floating messenger for friends and the current workspace group
-  chat, with independently draggable launcher and window positions on desktop.
-  Mobile opens the workspace messenger as a full-page view above the persistent
-  bottom bar.
+- A movable full messenger with workspace rooms, accepted-friend DMs, friend
+  management, and realtime online status. Its desktop window opens from the
+  draggable launcher anchor and replaces the launcher while open; mobile uses
+  a full-page view above the persistent bottom bar.
 - Card-linked workspace messages that are also stored and displayed as card
-  comments, plus realtime team-member online status.
+  comments, direct comment writing from card details, and realtime team-member
+  online status.
 - Realtime workspace-member-joined notifications.
 - HTTPS and WSS through Nginx, backed by PostgreSQL and Redis.
 
@@ -173,13 +174,13 @@ environment running the suite must allow loopback port binding.
 2. Create a private or public workspace.
 3. Add lists and cards, then drag them to reorder or move them.
 4. Open a card to edit its details and dates.
-5. Open Inbox from the bottom workspace toolbox. On desktop, drag cards between
-   its board-style list and the other board lists; on mobile, use the focused
-   Inbox view.
+5. Open Inbox from the bottom workspace toolbox. On desktop, use its split
+   sidebar beside Board or Calendar and drag cards between Inbox and board
+   lists; on mobile, use the focused Inbox page.
 6. Invite a registered or future user by email from the workspace share menu.
-7. Open or reposition the floating messenger to manage friends and the current
-   workspace chat. On mobile, open its full-page view from the workspace bottom
-   bar.
+7. Open or reposition the floating messenger, then choose a workspace room,
+   manage friends, or start a DM. Choosing a workspace room also loads that
+   workspace. On mobile, use the full-page view from the bottom bar.
 8. Select a card, or drop a board card onto the open chat, before sending a
    workspace message to also record that text in the card's comments.
 9. See team online status and member management from the workspace top bar,
@@ -250,6 +251,7 @@ Prisma application model.
 | `OAuthAccounts` | `id UUID`, `user_id UUID`, `provider String`, `provider_id String` | Unique provider/provider ID pair |
 | `Friendships` | `user_low_id UUID`, `user_high_id UUID`, `created_at DateTime` | Sorted composite key represents one undirected friendship |
 | `FriendRequests` | `user_low_id UUID`, `user_high_id UUID`, `requested_by_id UUID`, `created_at DateTime` | Canonical pending pair; deleted on accept, reject, or cancel |
+| `DirectMessages` | `id UUID`, `sender_user_id UUID`, `recipient_user_id UUID`, `content Text`, `created_at DateTime` | Append-only messages; API access requires the friendship to remain accepted |
 | `Workspaces` | `id UUID`, `name String`, `is_public Boolean` | Parent of members, lists, and labels |
 | `WorkspaceMembers` | `workspace_id UUID`, `user_id UUID`, `role Role` | Composite key; role is `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` |
 | `WorkspaceMessages` | `id UUID`, `workspace_id UUID`, `user_id UUID`, `card_id UUID?`, `content Text`, `created_at DateTime` | Append-only default-room messages; an optional card link is cleared if the card is deleted |
@@ -279,7 +281,7 @@ guessing an identity where the repository does not prove one.
 | Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
 | Personal inbox | API-backed cards, board/inbox drag round trip, and edge scrolling | `seankim96` |
 | Calendar and search | Range-bar workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
-| Friends and presence | Request/accept flow, symmetric friendships, unified messenger panel, and online/offline events | `seankim96` |
+| Friends, DMs, and presence | Request/accept flow, symmetric friendships, direct messages, unified messenger, and online/offline events | `seankim96` |
 | Realtime foundation | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain | `seankim96` |
 | Workspace realtime and chat | Member-only channels, targeted list reconciliation, team presence, and persistent group chat | `seankim96` |
 | Infrastructure | Docker services, HTTPS/WSS Nginx proxy, migrations | `ynam` / `nyhwbh`, `yeonjunky` / `yeonjunkim` |

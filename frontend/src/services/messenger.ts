@@ -1,7 +1,7 @@
 import { reactive } from 'vue'
-import type { List } from '../types'
+import type { Friend, List } from '../types'
 
-export type MessengerPane = 'friends' | 'chat'
+export type MessengerPane = 'directory' | 'friends' | 'chat' | 'dm'
 export type CardDragSource = 'board' | 'inbox'
 export type InboxDestination = Pick<List, 'id' | 'name'>
 export interface FloatingPosition {
@@ -17,6 +17,15 @@ export interface MessengerWorkspace {
   name: string
   syncVersion: number
 }
+export type MessengerRoom =
+  | {
+      kind: 'workspace'
+      workspace: MessengerWorkspace
+    }
+  | {
+      kind: 'dm'
+      friend: Pick<Friend, 'id' | 'name' | 'profile_image_url' | 'online'>
+    }
 
 export const MESSENGER_DRAG_THRESHOLD = 6
 export const MESSENGER_VIEWPORT_MARGIN = 8
@@ -49,6 +58,7 @@ export function exceedsDragThreshold(
 export const messengerState = reactive<{
   open: boolean
   pane: MessengerPane
+  activeRoom: MessengerRoom | null
   workspace: MessengerWorkspace | null
   cardDrag: { cardId: string; source: CardDragSource } | null
   chatDropConsumedCardId: string | null
@@ -57,7 +67,8 @@ export const messengerState = reactive<{
   boardRefreshToken: number
 }>({
   open: false,
-  pane: 'friends',
+  pane: 'directory',
+  activeRoom: null,
   workspace: null,
   cardDrag: null,
   chatDropConsumedCardId: null,
@@ -67,7 +78,16 @@ export const messengerState = reactive<{
 })
 
 export function openMessenger(pane: MessengerPane = messengerState.pane): void {
-  if (pane === 'chat' && !messengerState.workspace) return
+  if (pane === 'chat') {
+    if (messengerState.activeRoom?.kind !== 'workspace') {
+      if (!messengerState.workspace) return
+      messengerState.activeRoom = {
+        kind: 'workspace',
+        workspace: { ...messengerState.workspace },
+      }
+    }
+  }
+  if (pane === 'dm' && messengerState.activeRoom?.kind !== 'dm') return
   messengerState.pane = pane
   messengerState.open = true
 }
@@ -84,8 +104,46 @@ export function closeMessenger(): void {
   messengerState.open = false
 }
 
+export function showMessengerDirectory(): void {
+  messengerState.pane = 'directory'
+  messengerState.open = true
+}
+
+export function showFriendManagement(): void {
+  messengerState.pane = 'friends'
+  messengerState.open = true
+}
+
+export function openWorkspaceConversation(
+  workspace: MessengerWorkspace,
+): void {
+  messengerState.activeRoom = {
+    kind: 'workspace',
+    workspace: { ...workspace },
+  }
+  messengerState.pane = 'chat'
+  messengerState.open = true
+}
+
+export function openDirectConversation(
+  friend: Pick<Friend, 'id' | 'name' | 'profile_image_url' | 'online'>,
+): void {
+  messengerState.activeRoom = {
+    kind: 'dm',
+    friend: { ...friend },
+  }
+  messengerState.pane = 'dm'
+  messengerState.open = true
+}
+
 export function setMessengerWorkspace(workspace: MessengerWorkspace): void {
   messengerState.workspace = { ...workspace }
+  if (
+    messengerState.activeRoom?.kind === 'workspace' &&
+    messengerState.activeRoom.workspace.id === workspace.id
+  ) {
+    messengerState.activeRoom.workspace = { ...workspace }
+  }
 }
 
 export function clearMessengerWorkspace(workspaceId?: string): void {
@@ -96,13 +154,22 @@ export function clearMessengerWorkspace(workspaceId?: string): void {
   ) {
     return
   }
+  const clearedWorkspaceId = messengerState.workspace?.id ?? workspaceId
   messengerState.workspace = null
-  if (messengerState.pane === 'chat') messengerState.pane = 'friends'
+  if (
+    messengerState.activeRoom?.kind === 'workspace' &&
+    (!clearedWorkspaceId ||
+      messengerState.activeRoom.workspace.id === clearedWorkspaceId)
+  ) {
+    messengerState.activeRoom = null
+    if (messengerState.pane === 'chat') messengerState.pane = 'directory'
+  }
 }
 
 export function resetMessenger(): void {
   messengerState.open = false
-  messengerState.pane = 'friends'
+  messengerState.pane = 'directory'
+  messengerState.activeRoom = null
   messengerState.workspace = null
   messengerState.cardDrag = null
   messengerState.chatDropConsumedCardId = null

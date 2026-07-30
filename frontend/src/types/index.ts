@@ -52,6 +52,22 @@ export interface WorkspaceMessage {
   }
 }
 
+export interface DirectMessage {
+  id: UUID
+  content: string
+  created_at: ISODateString
+  author: {
+    user_id: UUID
+    name: string
+    profile_image_url: string | null
+  }
+  recipient: {
+    user_id: UUID
+    name: string
+    profile_image_url: string | null
+  }
+}
+
 export interface WorkspaceSubscriptionResult {
   workspace_id: UUID
   online_user_ids: UUID[]

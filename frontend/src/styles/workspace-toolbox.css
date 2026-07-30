@@ -17,6 +17,29 @@
   backdrop-filter: blur(12px);
 }
 
+.workspace-toolbox__group {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+}
+
+.workspace-toolbox__group + .workspace-toolbox__group {
+  margin-left: 5px;
+  padding-left: 6px;
+}
+
+.workspace-toolbox__group + .workspace-toolbox__group::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 1px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.46);
+}
+
 .workspace-toolbox__item {
   position: relative;
   min-width: 68px;
@@ -95,6 +118,19 @@
     border-radius: 0;
     box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.11);
     transform: none;
+  }
+
+  .workspace-toolbox__group {
+    display: contents;
+  }
+
+  .workspace-toolbox__group + .workspace-toolbox__group {
+    margin-left: 0;
+    padding-left: 0;
+  }
+
+  .workspace-toolbox__group + .workspace-toolbox__group::before {
+    display: none;
   }
 
   .workspace-toolbox__item {

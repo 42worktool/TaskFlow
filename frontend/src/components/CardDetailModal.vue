@@ -28,9 +28,13 @@ const startDate = ref('')
 const deadline = ref('')
 const loading = ref(true)
 const saving = ref(false)
+const commentDraft = ref('')
+const commentSaving = ref(false)
+const commentError = ref('')
 const error = ref('')
 const remoteUpdatePending = ref(false)
 let loadGeneration = 0
+let commentGeneration = 0
 let active = true
 let initialTitle = ''
 let initialDescription = ''
@@ -38,7 +42,7 @@ let initialStartDate = ''
 let initialDeadline = ''
 
 function close(): void {
-  if (!saving.value) emit('close')
+  if (!saving.value && !commentSaving.value) emit('close')
 }
 
 function applyDetail(card: CardDetail): void {
@@ -123,8 +127,56 @@ async function reloadAfterFailedSave(
   if (generation === loadGeneration) error.value = message
 }
 
+async function submitComment(): Promise<void> {
+  const cardId = props.cardId
+  const nextComment = commentDraft.value.trim()
+  if (!nextComment || commentSaving.value || saving.value) return
+
+  const generation = ++commentGeneration
+  commentSaving.value = true
+  commentError.value = ''
+  try {
+    const created = await CardAPI.createComment(cardId, nextComment)
+    if (
+      !active ||
+      generation !== commentGeneration ||
+      cardId !== props.cardId ||
+      !detail.value
+    ) {
+      return
+    }
+
+    if (!detail.value.comments.some((comment) => comment.id === created.id)) {
+      detail.value = {
+        ...detail.value,
+        comments: [...detail.value.comments, created],
+      }
+    }
+    commentDraft.value = ''
+  } catch (caught) {
+    if (
+      active &&
+      generation === commentGeneration &&
+      cardId === props.cardId
+    ) {
+      commentError.value =
+        caught instanceof Error
+          ? caught.message
+          : '댓글을 등록하지 못했습니다.'
+    }
+  } finally {
+    if (
+      active &&
+      generation === commentGeneration &&
+      cardId === props.cardId
+    ) {
+      commentSaving.value = false
+    }
+  }
+}
+
 async function submit(): Promise<void> {
-  if (!props.editable || saving.value) return
+  if (!props.editable || saving.value || commentSaving.value) return
   const cardId = props.cardId
   const trimmedTitle = title.value.trim()
   const nextDescription = description.value
@@ -193,6 +245,10 @@ async function submit(): Promise<void> {
 watch(
   () => props.cardId,
   () => {
+    commentGeneration += 1
+    commentDraft.value = ''
+    commentSaving.value = false
+    commentError.value = ''
     void loadCard()
   },
   { immediate: true },
@@ -217,6 +273,7 @@ watch(
 onUnmounted(() => {
   active = false
   loadGeneration += 1
+  commentGeneration += 1
 })
 </script>
 
@@ -236,7 +293,7 @@ onUnmounted(() => {
             class="close-btn"
             type="button"
             aria-label="닫기"
-            :disabled="saving"
+            :disabled="saving || commentSaving"
             @click="close"
           >
             ✕
@@ -325,6 +382,38 @@ onUnmounted(() => {
               <h3>댓글</h3>
               <span>{{ detail.comments.length }}</span>
             </div>
+            <div class="card-detail-comment-composer">
+              <label for="card-detail-comment-input">새 댓글</label>
+              <textarea
+                id="card-detail-comment-input"
+                v-model="commentDraft"
+                rows="3"
+                maxlength="2000"
+                placeholder="카드에 댓글을 남기세요."
+                :disabled="saving || commentSaving"
+                aria-describedby="card-detail-comment-hint"
+                @keydown.enter.exact.prevent="submitComment"
+              />
+              <div class="card-detail-comment-composer-actions">
+                <small id="card-detail-comment-hint">
+                  Enter로 등록 · Shift+Enter로 줄바꿈
+                </small>
+                <button
+                  type="button"
+                  :disabled="saving || commentSaving || !commentDraft.trim()"
+                  @click="submitComment"
+                >
+                  {{ commentSaving ? '등록 중…' : '댓글 등록' }}
+                </button>
+              </div>
+              <p
+                v-if="commentError"
+                class="card-detail-comment-error"
+                role="alert"
+              >
+                {{ commentError }}
+              </p>
+            </div>
             <p v-if="detail.comments.length === 0" class="card-detail-comments-empty">
               아직 댓글이 없습니다.
             </p>
@@ -368,7 +457,7 @@ onUnmounted(() => {
             <button
               type="button"
               class="card-detail-btn card-detail-btn--secondary"
-              :disabled="saving"
+              :disabled="saving || commentSaving"
               @click="close"
             >
               {{ editable ? '취소' : '닫기' }}
@@ -377,7 +466,7 @@ onUnmounted(() => {
               v-if="editable"
               type="submit"
               class="card-detail-btn card-detail-btn--primary"
-              :disabled="saving || !title.trim()"
+              :disabled="saving || commentSaving || !title.trim()"
             >
               {{ saving ? '저장 중…' : '저장' }}
             </button>

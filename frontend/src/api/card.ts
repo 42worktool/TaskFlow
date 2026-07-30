@@ -1,4 +1,4 @@
-import type { Card, CardDetail } from '../types'
+import type { Card, CardComment, CardDetail } from '../types'
 import { apiRequest } from '../services/auth'
 
 export const CardAPI = {
@@ -47,5 +47,11 @@ export const CardAPI = {
   moveToInbox: (cardId: string) =>
     apiRequest<Card>(`/api/cards/${cardId}/inbox`, {
       method: 'PUT',
+    }),
+
+  createComment: (cardId: string, comment: string) =>
+    apiRequest<CardComment>(`/api/cards/${cardId}/comments`, {
+      method: 'POST',
+      json: { comment_str: comment },
     }),
 }

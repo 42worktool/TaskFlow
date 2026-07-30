@@ -1,4 +1,6 @@
 .friends-panel-content {
+  height: 100%;
+  overflow-y: auto;
   padding: 18px;
   color: #111827;
 }

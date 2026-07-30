@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
+import InboxCardsPanel from '../components/InboxCardsPanel.vue'
 import ShareModal from '../components/ShareModal.vue'
 import WorkspaceMembersMenu from '../components/WorkspaceMembersMenu.vue'
 import WorkspaceToolbox from '../components/WorkspaceToolbox.vue'
@@ -9,15 +10,23 @@ import { WorkspaceAPI } from '../api/workspace'
 import { authState } from '../services/auth'
 import {
   clearMessengerWorkspace,
+  finishCardDrag,
   messengerState,
+  notifyBoardChanged,
+  notifyInboxChanged,
   setMessengerWorkspace,
+  startCardDrag,
 } from '../services/messenger'
 import { realtime, RealtimeRequestError } from '../services/realtime'
 import {
   parseWorkspaceChangedEvent,
   parseWorkspaceMemberPresenceEvent,
 } from '../services/realtime/protocol'
-import type { Workspace, WorkspaceSubscriptionResult } from '../types'
+import type {
+  Card,
+  Workspace,
+  WorkspaceSubscriptionResult,
+} from '../types'
 import {
   hasWorkspaceRole,
   workspaceRoleFor,
@@ -26,9 +35,6 @@ import {
 const route = useRoute()
 const router = useRouter()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
-const isBoardRoute = computed(
-  () => route.path === `/workspaces/${workspaceId.value}/board`,
-)
 const workspace = ref<Workspace | null>(null)
 const loadError = ref('')
 const onlineUserIds = ref<Set<string>>(new Set())
@@ -48,30 +54,45 @@ const canManageMembers = computed(() =>
 
 const showShareModal = ref(false)
 const inboxOpen = ref(false)
+const compactViewport = ref(false)
+const inboxAcceptingBoardCard = computed(
+  () =>
+    inboxOpen.value &&
+    canEditBoard.value &&
+    messengerState.cardDrag?.source === 'board',
+)
 
 function closeInbox(): void {
   if (messengerState.cardDrag) return
   inboxOpen.value = false
 }
 
-async function toggleInbox(): Promise<void> {
+function toggleInbox(): void {
   if (messengerState.cardDrag) return
   if (inboxOpen.value) {
     closeInbox()
     return
   }
 
-  const targetWorkspaceId = workspaceId.value
-  const boardPath = `/workspaces/${targetWorkspaceId}/board`
-  if (route.path !== boardPath) {
-    await router.push(boardPath)
-  }
-  if (
-    workspaceId.value === targetWorkspaceId &&
-    route.path === boardPath
-  ) {
-    inboxOpen.value = true
-  }
+  inboxOpen.value = true
+}
+
+function onInboxCardDragStart(card: Card): void {
+  if (!canEditBoard.value || !inboxOpen.value) return
+  startCardDrag(card.id, 'inbox')
+}
+
+function onInboxCardDragEnd(): void {
+  finishCardDrag()
+}
+
+function onInboxDropSettled(): void {
+  notifyBoardChanged()
+  notifyInboxChanged()
+}
+
+function syncCompactViewport(): void {
+  compactViewport.value = window.innerWidth <= 760
 }
 
 const SUBSCRIPTION_ATTEMPTS = 3
@@ -319,10 +340,6 @@ watch(
   { immediate: true },
 )
 
-watch(isBoardRoute, (boardRouteActive) => {
-  if (!boardRouteActive) inboxOpen.value = false
-})
-
 watch(
   [workspaceId, currentRole],
   ([id, role]) => {
@@ -352,8 +369,14 @@ watch(
   { immediate: true },
 )
 
+onMounted(() => {
+  syncCompactViewport()
+  window.addEventListener('resize', syncCompactViewport)
+})
+
 onUnmounted(() => {
   workspaceLoadGeneration += 1
+  window.removeEventListener('resize', syncCompactViewport)
   if (messengerContextWorkspaceId) {
     clearMessengerWorkspace(messengerContextWorkspaceId)
     messengerContextWorkspaceId = null
@@ -377,24 +400,37 @@ onUnmounted(() => {
       </template>
     </AppHeader>
 
-    <div class="content-area">
-      <RouterView v-slot="{ Component }">
-        <component
-          v-if="isBoardRoute"
-          :is="Component"
-          :can-edit-board="canEditBoard"
-          :can-view-card-details="canViewCardDetails"
-          :workspace-sync-version="workspaceSyncVersion"
-          :inbox-open="inboxOpen"
+    <div
+      class="content-area"
+      :class="{ 'content-area--inbox-open': inboxOpen }"
+    >
+      <aside
+        v-if="inboxOpen"
+        id="workspace-inbox-panel"
+        class="workspace-inbox-sidebar"
+        aria-label="인박스"
+      >
+        <InboxCardsPanel
+          :allow-drag="!compactViewport"
+          :destination-lists="messengerState.inboxDestinations"
+          :refresh-token="messengerState.inboxRefreshToken"
+          :accepting-drop="!compactViewport && inboxAcceptingBoardCard"
+          @drop-settled="onInboxDropSettled"
+          @drag-start="onInboxCardDragStart"
+          @drag-end="onInboxCardDragEnd"
         />
-        <component
-          v-else
-          :is="Component"
-          :can-edit-board="canEditBoard"
-          :can-view-card-details="canViewCardDetails"
-          :workspace-sync-version="workspaceSyncVersion"
-        />
-      </RouterView>
+      </aside>
+
+      <div class="workspace-route-content">
+        <RouterView v-slot="{ Component }">
+          <component
+            :is="Component"
+            :can-edit-board="canEditBoard"
+            :can-view-card-details="canViewCardDetails"
+            :workspace-sync-version="workspaceSyncVersion"
+          />
+        </RouterView>
+      </div>
     </div>
 
     <WorkspaceToolbox
