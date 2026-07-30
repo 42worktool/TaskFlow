@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  changeWorkspaceRoleSchema,
   createWorkspaceSchema,
   inviteWorkspaceMemberSchema,
   updateWorkspaceSchema,
@@ -35,4 +36,9 @@ test('workspace validation enforces partial updates and invitation roles', () =>
       role: 'MEMBER',
     }),
   )
+  assert.equal(
+    changeWorkspaceRoleSchema.parse({ role: 'ADMIN' }).role,
+    'ADMIN',
+  )
+  assert.throws(() => changeWorkspaceRoleSchema.parse({ role: 'OWNER' }))
 })

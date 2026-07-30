@@ -369,8 +369,9 @@ https://www.figma.com/design/M1kVwVRwvzgMdUrClh4zXI/%EC%B9%B8%EB%B0%98-%EB%B3%B4
 	초대받을 이용자의 권한을 설정하고 이메일로 초대.
 	T
 	멤버 권한 변경
-	OWNER 기능.
-ADMIN, MEMBER, VIEWER 중 하나를 선택해 워크스페이스에 속한 이용자의 권한을 변경
+	OWNER 및 ADMIN 기능.
+OWNER가 아닌 워크스페이스 구성원에게 ADMIN, MEMBER, VIEWER 중 하나를 선택해 권한을 변경.
+OWNER 역할 변경과 소유권 이전은 별도 흐름으로 취급
 	T
 	멤버 제거
 	이용자의 워크스페이스 접근 권한 삭제

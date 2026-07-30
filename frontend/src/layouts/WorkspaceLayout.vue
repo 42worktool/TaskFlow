@@ -95,6 +95,12 @@ function toggleInbox(): void {
   inboxOpen.value = true
 }
 
+function applyWorkspaceUpdate(updated: Workspace): void {
+  if (updated.id !== workspaceId.value) return
+  workspace.value = updated
+  workspaceSyncVersion.value += 1
+}
+
 function onInboxCardDragStart(card: Card): void {
   if (!canEditBoard.value || !inboxOpen.value) return
   startCardDrag(card.id, 'inbox')
@@ -516,6 +522,8 @@ onUnmounted(() => {
       :workspace-name="workspace.name"
       :workspace-id="workspaceId"
       :workspace="workspace"
+      :manager-role="currentRole"
+      @workspace-updated="applyWorkspaceUpdate"
       @close="showShareModal = false"
     />
   </div>

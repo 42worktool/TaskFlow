@@ -96,6 +96,23 @@ function requireRemovableOwner(
   }
 }
 
+function requireRoleChangeAllowed(
+  members: WorkspaceMember[],
+  callerId: string,
+  targetMembership: WorkspaceMember,
+  newRole: Role,
+): void {
+  const callerRole = members.find((member) => member.user_id === callerId)?.role
+
+  if (
+    (callerRole !== 'OWNER' && callerRole !== 'ADMIN') ||
+    targetMembership.role === 'OWNER' ||
+    newRole === 'OWNER'
+  ) {
+    throw new ForbiddenError()
+  }
+}
+
 // ============================================================
 // Public API
 // ============================================================
@@ -251,7 +268,8 @@ export async function deleteWorkspace(input: { userId: string; workspaceId: stri
 
 /**
  * Change a member's role. Caller must be ADMIN+.
- * Prevents demoting the sole OWNER (would leave the workspace with 0 owners).
+ * OWNER membership is intentionally immutable here: ownership transfer is a
+ * separate workflow, not an ordinary member-role update.
  */
 export async function changeMemberRole(
   input: {
@@ -274,7 +292,12 @@ export async function changeMemberRole(
     )
     if (!targetMembership) throw new NotFoundError()
 
-    requireRemovableOwner(ws.members, targetMembership, input.role)
+    requireRoleChangeAllowed(
+      ws.members,
+      input.userId,
+      targetMembership,
+      input.role,
+    )
 
     await tx.workspaceMember.update({
       where: {

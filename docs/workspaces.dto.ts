@@ -75,7 +75,8 @@ export interface InviteMemberResponse {
 export type AcceptInviteResponse = WorkspaceDto;
 
 // PUT /api/workspaces/{workspace_id}/members/{user_id} -> 200, ADMIN+
-// The final OWNER cannot be demoted.
+// The target must not be an OWNER. Ownership transfer is a separate workflow.
+// OWNER and ADMIN can manage ADMIN, MEMBER, and VIEWER memberships.
 export interface UpdateMemberRoleRequest {
   role: Exclude<Role, 'OWNER'>;
 }
