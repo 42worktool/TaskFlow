@@ -5,6 +5,7 @@ import { authState } from '../services/auth'
 import { realtime } from '../services/realtime'
 import { parseDirectMessage } from '../services/realtime/protocol'
 import type { DirectMessage } from '../types'
+import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
 
 const props = withDefaults(
   defineProps<{
@@ -105,6 +106,15 @@ async function sendMessage(): Promise<void> {
   }
 }
 
+const composerSubmitter = createComposerEnterSubmitter(
+  () => {
+    void sendMessage()
+  },
+  (callback) => {
+    void nextTick(callback)
+  },
+)
+
 function formatMessageTime(value: string): string {
   return new Date(value).toLocaleTimeString('ko-KR', {
     hour: '2-digit',
@@ -131,6 +141,7 @@ watch(
     error.value = ''
     loading.value = true
     sending.value = false
+    composerSubmitter.reset()
     if (friendId) void loadMessages()
   },
   { immediate: true },
@@ -138,6 +149,7 @@ watch(
 
 onUnmounted(() => {
   loadGeneration += 1
+  composerSubmitter.reset()
   removeMessageListener()
   removeRealtimeStateListener()
 })
@@ -242,7 +254,8 @@ onUnmounted(() => {
         maxlength="1000"
         :placeholder="`${friendName || '친구'}에게 메시지 보내기`"
         :disabled="loading || sending"
-        @keydown.enter.exact.prevent="sendMessage"
+        @keydown.enter.exact="composerSubmitter.handleEnter"
+        @compositionend="composerSubmitter.handleCompositionEnd"
       />
       <button
         type="submit"

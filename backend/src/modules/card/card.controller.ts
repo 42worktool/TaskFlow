@@ -3,6 +3,7 @@ import * as svc from './card.service'
 import {
   addAttachmentSchema,
   addCardMemberSchema,
+  cardCompletionSchema,
   cardDatesSchema,
   cardNeighborSchema,
   commentSchema,
@@ -86,6 +87,16 @@ export const updateDates: RequestHandler = async (req, res) => {
     cardId: req.params.card_id as string,
     ...('start_at' in data ? { startAt: data.start_at } : {}),
     ...('deadline' in data ? { deadline: data.deadline } : {}),
+  })
+  res.status(200).json(card)
+}
+
+export const updateCompletion: RequestHandler = async (req, res) => {
+  const data = cardCompletionSchema.parse(req.body)
+  const card = await svc.updateCardCompletion({
+    userId: req.user!.id,
+    cardId: req.params.card_id as string,
+    isCompleted: data.is_completed,
   })
   res.status(200).json(card)
 }

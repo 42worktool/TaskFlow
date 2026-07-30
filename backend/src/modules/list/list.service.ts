@@ -6,7 +6,10 @@
 // soft delete via deleted_at, role checks via workspace ROLE_RANK.
 // ============================================================
 import { prisma } from '../../db'
-import { ForbiddenError, NotFoundError } from '../../errors'
+import {
+  ForbiddenError,
+  NotFoundError,
+} from '../../errors'
 import { getRole, requireRole } from '../workspace/workspace.service'
 import { createdBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
@@ -65,6 +68,7 @@ export async function createList(input: {
   userId: string
   workspaceId: string
   name: string
+  isDone?: boolean
 }) {
   await requireRole(input.workspaceId, input.userId, 'MEMBER')
 
@@ -78,6 +82,7 @@ export async function createList(input: {
       workspace_id: input.workspaceId,
       name: input.name,
       sequence: (agg._max.sequence ?? 0) + 1,
+      is_done: input.isDone ?? false,
       ...createdBy(input.userId),
     },
   })
@@ -94,16 +99,25 @@ export async function createList(input: {
 }
 
 /**
- * Rename a list. Requires MEMBER+.
+ * Update a list's name and/or completion marker. Requires MEMBER+.
  */
-export async function updateList(input: { userId: string; listId: string; name: string }) {
+export async function updateList(input: {
+  userId: string
+  listId: string
+  name?: string
+  isDone?: boolean
+}) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
   await requireRole(list.workspace_id, input.userId, 'MEMBER')
 
   const updated = await prisma.list.update({
     where: { id: input.listId },
-    data: { name: input.name, ...updatedBy(input.userId) },
+    data: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.isDone !== undefined ? { is_done: input.isDone } : {}),
+      ...updatedBy(input.userId),
+    },
   })
   const dto = toListDto(updated)
   publishWorkspaceChange({

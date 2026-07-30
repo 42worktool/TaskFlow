@@ -8,6 +8,8 @@
 
 .content-area {
   --workspace-toolbox-space: 76px;
+  --messenger-expanded-width: clamp(560px, 48vw, 720px);
+  --messenger-collapsed-width: clamp(380px, 34vw, 460px);
   position: relative;
   flex: 1;
   display: flex;
@@ -15,6 +17,15 @@
   padding-bottom: var(--workspace-toolbox-space);
   overflow: hidden;
   box-sizing: border-box;
+  transition: padding-right 0.2s ease;
+}
+
+.content-area--messenger-open {
+  padding-right: var(--messenger-expanded-width);
+}
+
+.content-area--messenger-open.content-area--messenger-directory-collapsed {
+  padding-right: var(--messenger-collapsed-width);
 }
 
 .workspace-inbox-sidebar {
@@ -49,6 +60,8 @@
   .content-area {
     --workspace-toolbox-space:
       calc(62px + env(safe-area-inset-bottom, 0px));
+    padding-right: 0;
+    transition: none;
   }
 
   .content-area--inbox-open .workspace-route-content {
@@ -61,5 +74,11 @@
     max-width: none;
     flex: 1 1 auto;
     border-right: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content-area {
+    transition: none;
   }
 }

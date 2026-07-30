@@ -24,6 +24,7 @@ test('list DTOs expose the existing list and nested-card contracts', () => {
     workspace_id: 'workspace-id',
     name: 'Todo',
     sequence: 1,
+    is_done: false,
   })
 
   const card = {
@@ -32,6 +33,7 @@ test('list DTOs expose the existing list and nested-card contracts', () => {
     user_id: null,
     title: 'Card',
     description: '',
+    is_completed: false,
     start_at: null,
     deadline: null,
     sequence: 1,

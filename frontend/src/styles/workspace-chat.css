@@ -9,15 +9,15 @@
 
 .workspace-chat-card-drop-hint {
   position: absolute;
-  inset: 8px;
+  inset: 0;
   z-index: 5;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 5px;
-  padding: 20px;
+  gap: 2px;
+  padding: 8px 10px;
   border: 2px dashed #60a5fa;
-  border-radius: 12px;
+  border-radius: 9px;
   background: rgba(239, 246, 255, 0.94);
   color: #1d4ed8;
   text-align: center;
@@ -25,13 +25,13 @@
 }
 
 .workspace-chat-card-drop-hint strong {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .workspace-chat-card-drop-hint span {
   color: #475569;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.3;
 }
 
 .workspace-chat-panel--card-drop-over .workspace-chat-card-drop-hint {
@@ -77,11 +77,19 @@
   font-size: 17px;
 }
 
-.workspace-chat-messages {
+.workspace-chat-messages-region {
+  position: relative;
   min-height: 180px;
   flex: 1;
+  overflow: hidden;
+}
+
+.workspace-chat-messages {
+  height: 100%;
+  min-height: 0;
   padding: 16px 14px;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .workspace-chat-state {
@@ -213,6 +221,14 @@
   border-radius: 9px;
   font: inherit;
   font-size: 13px;
+}
+
+.workspace-chat-input-drop-region {
+  position: relative;
+}
+
+.workspace-chat-input-drop-region textarea {
+  display: block;
 }
 
 .workspace-chat-composer textarea:focus {

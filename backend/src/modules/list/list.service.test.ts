@@ -228,3 +228,51 @@ test('getList returns one list with cards under the board read policy', async (t
     orderBy: { sequence: 'asc' },
   })
 })
+
+test('updateList persists and exposes the completion marker', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { updateList }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./list.service'),
+  ])
+  const now = new Date('2026-07-30T00:00:00.000Z')
+
+  stubMethod(t, prisma.list, 'findFirst', async () => ({
+    id: LIST_ID,
+    workspace_id: WORKSPACE_ID,
+  }))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({
+    role: 'MEMBER',
+  }))
+  let updateArgs: any
+  stubMethod(t, prisma.list, 'update', async (args) => {
+    updateArgs = args
+    return {
+      id: LIST_ID,
+      workspace_id: WORKSPACE_ID,
+      name: 'Done',
+      sequence: 1,
+      is_done: true,
+      created_at: now,
+      created_by: USER_ID,
+      updated_at: now,
+      updated_by: USER_ID,
+      deleted_at: null,
+      deleted_by: null,
+    }
+  })
+  stubMethod(t, realtime, 'publish', () => undefined)
+
+  const result = await updateList({
+    userId: USER_ID,
+    listId: LIST_ID,
+    isDone: true,
+  })
+
+  assert.deepEqual(updateArgs.data, {
+    is_done: true,
+    updated_by: USER_ID,
+  })
+  assert.equal(result.is_done, true)
+})

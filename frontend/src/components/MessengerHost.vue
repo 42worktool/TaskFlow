@@ -6,7 +6,6 @@ import {
   onUnmounted,
   ref,
   watch,
-  type CSSProperties,
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DirectMessagePanel from './DirectMessagePanel.vue'
@@ -16,9 +15,8 @@ import { FriendAPI } from '../api/friend'
 import { WorkspaceAPI } from '../api/workspace'
 import { authState } from '../services/auth'
 import {
-  clampFloatingPosition,
+  clearExternalCardDropHover,
   closeMessenger,
-  exceedsDragThreshold,
   messengerState,
   openDirectConversation,
   openMessenger,
@@ -26,56 +24,28 @@ import {
   resetMessenger,
   showFriendManagement,
   showMessengerDirectory,
-  toggleMessenger,
-  type FloatingPosition,
+  toggleMessengerDirectory,
   type MessengerPane,
 } from '../services/messenger'
 import { realtime } from '../services/realtime'
 import { parseFriendPresenceEvent } from '../services/realtime/protocol'
 import type { Friend, Workspace } from '../types'
 
-type FloatingTarget = 'launcher' | 'window'
-
-interface ActivePointerDrag {
-  target: FloatingTarget
-  pointerId: number
-  start: FloatingPosition
-  origin: FloatingPosition
-  moved: boolean
-}
-
 const route = useRoute()
 const router = useRouter()
 const closeButton = ref<HTMLButtonElement | null>(null)
-const launcher = ref<HTMLButtonElement | null>(null)
-const messengerWindow = ref<HTMLElement | null>(null)
-const floatingAnchor = ref<FloatingPosition | null>(null)
-const activeDrag = ref<ActivePointerDrag | null>(null)
 const compactViewport = ref(false)
 const directoryFriends = ref<Friend[]>([])
 const directoryWorkspaces = ref<Workspace[]>([])
 const directoryLoading = ref(false)
 const directoryError = ref('')
 let directoryLoadGeneration = 0
-let suppressLauncherClick = false
 let returnFocus: HTMLElement | null = null
 
-const mobileToolboxRoute = computed(
+const toolboxRoute = computed(
   () =>
-    compactViewport.value &&
     (route.path === '/workspaces' ||
       route.path.startsWith('/workspaces/')),
-)
-const mobilePageMode = computed(
-  () => compactViewport.value && messengerState.open,
-)
-const launcherStyle = computed(() =>
-  mobileToolboxRoute.value
-    ? {}
-    : positionStyle(positionFromAnchor('launcher')),
-)
-const windowStyle = computed(() =>
-  mobilePageMode.value ? {} : positionStyle(positionFromAnchor('window')),
 )
 const activeWorkspaceRoom = computed(() =>
   messengerState.activeRoom?.kind === 'workspace'
@@ -98,7 +68,10 @@ const activeRoomTitle = computed(() => {
   return '대화 목록'
 })
 const directoryVisible = computed(
-  () => !compactViewport.value || messengerState.pane === 'directory',
+  () =>
+    compactViewport.value
+      ? messengerState.pane === 'directory'
+      : !messengerState.directoryCollapsed,
 )
 const conversationVisible = computed(
   () => !compactViewport.value || messengerState.pane !== 'directory',
@@ -106,94 +79,6 @@ const conversationVisible = computed(
 
 function paneFromQuery(value: unknown): MessengerPane | null {
   return value === 'friends' || value === 'chat' ? value : null
-}
-
-function positionStyle(position: FloatingPosition | null): CSSProperties {
-  if (!position) return {}
-  return {
-    left: `${position.x}px`,
-    top: `${position.y}px`,
-    right: 'auto',
-    bottom: 'auto',
-  }
-}
-
-function elementFor(target: FloatingTarget): HTMLElement | null {
-  return target === 'launcher' ? launcher.value : messengerWindow.value
-}
-
-function sizeFor(target: FloatingTarget): {
-  width: number
-  height: number
-} {
-  const bounds = elementFor(target)?.getBoundingClientRect()
-  if (bounds && bounds.width > 0 && bounds.height > 0) {
-    return { width: bounds.width, height: bounds.height }
-  }
-  return target === 'launcher'
-    ? { width: 54, height: 54 }
-    : { width: Math.min(760, window.innerWidth - 24), height: 640 }
-}
-
-function positionFromAnchor(
-  target: FloatingTarget,
-): FloatingPosition | null {
-  if (!floatingAnchor.value) return null
-  const size = sizeFor(target)
-  return clampFloatingPosition(
-    {
-      x: floatingAnchor.value.x - size.width,
-      y: floatingAnchor.value.y - size.height,
-    },
-    size,
-    { width: window.innerWidth, height: window.innerHeight },
-  )
-}
-
-function setAnchorFromPosition(
-  target: FloatingTarget,
-  position: FloatingPosition,
-): void {
-  const size = sizeFor(target)
-  const clamped = clampFloatingPosition(
-    position,
-    size,
-    { width: window.innerWidth, height: window.innerHeight },
-  )
-  floatingAnchor.value = {
-    x: clamped.x + size.width,
-    y: clamped.y + size.height,
-  }
-}
-
-function syncAnchor(target: FloatingTarget): void {
-  if (!floatingAnchor.value) {
-    floatingAnchor.value = {
-      x: window.innerWidth - 20,
-      y: window.innerHeight - 20,
-    }
-  }
-  if (target === 'window') {
-    floatingAnchor.value = { ...floatingAnchor.value }
-    return
-  }
-  const position = positionFromAnchor(target)
-  if (position) setAnchorFromPosition(target, position)
-}
-
-async function syncFloatingPositions(): Promise<void> {
-  await nextTick()
-  if (mobilePageMode.value) return
-  syncAnchor(messengerState.open ? 'window' : 'launcher')
-}
-
-async function resetDesktopFloatingPositions(): Promise<void> {
-  await nextTick()
-  floatingAnchor.value = {
-    x: window.innerWidth - 20,
-    y: window.innerHeight - 20,
-  }
-  syncAnchor(messengerState.open ? 'window' : 'launcher')
 }
 
 function clearMessengerQuery(): void {
@@ -209,133 +94,38 @@ function clearMessengerQuery(): void {
   void router.replace({ query })
 }
 
-function cancelPointerDrag(): void {
-  if (activeDrag.value?.target === 'launcher') {
-    suppressLauncherClick = true
-  }
-  activeDrag.value = null
+function closeWindow(): void {
+  closeMessenger()
 }
 
-function closeWindow(): void {
-  cancelPointerDrag()
-  closeMessenger()
+function clearChatDropOutsidePanel(event: DragEvent): void {
+  const drag = messengerState.cardDrag
+  const drop = messengerState.externalCardDrop
+  if (
+    drag?.source !== 'board' ||
+    !drop ||
+    drop.committed ||
+    drop.cardId !== drag.cardId ||
+    drop.owner !== 'chat-panel'
+  ) {
+    return
+  }
+  const target = event.target
+  if (
+    target instanceof Element &&
+    target.closest('.workspace-chat-panel')
+  ) {
+    return
+  }
+  clearExternalCardDropHover(drag.cardId, 'chat-panel')
 }
 
 function handleKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && messengerState.open) closeWindow()
 }
 
-function startPointerDrag(
-  event: PointerEvent,
-  target: FloatingTarget,
-): void {
-  if (mobilePageMode.value) return
-  if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) {
-    return
-  }
-  if (
-    target === 'window' &&
-    event.target instanceof Element &&
-    event.target.closest('button')
-  ) {
-    return
-  }
-
-  syncAnchor(target)
-  const bounds = elementFor(target)?.getBoundingClientRect()
-  if (!bounds) return
-
-  if (target === 'launcher') suppressLauncherClick = false
-  activeDrag.value = {
-    target,
-    pointerId: event.pointerId,
-    start: { x: event.clientX, y: event.clientY },
-    origin: { x: bounds.left, y: bounds.top },
-    moved: false,
-  }
-  ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
-  event.preventDefault()
-}
-
-function movePointerDrag(
-  event: PointerEvent,
-  target: FloatingTarget,
-): void {
-  const drag = activeDrag.value
-  if (
-    !drag ||
-    drag.target !== target ||
-    drag.pointerId !== event.pointerId
-  ) {
-    return
-  }
-
-  const current = { x: event.clientX, y: event.clientY }
-  if (!drag.moved && !exceedsDragThreshold(drag.start, current)) return
-  drag.moved = true
-  setAnchorFromPosition(
-    target,
-    {
-      x: drag.origin.x + current.x - drag.start.x,
-      y: drag.origin.y + current.y - drag.start.y,
-    },
-  )
-  event.preventDefault()
-}
-
-function finishPointerDrag(
-  event: PointerEvent,
-  target: FloatingTarget,
-): void {
-  const drag = activeDrag.value
-  if (
-    !drag ||
-    drag.target !== target ||
-    drag.pointerId !== event.pointerId
-  ) {
-    return
-  }
-
-  if (target === 'launcher' && drag.moved) suppressLauncherClick = true
-  activeDrag.value = null
-  const element = event.currentTarget as HTMLElement
-  if (element.hasPointerCapture(event.pointerId)) {
-    element.releasePointerCapture(event.pointerId)
-  }
-}
-
-function cancelPointerDragFor(
-  event: PointerEvent,
-  target: FloatingTarget,
-): void {
-  const drag = activeDrag.value
-  if (
-    !drag ||
-    drag.target !== target ||
-    drag.pointerId !== event.pointerId
-  ) {
-    return
-  }
-  activeDrag.value = null
-  if (target === 'launcher') suppressLauncherClick = false
-}
-
-function handleLauncherClick(event: MouseEvent): void {
-  if (suppressLauncherClick) {
-    suppressLauncherClick = false
-    event.preventDefault()
-    return
-  }
-  toggleMessenger()
-}
-
 function handleResize(): void {
   compactViewport.value = window.matchMedia('(max-width: 760px)').matches
-  if (mobilePageMode.value) {
-    cancelPointerDrag()
-    return
-  }
-  syncAnchor(messengerState.open ? 'window' : 'launcher')
 }
 
 async function loadDirectory(): Promise<void> {
@@ -440,12 +230,10 @@ watch(
           : null
       void loadDirectory()
       await nextTick()
-      if (!mobilePageMode.value) syncAnchor('window')
       closeButton.value?.focus()
     } else if (!open && previousOpen) {
       await nextTick()
-      if (!compactViewport.value) syncAnchor('launcher')
-      ;(returnFocus ?? launcher.value)?.focus()
+      returnFocus?.focus()
       returnFocus = null
     }
   },
@@ -479,21 +267,10 @@ watch(
       directoryLoadGeneration += 1
     }
     if (userId) {
-      await syncFloatingPositions()
       if (messengerState.open) void loadDirectory()
     }
   },
 )
-
-watch(mobilePageMode, async (enabled, previousEnabled) => {
-  if (enabled) {
-    cancelPointerDrag()
-    return
-  }
-  if (previousEnabled && !compactViewport.value) {
-    await resetDesktopFloatingPositions()
-  }
-})
 
 onMounted(() => {
   compactViewport.value = window.matchMedia('(max-width: 760px)').matches
@@ -503,7 +280,6 @@ onMounted(() => {
   )
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('resize', handleResize)
-  void syncFloatingPositions()
   if (messengerState.open) void loadDirectory()
 })
 onUnmounted(() => {
@@ -519,28 +295,19 @@ onUnmounted(() => {
     <template v-if="authState.user">
       <aside
         id="messenger-window"
-        ref="messengerWindow"
         class="messenger-window"
         :class="{
           'messenger-window--open': messengerState.open,
-          'messenger-window--moving': activeDrag?.target === 'window',
+          'messenger-window--directory-collapsed':
+            messengerState.directoryCollapsed,
           'messenger-window--mobile-page': compactViewport,
-          'messenger-window--with-toolbox': mobileToolboxRoute,
+          'messenger-window--with-toolbox': toolboxRoute,
         }"
-        :style="windowStyle"
         :aria-hidden="messengerState.open ? 'false' : 'true'"
         aria-label="메신저"
+        @dragover.capture="clearChatDropOutsidePanel"
       >
-        <header
-          class="messenger-header"
-          :title="
-            mobilePageMode ? undefined : '드래그하여 메신저 이동'
-          "
-          @pointerdown="startPointerDrag($event, 'window')"
-          @pointermove="movePointerDrag($event, 'window')"
-          @pointerup="finishPointerDrag($event, 'window')"
-          @pointercancel="cancelPointerDragFor($event, 'window')"
-        >
+        <header class="messenger-header">
           <button
             v-if="compactViewport && messengerState.pane !== 'directory'"
             class="messenger-back"
@@ -555,6 +322,21 @@ onUnmounted(() => {
             <span>{{ activeRoomTitle }}</span>
           </div>
           <button
+            v-if="!compactViewport"
+            class="messenger-directory-toggle"
+            type="button"
+            :aria-label="
+              messengerState.directoryCollapsed
+                ? '대화 목록 펼치기'
+                : '대화 목록 접기'
+            "
+            aria-controls="messenger-directory"
+            :aria-expanded="!messengerState.directoryCollapsed"
+            @click="toggleMessengerDirectory"
+          >
+            {{ messengerState.directoryCollapsed ? '‹' : '›' }}
+          </button>
+          <button
             ref="closeButton"
             class="messenger-close"
             type="button"
@@ -568,6 +350,7 @@ onUnmounted(() => {
         <div class="messenger-shell">
           <nav
             v-show="directoryVisible"
+            id="messenger-directory"
             class="messenger-directory"
             aria-label="메신저 대화 목록"
           >
@@ -729,29 +512,6 @@ onUnmounted(() => {
           </main>
         </div>
       </aside>
-
-      <button
-        v-show="!messengerState.open"
-        ref="launcher"
-        class="messenger-launcher"
-        :class="{
-          'messenger-launcher--moving': activeDrag?.target === 'launcher',
-          'messenger-launcher--mobile-toolbox': mobileToolboxRoute,
-        }"
-        :style="launcherStyle"
-        type="button"
-        aria-label="메신저 열기"
-        aria-controls="messenger-window"
-        :aria-expanded="messengerState.open"
-        @pointerdown="startPointerDrag($event, 'launcher')"
-        @pointermove="movePointerDrag($event, 'launcher')"
-        @pointerup="finishPointerDrag($event, 'launcher')"
-        @pointercancel="cancelPointerDragFor($event, 'launcher')"
-        @click="handleLauncherClick"
-      >
-        <span aria-hidden="true">●</span>
-        <span aria-hidden="true">💬</span>
-      </button>
     </template>
   </Teleport>
 </template>

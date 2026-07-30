@@ -29,6 +29,12 @@ export const CardAPI = {
       json: data,
     }),
 
+  updateCompletion: (cardId: string, isCompleted: boolean) =>
+    apiRequest<Card>(`/api/cards/${cardId}/completion`, {
+      method: 'PATCH',
+      json: { is_completed: isCompleted },
+    }),
+
   reorder: (cardId: string, neighbor: { before_card_id?: string | null; after_card_id?: string | null }) =>
     apiRequest<Card>(`/api/cards/${cardId}/order`, {
       method: 'PUT',

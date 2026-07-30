@@ -6,7 +6,8 @@ import { UUID, ISODateString } from './common.dto';
 // ------------------------------------------------------------
 // 공용: 카드 표현
 //   DBML Cards: id, list_id(null 가능=inbox), user_id(null 가능=inbox owner),
-//               title, description, start_at, deadline, sequence, created_at
+//               title, description, is_completed, start_at, deadline,
+//               sequence, created_at
 //   ⚠️ user_id 는 "inbox 카드 소유자"이지 "담당자"가 아니다.
 //      담당자(assignee)는 CardMembers(N:M) 로 따로 관리.
 //      → 응답에서 둘을 분명히 구분해야 한다.
@@ -16,6 +17,7 @@ export interface CardDto {
   list_id: UUID | null;          // null = inbox 카드
   title: string;
   description: string | null;
+  is_completed: boolean;
   start_at: ISODateString | null;
   deadline: ISODateString | null;
   sequence: number;
@@ -123,6 +125,15 @@ export interface UpdateCardDatesRequest {
   deadline?: ISODateString | null;
 }
 export type UpdateCardDatesResponse = CardDto;
+
+// ------------------------------------------------------------
+// PATCH /cards/{card_id}/completion  → 200
+//   리스트 위치를 바꾸지 않고 카드 자체의 완료 여부를 명시적으로 변경.
+// ------------------------------------------------------------
+export interface UpdateCardCompletionRequest {
+  is_completed: boolean;
+}
+export type UpdateCardCompletionResponse = CardDto;
 
 // ------------------------------------------------------------
 // PUT /cards/{card_id}/inbox  → 200

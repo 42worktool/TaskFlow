@@ -6,11 +6,13 @@ import * as ctrl from './workspace.controller'
 import * as listCtrl from '../list/list.controller'
 import * as messageCtrl from './workspace-message.controller'
 import { requireAuth } from '../../middleware/auth'
+import { dashboardRouter } from '../dashboard'
 
 export const workspaceRouter = Router()
 
 workspaceRouter.get('/', requireAuth, ctrl.list)
 workspaceRouter.post('/', requireAuth, ctrl.create)
+workspaceRouter.use('/:workspaceId/dashboard', dashboardRouter)
 workspaceRouter.get('/:workspaceId', requireAuth, ctrl.getOne)
 workspaceRouter.put('/:workspaceId', requireAuth, ctrl.update)
 workspaceRouter.delete('/:workspaceId', requireAuth, ctrl.remove)

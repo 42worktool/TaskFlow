@@ -5,7 +5,7 @@ import { UUID } from './common.dto';
 
 // ------------------------------------------------------------
 // 공용: 리스트 표현
-//   DBML Lists: id, workspace_id, name, sequence(float)
+//   DBML Lists: id, workspace_id, name, sequence(float), is_done
 //   ⚠️ sequence 는 fractional indexing 용 float.
 //      중간 삽입을 계속하면 정밀도 고갈로 두 리스트의 sequence 가
 //      같아질 수 있음 → order 변경 응답에 항상 갱신된 sequence 를
@@ -16,6 +16,8 @@ export interface ListDto {
   workspace_id: UUID;
   name: string;
   sequence: number;
+  // 칸반 단계의 시각적 표시. 개별 카드 완료 상태와는 독립적이다.
+  is_done: boolean;
 }
 
 // ------------------------------------------------------------
@@ -24,17 +26,18 @@ export interface ListDto {
 // ------------------------------------------------------------
 export interface CreateListRequest {
   name: string;
+  is_done?: boolean; // 기본값 false
   // sequence 는 클라가 정하지 않음. 서버가 "맨 뒤"로 자동 계산.
 }
 export type CreateListResponse = ListDto;
 
 // ------------------------------------------------------------
 // PUT /lists/{list_id}  → 200
-//   현재 변경 가능한 건 name 뿐.
+//   name과 완료 단계 표시를 함께 또는 따로 변경할 수 있음.
 // ------------------------------------------------------------
-export interface UpdateListRequest {
-  name: string;
-}
+export type UpdateListRequest =
+  | { name: string; is_done?: boolean }
+  | { name?: string; is_done: boolean };
 export type UpdateListResponse = ListDto;
 
 // ------------------------------------------------------------

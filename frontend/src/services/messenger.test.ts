@@ -1,32 +1,37 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   clampFloatingPosition,
-  clearChatCardDrop,
+  claimExternalCardDrop,
+  clearExternalCardDrop,
+  clearExternalCardDropHover,
   clearInboxDestinations,
   clearMessengerWorkspace,
-  consumeChatCardDrop,
   exceedsDragThreshold,
   finishCardDrag,
-  markCardDragConsumedByChat,
+  isExternalCardDropClaimed,
   messengerState,
   notifyBoardChanged,
   notifyInboxChanged,
   openDirectConversation,
   openMessenger,
   openWorkspaceConversation,
+  requestChatCardAttachment,
   resetMessenger,
   setInboxDestinations,
   setMessengerWorkspace,
   showFriendManagement,
   showMessengerDirectory,
   startCardDrag,
+  setExternalCardDropHover,
+  takePendingChatCardAttachment,
+  toggleMessengerDirectory,
   toggleMessenger,
 } from './messenger'
 
 describe('messenger state', () => {
   afterEach(() => {
     finishCardDrag()
-    clearChatCardDrop()
+    clearExternalCardDrop()
     clearInboxDestinations()
     resetMessenger()
   })
@@ -109,6 +114,16 @@ describe('messenger state', () => {
     expect(messengerState.activeRoom?.kind).toBe('dm')
   })
 
+  it('collapses and restores the desktop directory rail', () => {
+    expect(messengerState.directoryCollapsed).toBe(false)
+
+    toggleMessengerDirectory()
+    expect(messengerState.directoryCollapsed).toBe(true)
+
+    toggleMessengerDirectory()
+    expect(messengerState.directoryCollapsed).toBe(false)
+  })
+
   it('shares only the small inbox context needed by the active board', () => {
     const inboxToken = messengerState.inboxRefreshToken
     const boardToken = messengerState.boardRefreshToken
@@ -139,26 +154,76 @@ describe('messenger state', () => {
     expect(messengerState.cardDrag).toBeNull()
   })
 
-  it('keeps a consumed chat drop until the board change handler restores it', () => {
+  it('tracks external hover by owner and clears only the matching hover', () => {
     startCardDrag('card-1', 'board')
-    markCardDragConsumedByChat('card-1')
-    finishCardDrag()
 
-    expect(messengerState.chatDropConsumedCardId).toBe('card-1')
-    expect(consumeChatCardDrop('another-card')).toBe(false)
-    expect(consumeChatCardDrop('card-1')).toBe(true)
-    expect(consumeChatCardDrop('card-1')).toBe(false)
-    expect(messengerState.chatDropConsumedCardId).toBeNull()
+    expect(
+      setExternalCardDropHover('card-1', 'chat', 'chat-panel'),
+    ).toBe(true)
+    expect(isExternalCardDropClaimed('card-1')).toBe(true)
+
+    clearExternalCardDropHover('card-1', 'toolbox-chat')
+    expect(isExternalCardDropClaimed('card-1')).toBe(true)
+
+    clearExternalCardDropHover('card-1', 'chat-panel')
+    expect(isExternalCardDropClaimed('card-1')).toBe(false)
   })
 
-  it('does not mark inbox or mismatched card drags as chat drops', () => {
+  it('keeps a committed chat drop and one-shot attachment after drag end', () => {
+    setMessengerWorkspace({ id: 'workspace-1', name: 'Alpha', syncVersion: 1 })
+    startCardDrag('card-1', 'board')
+
+    expect(requestChatCardAttachment('card-1', 'toolbox-chat')).toBe(true)
+    finishCardDrag()
+
+    expect(messengerState.externalCardDrop).toEqual({
+      cardId: 'card-1',
+      target: 'chat',
+      owner: 'toolbox-chat',
+      committed: true,
+    })
+    expect(messengerState.open).toBe(true)
+    expect(messengerState.pane).toBe('chat')
+    expect(takePendingChatCardAttachment('workspace-2')).toBeNull()
+    expect(takePendingChatCardAttachment('workspace-1')).toBe('card-1')
+    expect(takePendingChatCardAttachment('workspace-1')).toBeNull()
+  })
+
+  it('does not rearm an attachment after the drag was already committed', () => {
+    setMessengerWorkspace({ id: 'workspace-1', name: 'Alpha', syncVersion: 1 })
+    startCardDrag('card-1', 'board')
+
+    expect(requestChatCardAttachment('card-1', 'chat-panel')).toBe(true)
+    expect(takePendingChatCardAttachment('workspace-1')).toBe('card-1')
+    expect(requestChatCardAttachment('card-1', 'chat-panel')).toBe(false)
+    expect(messengerState.pendingChatCardAttachment).toBeNull()
+  })
+
+  it('does not claim inbox or mismatched card drags as external drops', () => {
     startCardDrag('card-1', 'inbox')
-    markCardDragConsumedByChat('card-1')
-    expect(messengerState.chatDropConsumedCardId).toBeNull()
+    expect(
+      setExternalCardDropHover('card-1', 'chat', 'chat-panel'),
+    ).toBe(false)
+    expect(
+      claimExternalCardDrop('card-1', 'inbox', 'toolbox-inbox'),
+    ).toBe(false)
 
     startCardDrag('card-1', 'board')
-    markCardDragConsumedByChat('card-2')
-    expect(messengerState.chatDropConsumedCardId).toBeNull()
+    expect(
+      claimExternalCardDrop('card-2', 'chat', 'toolbox-chat'),
+    ).toBe(false)
+    expect(messengerState.externalCardDrop).toBeNull()
+  })
+
+  it('clears stale external state when a new card drag starts', () => {
+    setMessengerWorkspace({ id: 'workspace-1', name: 'Alpha', syncVersion: 1 })
+    startCardDrag('card-1', 'board')
+    requestChatCardAttachment('card-1', 'toolbox-chat')
+
+    startCardDrag('card-2', 'board')
+
+    expect(messengerState.externalCardDrop).toBeNull()
+    expect(messengerState.pendingChatCardAttachment).toBeNull()
   })
 
   it('resets session-scoped messenger context', () => {
@@ -170,11 +235,13 @@ describe('messenger state', () => {
     resetMessenger()
 
     expect(messengerState.open).toBe(false)
+    expect(messengerState.directoryCollapsed).toBe(false)
     expect(messengerState.pane).toBe('directory')
     expect(messengerState.activeRoom).toBeNull()
     expect(messengerState.workspace).toBeNull()
     expect(messengerState.cardDrag).toBeNull()
-    expect(messengerState.chatDropConsumedCardId).toBeNull()
+    expect(messengerState.externalCardDrop).toBeNull()
+    expect(messengerState.pendingChatCardAttachment).toBeNull()
     expect(messengerState.inboxDestinations).toEqual([])
   })
 })

@@ -4,7 +4,7 @@ import draggable from 'vuedraggable'
 import CardDetailModal from './CardDetailModal.vue'
 import TaskCard from './TaskCard.vue'
 import { InboxAPI } from '../api/inbox'
-import { consumeChatCardDrop } from '../services/messenger'
+import { isExternalCardDropClaimed } from '../services/messenger'
 import type { Card, DraggableChange, List } from '../types'
 
 const props = withDefaults(
@@ -84,7 +84,7 @@ async function deleteCard(cardId: string) {
 async function handleCardChange(event: DraggableChange<Card>) {
   if (!event.added || busyCardId.value) return
   const card = event.added.element
-  if (consumeChatCardDrop(card.id)) {
+  if (isExternalCardDropClaimed(card.id)) {
     cards.value = cards.value.filter((item) => item.id !== card.id)
     emit('drop-settled')
     return
@@ -166,6 +166,7 @@ onUnmounted(() => {
       :disabled="!dragEnabled"
       :sort="false"
       ghost-class="card-ghost"
+      :force-fallback="true"
       :scroll="true"
       :scroll-sensitivity="80"
       :scroll-speed="12"
@@ -180,6 +181,7 @@ onUnmounted(() => {
         <li>
           <TaskCard
             :card="card"
+            :completed="card.is_completed"
             @open="selectedCardId = card.id"
             @delete="deleteCard"
           />

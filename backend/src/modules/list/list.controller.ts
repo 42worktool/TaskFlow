@@ -1,6 +1,10 @@
 import type { RequestHandler } from 'express'
 import * as svc from './list.service'
-import { listNameSchema, listReorderSchema } from './list.validation'
+import {
+  createListSchema,
+  listReorderSchema,
+  updateListSchema,
+} from './list.validation'
 
 export const list: RequestHandler = async (req, res) => {
   const lists = await svc.listLists({
@@ -19,21 +23,23 @@ export const getOne: RequestHandler = async (req, res) => {
 }
 
 export const create: RequestHandler = async (req, res) => {
-  const body = listNameSchema.parse(req.body)
+  const body = createListSchema.parse(req.body)
   const list = await svc.createList({
     userId: req.user!.id,
     workspaceId: req.params.workspaceId as string,
     name: body.name,
+    isDone: body.is_done,
   })
   res.status(201).json(list)
 }
 
 export const update: RequestHandler = async (req, res) => {
-  const body = listNameSchema.parse(req.body)
+  const body = updateListSchema.parse(req.body)
   const list = await svc.updateList({
     userId: req.user!.id,
     listId: req.params.list_id as string,
-    name: body.name,
+    ...(body.name !== undefined ? { name: body.name } : {}),
+    ...(body.is_done !== undefined ? { isDone: body.is_done } : {}),
   })
   res.status(200).json(list)
 }

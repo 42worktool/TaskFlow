@@ -18,11 +18,46 @@ describe('ListAPI', () => {
       workspace_id: 'workspace-1',
       name: 'Todo',
       sequence: 1,
+      is_done: false,
       cards: [],
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(list)
 
     await expect(ListAPI.get('list-1')).resolves.toEqual(list)
     expect(apiRequest).toHaveBeenCalledWith('/api/lists/list-1')
+  })
+
+  it('updates the completion role of a list', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      id: 'list-1',
+      workspace_id: 'workspace-1',
+      name: 'Done',
+      sequence: 1,
+      is_done: true,
+    })
+
+    await ListAPI.update('list-1', { is_done: true })
+
+    expect(apiRequest).toHaveBeenCalledWith('/api/lists/list-1', {
+      method: 'PUT',
+      json: { is_done: true },
+    })
+  })
+
+  it('keeps rename as a small update wrapper', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce({
+      id: 'list-1',
+      workspace_id: 'workspace-1',
+      name: 'Review',
+      sequence: 1,
+      is_done: false,
+    })
+
+    await ListAPI.rename('list-1', 'Review')
+
+    expect(apiRequest).toHaveBeenCalledWith('/api/lists/list-1', {
+      method: 'PUT',
+      json: { name: 'Review' },
+    })
   })
 })

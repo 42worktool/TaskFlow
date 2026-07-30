@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onUnmounted, ref } from 'vue'
 import draggable from 'vuedraggable'
 import TaskCard from './TaskCard.vue'
+import { isExternalCardDropClaimed } from '../services/messenger'
 import type { Card, DraggableChange, ListWithCards } from '../types'
 
 const props = withDefaults(
@@ -9,10 +10,12 @@ const props = withDefaults(
     list: ListWithCards
     canEdit?: boolean
     canOpenDetails?: boolean
+    completingCardIds?: ReadonlySet<string>
   }>(),
   {
     canEdit: false,
     canOpenDetails: false,
+    completingCardIds: () => new Set<string>(),
   },
 )
 
@@ -23,7 +26,9 @@ const emit = defineEmits<{
   'open-card': [card: Card]
   'add-card': [listId: string, title: string]
   'delete-card': [cardId: string]
+  'toggle-card-completion': [card: Card]
   'rename-list': [listId: string, name: string]
+  'toggle-list-done': [listId: string, isDone: boolean]
   'delete-list': [listId: string]
 }>()
 
@@ -36,6 +41,7 @@ const badgeColors: Record<string, string> = {
 
 const showAddCard = ref(false)
 const newCardTitle = ref('')
+let originPlaceholder: HTMLElement | null = null
 
 function submitAddCard() {
   if (!props.canEdit) return
@@ -76,12 +82,61 @@ function startRename() {
   renaming.value = true
 }
 
-function startCardDrag(event: { oldIndex?: number | null }) {
+function removeOriginPlaceholder(): void {
+  originPlaceholder?.remove()
+  originPlaceholder = null
+}
+
+function createOriginPlaceholder(item: HTMLElement): void {
+  removeOriginPlaceholder()
+  const bounds = item.getBoundingClientRect()
+  const placeholder = item.cloneNode(true) as HTMLElement
+  placeholder.removeAttribute('data-draggable')
+  placeholder.removeAttribute('draggable')
+  placeholder.setAttribute('aria-hidden', 'true')
+  placeholder.inert = true
+  placeholder.classList.remove('card-ghost', 'card-drag-preview')
+  placeholder.classList.add('card-origin-placeholder')
+  Object.assign(placeholder.style, {
+    position: 'fixed',
+    top: `${bounds.top}px`,
+    left: `${bounds.left}px`,
+    width: `${bounds.width}px`,
+    height: `${bounds.height}px`,
+    margin: '0',
+    pointerEvents: 'none',
+    transform: 'none',
+    transition: 'none',
+  })
+  document.body.appendChild(placeholder)
+  originPlaceholder = placeholder
+}
+
+function startCardDrag(event: {
+  oldIndex?: number | null
+  item?: HTMLElement
+}) {
   const index = event.oldIndex
   if (index === null || index === undefined) return
   const card = props.list.cards[index]
-  if (card) emit('card-drag-start', card)
+  if (!card) return
+  if (event.item) createOriginPlaceholder(event.item)
+  emit('card-drag-start', card)
 }
+
+function finishCardDrag(): void {
+  removeOriginPlaceholder()
+  emit('card-drag-end')
+}
+
+function canMoveCard(event: {
+  draggedContext?: { element?: Card }
+}): boolean {
+  const cardId = event.draggedContext?.element?.id
+  return !cardId || !isExternalCardDropClaimed(cardId)
+}
+
+onUnmounted(removeOriginPlaceholder)
 
 const vFocus = {
   mounted: (el: HTMLInputElement) => el.focus(),
@@ -89,7 +144,13 @@ const vFocus = {
 </script>
 
 <template>
-  <section class="task-list" :class="{ 'task-list--readonly': !canEdit }">
+  <section
+    class="task-list"
+    :class="{
+      'task-list--readonly': !canEdit,
+      'task-list--done': list.is_done,
+    }"
+  >
     <div class="list-header">
       <input
         v-if="renaming"
@@ -103,7 +164,43 @@ const vFocus = {
       />
       <span v-else class="list-name" @click="startRename">{{ list.name }}</span>
       <div class="list-header-actions">
-        <span class="list-count" :style="{ background: badgeColors[list.name] ?? '#6b7280' }">
+        <button
+          v-if="canEdit"
+          class="list-done-toggle"
+          :class="{ 'list-done-toggle--active': list.is_done }"
+          type="button"
+          :aria-label="
+            list.is_done
+              ? `${list.name}의 완료 단계 표시 해제`
+              : `${list.name}을(를) 완료 단계로 표시`
+          "
+          :aria-pressed="list.is_done"
+          :title="
+            list.is_done ? '완료 단계 표시 해제' : '완료 단계로 표시'
+          "
+          @pointerdown.stop
+          @click.stop="emit('toggle-list-done', list.id, !list.is_done)"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="10" r="7.5" />
+            <path d="m6.5 10 2.2 2.2 4.8-5" />
+          </svg>
+        </button>
+        <span
+          v-else-if="list.is_done"
+          class="list-done-label"
+        >
+          완료
+        </span>
+        <span
+          class="list-count"
+          :style="{
+            background:
+              list.is_done
+                ? '#16a34a'
+                : (badgeColors[list.name] ?? '#6b7280'),
+          }"
+        >
           {{ list.cards.length }}
         </span>
         <button
@@ -123,15 +220,19 @@ const vFocus = {
       item-key="id"
       group="board-cards"
       :disabled="!canEdit"
+      :move="canMoveCard"
       class="card-list"
       ghost-class="card-ghost"
+      fallback-class="card-drag-preview"
+      :force-fallback="true"
+      :fallback-on-body="true"
       :scroll="true"
       :scroll-sensitivity="80"
       :scroll-speed="12"
       :bubble-scroll="true"
       :force-auto-scroll-fallback="true"
       @start="startCardDrag"
-      @end="emit('card-drag-end')"
+      @end="finishCardDrag"
       @change="(e: DraggableChange<Card>) => emit('card-change', list.id, e)"
     >
       <template #item="{ element: card }">
@@ -139,8 +240,12 @@ const vFocus = {
           :card="card"
           :openable="canOpenDetails"
           :show-delete-action="canEdit"
+          :show-completion-action="canEdit"
+          :completed="card.is_completed"
+          :completion-pending="completingCardIds.has(card.id)"
           @open="emit('open-card', card)"
           @delete="emit('delete-card', card.id)"
+          @toggle-completion="emit('toggle-card-completion', card)"
         />
       </template>
     </draggable>

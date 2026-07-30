@@ -4,10 +4,21 @@
   padding: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .task-card:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.task-card--completed {
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+.task-card--completed .card-title {
+  color: #64748b;
 }
 
 .task-card:active {
@@ -64,6 +75,48 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.card-completion-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 3px 7px 3px 5px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.card-completion-btn:hover:not(:disabled) {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.card-completion-btn--completed {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.card-completion-btn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.card-completion-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .card-date {

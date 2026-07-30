@@ -16,6 +16,23 @@ body {
   background: #f3f4f6;
 }
 
+html.is-card-dragging,
+html.is-card-dragging *,
+body.is-card-dragging,
+body.is-card-dragging * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+body.is-card-dragging {
+  cursor: grabbing;
+}
+
+body.is-card-dragging img,
+body.is-card-dragging a {
+  -webkit-user-drag: none !important;
+}
+
 a {
   text-decoration: none;
   color: inherit;

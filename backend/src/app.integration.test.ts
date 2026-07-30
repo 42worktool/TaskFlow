@@ -127,6 +127,7 @@ test('feature routes reject requests without a bearer token', async () => {
     '/api/friends',
     '/api/inbox',
     '/api/lists/00000000-0000-4000-8000-000000000001',
+    '/api/workspaces/00000000-0000-4000-8000-000000000001/dashboard',
     '/api/workspaces/00000000-0000-4000-8000-000000000001/messages',
   ]) {
     const result = await send(path);

@@ -216,20 +216,21 @@ model List {
 // 리스트/유저 삭제 시 카드는 지우지 않고 SetNull로 inbox에 남긴다 (팀 결정).
 // sequence는 List와 동일한 fractional indexing 방식.
 model Card {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  list_id     String?   @db.Uuid
-  user_id     String?   @db.Uuid
-  title       String
-  description String    @db.Text
-  start_at    DateTime?
-  deadline    DateTime?
-  sequence    Float
-  created_at  DateTime  @default(now())
-  created_by  String?   @db.Uuid
-  updated_at  DateTime  @default(now()) @updatedAt
-  updated_by  String?   @db.Uuid
-  deleted_at  DateTime? @db.Timestamptz(3)
-  deleted_by  String?   @db.Uuid
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  list_id      String?   @db.Uuid
+  user_id      String?   @db.Uuid
+  title        String
+  description  String    @db.Text
+  is_completed Boolean   @default(false)
+  start_at     DateTime?
+  deadline     DateTime?
+  sequence     Float
+  created_at   DateTime  @default(now())
+  created_by   String?   @db.Uuid
+  updated_at   DateTime  @default(now()) @updatedAt
+  updated_by   String?   @db.Uuid
+  deleted_at   DateTime? @db.Timestamptz(3)
+  deleted_by   String?   @db.Uuid
 
   list List? @relation(fields: [list_id], references: [id], onDelete: SetNull) //인박스에 들어가는 경우 null이 가능해서 set null
   user User? @relation(fields: [user_id], references: [id], onDelete: SetNull) //인박스에 들어가는 경우 null이 가능해서 set null

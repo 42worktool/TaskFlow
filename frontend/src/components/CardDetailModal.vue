@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
+import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { CardAPI } from '../api/card'
 import type { Card, CardDetail } from '../types'
 import {
@@ -7,6 +7,7 @@ import {
   toDateInput,
   toIsoDate,
 } from '../utils/cardDates'
+import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
 
 const props = withDefaults(
   defineProps<{
@@ -175,6 +176,15 @@ async function submitComment(): Promise<void> {
   }
 }
 
+const commentSubmitter = createComposerEnterSubmitter(
+  () => {
+    void submitComment()
+  },
+  (callback) => {
+    void nextTick(callback)
+  },
+)
+
 async function submit(): Promise<void> {
   if (!props.editable || saving.value || commentSaving.value) return
   const cardId = props.cardId
@@ -245,6 +255,7 @@ async function submit(): Promise<void> {
 watch(
   () => props.cardId,
   () => {
+    commentSubmitter.reset()
     commentGeneration += 1
     commentDraft.value = ''
     commentSaving.value = false
@@ -271,6 +282,7 @@ watch(
 )
 
 onUnmounted(() => {
+  commentSubmitter.reset()
   active = false
   loadGeneration += 1
   commentGeneration += 1
@@ -392,7 +404,8 @@ onUnmounted(() => {
                 placeholder="카드에 댓글을 남기세요."
                 :disabled="saving || commentSaving"
                 aria-describedby="card-detail-comment-hint"
-                @keydown.enter.exact.prevent="submitComment"
+                @keydown.enter.exact="commentSubmitter.handleEnter"
+                @compositionend="commentSubmitter.handleCompositionEnd"
               />
               <div class="card-detail-comment-composer-actions">
                 <small id="card-detail-comment-hint">
