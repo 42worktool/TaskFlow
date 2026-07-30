@@ -4,6 +4,7 @@ import {
   markNotificationRead,
   notificationState,
   receiveNotification,
+  unreadNotificationCount,
 } from './notifications'
 import type { NotificationEvent } from '../types'
 
@@ -36,6 +37,7 @@ describe('notification state', () => {
       'first',
     ])
     expect(notificationState.items.every((item) => !item.read)).toBe(true)
+    expect(unreadNotificationCount.value).toBe(2)
   })
 
   it('marks a received notification as read', () => {
@@ -43,6 +45,7 @@ describe('notification state', () => {
     markNotificationRead('notification-1')
 
     expect(notificationState.items[0]?.read).toBe(true)
+    expect(unreadNotificationCount.value).toBe(0)
   })
 
   it('ignores malformed realtime payloads', () => {

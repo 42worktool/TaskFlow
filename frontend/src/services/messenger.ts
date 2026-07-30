@@ -1,7 +1,12 @@
 import { reactive } from 'vue'
 import type { Friend, List } from '../types'
 
-export type MessengerPane = 'directory' | 'friends' | 'chat' | 'dm'
+export type MessengerPane =
+  | 'directory'
+  | 'notifications'
+  | 'friends'
+  | 'chat'
+  | 'dm'
 export type CardDragSource = 'board' | 'inbox'
 export type ExternalCardDropTarget = 'chat' | 'inbox'
 export type ExternalCardDropOwner =
@@ -136,6 +141,11 @@ export function showMessengerDirectory(): void {
 
 export function showFriendManagement(): void {
   messengerState.pane = 'friends'
+  messengerState.open = true
+}
+
+export function showMessengerNotifications(): void {
+  messengerState.pane = 'notifications'
   messengerState.open = true
 }
 
