@@ -35,10 +35,10 @@ HTTP controllers or the Vue component tree.
   metrics, activity breakdowns, and a recent activity feed.
 - Email-based friend requests with acceptance/rejection and realtime
   online/offline presence for accepted friends.
-- A movable full messenger with workspace rooms, accepted-friend DMs, friend
-  management, and realtime online status. Its desktop window opens from the
-  draggable launcher anchor and replaces the launcher while open; mobile uses
-  a full-page view above the persistent bottom bar.
+- A full messenger with workspace rooms, accepted-friend DMs, friend
+  management, and realtime online status. On desktop it toggles from the right
+  and its right-side directory rail can collapse to return space to the board;
+  mobile uses a full-page view above the persistent bottom bar.
 - Card-linked workspace messages that are also stored and displayed as card
   comments, direct comment writing from card details, and realtime team-member
   online status.
@@ -179,16 +179,22 @@ environment running the suite must allow loopback port binding.
 4. Open a card to edit its details and dates.
 5. Open Inbox from the bottom workspace toolbox. On desktop, use its split
    sidebar beside Board or Calendar and drag cards between Inbox and board
-   lists; on mobile, use the focused Inbox page.
+   lists. Dropping a board card directly on the closed Inbox tool moves it
+   without opening the sidebar; on mobile, use the focused Inbox page.
 6. Invite a registered or future user by email from the workspace share menu.
-7. Open or reposition the floating messenger, then choose a workspace room,
-   manage friends, or start a DM. Choosing a workspace room also loads that
-   workspace. On mobile, use the full-page view from the bottom bar.
-8. Select a card, or drop a board card onto the open chat, before sending a
-   workspace message to also record that text in the card's comments.
+7. Toggle Chat from the bottom toolbox, then choose a workspace room, manage
+   friends, or start a DM. On desktop it opens as a right sidebar whose
+   directory rail can collapse; on mobile it becomes a full page.
+8. Select a card, or drop a board card onto the open right-side workspace chat,
+   before sending a message to also record that text in the card's comments.
+   Dropping onto the closed Chat tool opens the current workspace room with
+   that card already attached.
 9. See team online status and member management from the workspace top bar,
    search accessible cards, or use the bottom toolbox to switch between the
-   board, Calendar, and workspace list.
+   board, Calendar, Dashboard, and workspace list.
+10. Use a card's Complete/Reopen action to change its own completion state
+    without moving it. List completion markers are optional visual hints only;
+    the dashboard history follows the card state.
 
 Workspace permissions are deliberately small:
 
@@ -456,8 +462,8 @@ to an AI system.
 - [Authentication and account API](docs/auth-api.md)
 - [Realtime protocol and extension points](docs/realtime.md)
 - [Workspace synchronization, chat, and team presence](docs/workspace-realtime.md)
-- [Friend API and presence events](docs/friends.md)
 - [Workspace activity dashboard metrics](docs/dashboard.md)
+- [Friend API and presence events](docs/friends.md)
 - [Workspace DTO contract](docs/workspaces.dto.ts)
 - [Email invitation pipeline](docs/mail.md)
 - [Design decisions and tradeoffs](docs/CONSIDERATIONS.md)

@@ -10,12 +10,15 @@ import { InboxAPI } from '../api/inbox'
 import { realtime } from '../services/realtime'
 import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
 import {
-  clearChatCardDrop,
+  claimExternalCardDrop,
+  clearExternalCardDrop,
   clearInboxDestinations,
-  consumeChatCardDrop,
   finishCardDrag,
+  isExternalCardDropClaimed,
   messengerState,
+  notifyBoardChanged,
   notifyInboxChanged,
+  requestChatCardAttachment,
   setInboxDestinations,
   startCardDrag,
 } from '../services/messenger'
@@ -41,6 +44,8 @@ const props = withDefaults(
 const lists = ref<ListWithCards[]>([])
 const loading = ref(false)
 const error = ref('')
+const actionError = ref('')
+const completingCardIds = ref<Set<string>>(new Set())
 const selectedCardId = ref<string | null>(null)
 const cardDetailRefreshToken = ref(0)
 const boardColumns = ref<{ $el: HTMLElement } | null>(null)
@@ -52,6 +57,7 @@ let refreshTimer: ReturnType<typeof setTimeout> | null = null
 let refreshRunning = false
 let fullRefreshPending = false
 let fullRefreshRetriesRemaining = 0
+const cardChangeTimers = new Set<ReturnType<typeof setTimeout>>()
 const MAX_FULL_REFRESH_RETRIES = 2
 const pendingListIds = new Set<string>()
 const pendingDeletedListIds = new Set<string>()
@@ -230,6 +236,8 @@ watch(
   () => route.params.workspaceId,
   () => {
     selectedCardId.value = null
+    actionError.value = ''
+    completingCardIds.value = new Set()
     fullRefreshPending = false
     fullRefreshRetriesRemaining = 0
     pendingListIds.clear()
@@ -331,14 +339,23 @@ function onListChange(event: DraggableChange<ListWithCards>) {
   )
 }
 
-function onCardChange(listId: string, event: DraggableChange<Card>) {
-  if (!props.canEditBoard) return
+function persistCardChange(
+  workspaceId: string,
+  listId: string,
+  event: DraggableChange<Card>,
+): void {
+  if (
+    !props.canEditBoard ||
+    workspaceId !== String(route.params.workspaceId ?? '')
+  ) {
+    return
+  }
   const list = lists.value.find((l) => l.id === listId)
   if (!list) return
 
   if (event.added) {
     const { element, newIndex } = event.added
-    if (consumeChatCardDrop(element.id)) {
+    if (isExternalCardDropClaimed(element.id)) {
       queueFullRefresh()
       return
     }
@@ -366,7 +383,7 @@ function onCardChange(listId: string, event: DraggableChange<Card>) {
     )
   } else if (event.moved) {
     const { element, newIndex } = event.moved
-    if (consumeChatCardDrop(element.id)) {
+    if (isExternalCardDropClaimed(element.id)) {
       queueFullRefresh()
       return
     }
@@ -378,7 +395,24 @@ function onCardChange(listId: string, event: DraggableChange<Card>) {
       () => queueFullRefresh(),
       () => queueFullRefresh(),
     )
+  } else if (
+    event.removed &&
+    isExternalCardDropClaimed(event.removed.element.id)
+  ) {
+    // Sortable can remove a fallback-dragged card from its local source model
+    // before the external target settles. Reconcile without persisting a move.
+    queueFullRefresh()
   }
+}
+
+function onCardChange(listId: string, event: DraggableChange<Card>) {
+  if (!props.canEditBoard) return
+  const workspaceId = String(route.params.workspaceId ?? '')
+  const timer = window.setTimeout(() => {
+    cardChangeTimers.delete(timer)
+    persistCardChange(workspaceId, listId, event)
+  }, 0)
+  cardChangeTimers.add(timer)
 }
 
 async function onAddCard(listId: string, title: string) {
@@ -402,22 +436,89 @@ async function onDeleteCard(cardId: string) {
   }
 }
 
+async function onToggleCardCompletion(card: Card) {
+  if (
+    !props.canEditBoard ||
+    completingCardIds.value.has(card.id)
+  ) {
+    return
+  }
+
+  actionError.value = ''
+  completingCardIds.value = new Set(completingCardIds.value).add(card.id)
+  try {
+    const saved = await CardAPI.updateCompletion(
+      card.id,
+      !card.is_completed,
+    )
+    lists.value = lists.value.map((list) => ({
+      ...list,
+      cards: list.cards.map((item) =>
+        item.id === saved.id ? saved : item,
+      ),
+    }))
+    queueFullRefresh()
+  } catch (caught) {
+    actionError.value =
+      caught instanceof Error
+        ? caught.message
+        : card.is_completed
+          ? '카드를 다시 열지 못했습니다.'
+          : '카드를 완료하지 못했습니다.'
+    queueFullRefresh()
+  } finally {
+    const next = new Set(completingCardIds.value)
+    next.delete(card.id)
+    completingCardIds.value = next
+  }
+}
+
 function onBoardCardDragStart(card: Card): void {
   if (!props.canEditBoard) return
   startCardDrag(card.id, 'board')
 }
 
 function onBoardCardDragEnd(): void {
-  const cardId =
-    messengerState.cardDrag?.source === 'board'
-      ? messengerState.cardDrag.cardId
-      : null
-  finishCardDrag()
-  if (!cardId) return
-  window.setTimeout(() => {
-    if (messengerState.cardDrag?.cardId === cardId) return
-    clearChatCardDrop(cardId)
-  }, 0)
+  try {
+    const drag = messengerState.cardDrag
+    const drop = messengerState.externalCardDrop
+    if (
+      drag?.source === 'board' &&
+      drop?.cardId === drag.cardId &&
+      !drop.committed
+    ) {
+      if (
+        drop.target === 'chat' &&
+        (drop.owner === 'chat-panel' || drop.owner === 'toolbox-chat')
+      ) {
+        requestChatCardAttachment(drag.cardId, drop.owner)
+      } else if (
+        drop.target === 'inbox' &&
+        drop.owner === 'toolbox-inbox' &&
+        claimExternalCardDrop(
+          drag.cardId,
+          'inbox',
+          'toolbox-inbox',
+        )
+      ) {
+        void InboxAPI.moveToInbox(drag.cardId).then(
+          () => {
+            notifyBoardChanged()
+            notifyInboxChanged()
+          },
+          (caught: unknown) => {
+            actionError.value =
+              caught instanceof Error
+                ? caught.message
+                : '카드를 인박스로 옮기지 못했습니다.'
+            notifyBoardChanged()
+          },
+        )
+      }
+    }
+  } finally {
+    finishCardDrag()
+  }
 }
 
 function openCard(card: Card) {
@@ -453,6 +554,19 @@ async function onRenameList(listId: string, name: string) {
     queueFullRefresh()
   } catch (e) {
     error.value = e instanceof Error ? e.message : '리스트 이름을 변경하지 못했습니다.'
+  }
+}
+
+async function onToggleListDone(listId: string, isDone: boolean) {
+  if (!props.canEditBoard) return
+  try {
+    await ListAPI.update(listId, { is_done: isDone })
+    queueFullRefresh()
+  } catch (e) {
+    error.value =
+      e instanceof Error
+        ? e.message
+        : '리스트의 완료 단계를 변경하지 못했습니다.'
   }
 }
 
@@ -535,18 +649,34 @@ onUnmounted(() => {
   listLoadGeneration += 1
   clearInboxDestinations()
   if (messengerState.cardDrag) finishCardDrag()
-  clearChatCardDrop()
+  clearExternalCardDrop()
   removeWorkspaceChangeListener()
   stopBoardAutoScroll()
   window.removeEventListener('dragover', handleCardDragPointer)
   window.removeEventListener('mousemove', handleCardDragPointer)
   window.removeEventListener('pointermove', handleCardDragPointer)
+  cardChangeTimers.forEach((timer) => clearTimeout(timer))
+  cardChangeTimers.clear()
   if (refreshTimer) clearTimeout(refreshTimer)
 })
 </script>
 
 <template>
   <div class="board-page">
+    <p
+      v-if="actionError"
+      class="board-action-error"
+      role="alert"
+    >
+      <span>{{ actionError }}</span>
+      <button
+        type="button"
+        aria-label="알림 닫기"
+        @click="actionError = ''"
+      >
+        ×
+      </button>
+    </p>
     <div v-if="loading" class="board-status">불러오는 중...</div>
     <div
       v-else-if="error"
@@ -571,13 +701,16 @@ onUnmounted(() => {
           :list="col"
           :can-edit="canEditBoard"
           :can-open-details="canViewCardDetails"
+          :completing-card-ids="completingCardIds"
           @open-card="openCard"
           @card-change="onCardChange"
           @card-drag-start="onBoardCardDragStart"
           @card-drag-end="onBoardCardDragEnd"
           @add-card="onAddCard"
           @delete-card="onDeleteCard"
+          @toggle-card-completion="onToggleCardCompletion"
           @rename-list="onRenameList"
+          @toggle-list-done="onToggleListDone"
           @delete-list="onDeleteList"
         />
       </template>

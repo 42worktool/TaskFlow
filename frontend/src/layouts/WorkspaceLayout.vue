@@ -9,6 +9,7 @@ import WorkspaceToolbox from '../components/WorkspaceToolbox.vue'
 import { WorkspaceAPI } from '../api/workspace'
 import { authState } from '../services/auth'
 import {
+  clearExternalCardDropHover,
   clearMessengerWorkspace,
   finishCardDrag,
   messengerState,
@@ -55,12 +56,29 @@ const canManageMembers = computed(() =>
 const showShareModal = ref(false)
 const inboxOpen = ref(false)
 const compactViewport = ref(false)
+const CARD_DRAG_PAGE_CLASS = 'is-card-dragging'
+const CARD_DRAG_END_GRACE_MS = 250
+let cardDragEndFallback: ReturnType<typeof setTimeout> | null = null
 const inboxAcceptingBoardCard = computed(
   () =>
     inboxOpen.value &&
     canEditBoard.value &&
     messengerState.cardDrag?.source === 'board',
 )
+
+function setCardDragPageState(active: boolean): void {
+  document.documentElement.classList.toggle(CARD_DRAG_PAGE_CLASS, active)
+  document.body.classList.toggle(CARD_DRAG_PAGE_CLASS, active)
+  if (active) document.getSelection()?.removeAllRanges()
+}
+
+function scheduleCardDragEndFallback(): void {
+  if (!messengerState.cardDrag || cardDragEndFallback) return
+  cardDragEndFallback = window.setTimeout(() => {
+    cardDragEndFallback = null
+    if (messengerState.cardDrag) finishCardDrag()
+  }, CARD_DRAG_END_GRACE_MS)
+}
 
 function closeInbox(): void {
   if (messengerState.cardDrag) return
@@ -89,6 +107,27 @@ function onInboxCardDragEnd(): void {
 function onInboxDropSettled(): void {
   notifyBoardChanged()
   notifyInboxChanged()
+}
+
+function clearExternalDropOverWorkspace(event: DragEvent): void {
+  const drag = messengerState.cardDrag
+  const drop = messengerState.externalCardDrop
+  if (
+    drag?.source !== 'board' ||
+    !drop ||
+    drop.committed ||
+    drop.cardId !== drag.cardId
+  ) {
+    return
+  }
+  const target = event.target
+  if (
+    target instanceof Element &&
+    target.closest('[data-card-drop-target]')
+  ) {
+    return
+  }
+  clearExternalCardDropHover(drag.cardId, drop.owner)
 }
 
 function syncCompactViewport(): void {
@@ -369,14 +408,36 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => messengerState.cardDrag !== null,
+  (active) => {
+    if (!active && cardDragEndFallback) {
+      clearTimeout(cardDragEndFallback)
+      cardDragEndFallback = null
+    }
+    setCardDragPageState(active)
+  },
+  { immediate: true, flush: 'sync' },
+)
+
 onMounted(() => {
   syncCompactViewport()
   window.addEventListener('resize', syncCompactViewport)
+  window.addEventListener('dragend', scheduleCardDragEndFallback)
+  window.addEventListener('pointerup', scheduleCardDragEndFallback)
+  window.addEventListener('blur', scheduleCardDragEndFallback)
 })
 
 onUnmounted(() => {
   workspaceLoadGeneration += 1
   window.removeEventListener('resize', syncCompactViewport)
+  window.removeEventListener('dragend', scheduleCardDragEndFallback)
+  window.removeEventListener('pointerup', scheduleCardDragEndFallback)
+  window.removeEventListener('blur', scheduleCardDragEndFallback)
+  if (cardDragEndFallback) clearTimeout(cardDragEndFallback)
+  cardDragEndFallback = null
+  if (messengerState.cardDrag) finishCardDrag()
+  setCardDragPageState(false)
   if (messengerContextWorkspaceId) {
     clearMessengerWorkspace(messengerContextWorkspaceId)
     messengerContextWorkspaceId = null
@@ -388,7 +449,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="workspace" class="app-shell">
+  <div
+    v-if="workspace"
+    class="app-shell"
+    @dragover.capture="clearExternalDropOverWorkspace"
+  >
     <AppHeader :workspace-name="workspace.name">
       <template #workspace-actions>
         <WorkspaceMembersMenu
@@ -402,7 +467,13 @@ onUnmounted(() => {
 
     <div
       class="content-area"
-      :class="{ 'content-area--inbox-open': inboxOpen }"
+      :class="{
+        'content-area--inbox-open': inboxOpen,
+        'content-area--messenger-open':
+          messengerState.open && !compactViewport,
+        'content-area--messenger-directory-collapsed':
+          messengerState.directoryCollapsed,
+      }"
     >
       <aside
         v-if="inboxOpen"
