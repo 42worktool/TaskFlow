@@ -1,16 +1,19 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import { config } from '../../config';
+import { AppError } from '../../errors';
 import { requireAuth } from '../../middleware/auth';
 import * as controller from './auth.controller';
 
-function requireSameOrigin(req: Request, res: Response, next: NextFunction): void {
+function requireSameOrigin(req: Request, _res: Response, next: NextFunction): void {
   const origin = req.get('origin');
   if (origin && origin !== config.appOrigin) {
-    res.status(403).json({
-      status_code: 403,
-      error: 'INVALID_ORIGIN',
-      message: 'The request origin is not allowed',
-    });
+    next(
+      new AppError(
+        'INVALID_ORIGIN',
+        403,
+        'The request origin is not allowed',
+      ),
+    );
     return;
   }
   next();

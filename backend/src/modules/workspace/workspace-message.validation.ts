@@ -1,8 +1,10 @@
 import { z } from 'zod'
+import { messageContentSchema } from '../../lib/messaging'
+import { uuidSchema } from '../../lib/validation'
 
 export const createWorkspaceMessageSchema = z
   .object({
-    content: z.string().trim().min(1).max(1000),
-    card_id: z.string().uuid().nullable().optional(),
+    content: messageContentSchema,
+    card_id: uuidSchema.nullable().optional(),
   })
   .strict()

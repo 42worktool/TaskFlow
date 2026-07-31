@@ -217,6 +217,7 @@ test('getList returns one list with cards under the board read policy', async (t
   })
   stubMethod(t, prisma.workspace, 'findFirst', async () => ({
     is_public: true,
+    members: [],
   }))
 
   const result = await getList({ userId: USER_ID, listId: LIST_ID })

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { uuidSchema } from '../../lib/validation'
 
 const isoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'invalid date')
 
@@ -16,8 +17,8 @@ export const updateCardSchema = z.object({
 
 export const cardNeighborSchema = z
   .object({
-    before_card_id: z.string().uuid().nullable().optional(),
-    after_card_id: z.string().uuid().nullable().optional(),
+    before_card_id: uuidSchema.nullable().optional(),
+    after_card_id: uuidSchema.nullable().optional(),
   })
   .refine(
     (value) => value.before_card_id !== undefined || value.after_card_id !== undefined,
@@ -25,9 +26,9 @@ export const cardNeighborSchema = z
   )
 
 export const moveCardSchema = z.object({
-  list_id: z.string().uuid(),
-  before_card_id: z.string().uuid().nullable().optional(),
-  after_card_id: z.string().uuid().nullable().optional(),
+  list_id: uuidSchema,
+  before_card_id: uuidSchema.nullable().optional(),
+  after_card_id: uuidSchema.nullable().optional(),
 })
 
 export const cardDatesSchema = z
@@ -43,7 +44,7 @@ export const cardCompletionSchema = z.object({
   is_completed: z.boolean(),
 })
 
-export const addCardMemberSchema = z.object({ user_id: z.string().uuid() })
+export const addCardMemberSchema = z.object({ user_id: uuidSchema })
 
 export const addAttachmentSchema = z.object({
   file_url: z.string().url(),

@@ -11,6 +11,7 @@ import type { Card, List, Prisma, Role } from '@prisma/client'
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../errors'
 import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
+import { userSummarySelect } from '../../lib/user-summary'
 import {
   getWorkspaceRole,
   requireWorkspaceRole,
@@ -29,7 +30,7 @@ async function buildCardDetail(card: Card) {
   const [members, labels, attachments, comments] = await Promise.all([
     prisma.cardMember.findMany({
       where: { card_id: card.id, deleted_at: null },
-      include: { user: { select: { id: true, name: true, profile_image_url: true } } },
+      include: { user: { select: userSummarySelect } },
     }),
     prisma.cardLabel.findMany({
       where: {
@@ -52,9 +53,7 @@ async function buildCardDetail(card: Card) {
       where: { card_id: card.id, deleted_at: null },
       orderBy: { created_at: 'asc' },
       include: {
-        user: {
-          select: { id: true, name: true, profile_image_url: true },
-        },
+        user: { select: userSummarySelect },
       },
     }),
   ])
@@ -757,7 +756,7 @@ export async function createComment(input: {
       comment_str: input.comment,
       ...createdBy(input.userId),
     },
-    include: { user: { select: { id: true, name: true, profile_image_url: true } } },
+    include: { user: { select: userSummarySelect } },
   })
   const dto = toCommentDto(comment)
   publishCardChange({
@@ -788,7 +787,7 @@ export async function updateComment(input: {
       comment_str: input.comment,
       ...updatedBy(input.userId),
     },
-    include: { user: { select: { id: true, name: true, profile_image_url: true } } },
+    include: { user: { select: userSummarySelect } },
   })
   const dto = toCommentDto(updated)
   publishCardChange({

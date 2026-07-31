@@ -32,14 +32,6 @@ function derivePasswordKey(password: string, salt: Buffer): Promise<Buffer> {
   });
 }
 
-export function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-export function isValidEmail(email: string): boolean {
-  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(PASSWORD_SALT_BYTES);
   const key = await derivePasswordKey(password, salt);

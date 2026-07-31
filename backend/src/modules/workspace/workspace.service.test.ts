@@ -295,6 +295,94 @@ test('workspace member role changes preserve the ownership boundary', async (t) 
   }
 })
 
+test('workspace member removal protects ADMIN and OWNER targets', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { removeMember }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./workspace.service'),
+  ])
+
+  for (const scenario of [
+    { callerRole: 'ADMIN', targetRole: 'MEMBER' },
+    { callerRole: 'OWNER', targetRole: 'MEMBER' },
+    { callerRole: 'ADMIN', targetRole: 'VIEWER' },
+    { callerRole: 'OWNER', targetRole: 'VIEWER' },
+  ] as const) {
+    await t.test(
+      `${scenario.callerRole} can remove a ${scenario.targetRole}`,
+      async (t) => {
+        const current = workspaceForRoleChange(
+          scenario.callerRole,
+          scenario.targetRole,
+        )
+        let updateCount = 0
+
+        stubMethod(t, prisma, '$transaction', async (operation) =>
+          operation(prisma),
+        )
+        stubMethod(t, prisma.workspace, 'findFirst', async () => current)
+        stubMethod(t, prisma.workspaceMember, 'update', async () => {
+          updateCount += 1
+          return {}
+        })
+        stubMethod(t, realtime, 'publish', () => {})
+        stubMethod(t, realtime, 'leaveUserChannel', () => {})
+
+        await removeMember({
+          userId: USER_ID,
+          workspaceId: WORKSPACE_ID,
+          targetUserId: OWNER_ID,
+        })
+
+        assert.equal(updateCount, 1)
+      },
+    )
+  }
+
+  for (const scenario of [
+    { callerRole: 'ADMIN', targetRole: 'ADMIN' },
+    { callerRole: 'OWNER', targetRole: 'ADMIN' },
+    { callerRole: 'ADMIN', targetRole: 'OWNER' },
+    { callerRole: 'OWNER', targetRole: 'OWNER' },
+  ] as const) {
+    await t.test(
+      `${scenario.callerRole} cannot remove a ${scenario.targetRole}`,
+      async (t) => {
+        const current = workspaceForRoleChange(
+          scenario.callerRole,
+          scenario.targetRole,
+        )
+        let updateCount = 0
+
+        stubMethod(t, prisma, '$transaction', async (operation) =>
+          operation(prisma),
+        )
+        stubMethod(t, prisma.workspace, 'findFirst', async () => current)
+        stubMethod(t, prisma.workspaceMember, 'update', async () => {
+          updateCount += 1
+          return {}
+        })
+
+        await assert.rejects(
+          () =>
+            removeMember({
+              userId: USER_ID,
+              workspaceId: WORKSPACE_ID,
+              targetUserId: OWNER_ID,
+            }),
+          (error: unknown) =>
+            typeof error === 'object' &&
+            error !== null &&
+            'code' in error &&
+            error.code === 'FORBIDDEN',
+        )
+        assert.equal(updateCount, 0)
+      },
+    )
+  }
+})
+
 test('workspace invitation acceptance is bound to the invited email', async (t) => {
   setRequiredEnvironment()
   const [

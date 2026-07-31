@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { normalizedEmailSchema } from '../../lib/validation'
 
 export const workspaceRoleSchema = z.enum(['ADMIN', 'MEMBER', 'VIEWER'])
 
@@ -17,7 +18,7 @@ export const updateWorkspaceSchema = z
   })
 
 export const inviteWorkspaceMemberSchema = z.object({
-  email: z.string().trim().toLowerCase().email().max(254),
+  email: normalizedEmailSchema,
   role: workspaceRoleSchema,
 })
 

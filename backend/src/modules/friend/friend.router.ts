@@ -1,11 +1,11 @@
 import { Router } from 'express'
-import { requireAuth } from '../../middleware/auth'
+import { uuidParam } from '../../middleware/validation'
 import * as friendController from './friend.controller'
 import * as directMessageController from './direct-message.controller'
 
 export const friendRouter = Router()
 
-friendRouter.use(requireAuth)
+friendRouter.param('friendUserId', uuidParam)
 friendRouter.get('/', friendController.list)
 friendRouter.get('/requests', friendController.listRequests)
 friendRouter.post('/requests', friendController.sendRequest)

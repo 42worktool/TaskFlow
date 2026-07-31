@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { uuidSchema } from '../../lib/validation'
 
 const listName = z.string().min(1).max(100)
 
@@ -22,8 +23,8 @@ export const updateListSchema = z
 
 export const listReorderSchema = z
   .object({
-    before_list_id: z.string().uuid().nullable().optional(),
-    after_list_id: z.string().uuid().nullable().optional(),
+    before_list_id: uuidSchema.nullable().optional(),
+    after_list_id: uuidSchema.nullable().optional(),
   })
   .refine(
     (value) => value.before_list_id !== undefined || value.after_list_id !== undefined,

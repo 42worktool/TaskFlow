@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { config } from '../config';
-import { verifyAccessTokenPrincipal } from '../modules/auth/auth.service';
+import { verifyAccessToken } from '../lib/access-token';
 import { RealtimeServer } from './server';
 
 export { RealtimeServer };
@@ -25,7 +25,7 @@ export type {
 export const realtime = new RealtimeServer({
   ...config.websocket,
   allowedOrigin: config.appOrigin,
-  authenticateAccessToken: verifyAccessTokenPrincipal,
+  authenticateAccessToken: verifyAccessToken,
 });
 
 realtime.register(

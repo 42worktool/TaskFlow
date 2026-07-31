@@ -15,21 +15,6 @@
     "resolveJsonModule": true,
     "types": ["node", "express"]
   },
-  "include": [
-    "index.ts",
-    "src/app.ts",
-    "src/errors.ts",
-    "src/config/**/*.ts",
-    "src/docs/**/*.ts",
-    "src/lib/**/*.ts",
-    "src/middleware/**/*.ts",
-    "src/modules/auth/**/*.ts",
-    "src/modules/workspace/**/*.ts",
-    "src/modules/list/**/*.ts",
-    "src/modules/card/**/*.ts",
-    "src/realtime/**/*.ts",
-    "src/types/**/*.d.ts",
-    "prisma/seed.ts"
-  ],
+  "include": ["index.ts", "src/**/*.ts", "prisma/seed.ts"],
   "exclude": ["src/**/*.test.ts"]
 }

@@ -1,22 +1,18 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
+import { userSummarySchema } from '../../lib/user-summary'
+import { uuidSchema } from '../../lib/validation'
 import { realtime } from '../../realtime'
 
 export const realtimeNotificationSchema = z
   .object({
-    id: z.string().uuid(),
+    id: uuidSchema,
     category: z.enum(['MENTION', 'UPDATE']),
     kind: z.literal('workspace.member_joined'),
     text: z.string().min(1).max(250),
     created_at: z.string().datetime(),
-    workspace_id: z.string().uuid(),
-    actor: z
-      .object({
-        user_id: z.string().uuid(),
-        name: z.string().min(1).max(80),
-        profile_image_url: z.string().nullable(),
-      })
-      .strict(),
+    workspace_id: uuidSchema,
+    actor: userSummarySchema,
   })
   .strict()
 
@@ -46,11 +42,11 @@ export function notifyWorkspaceMemberJoined(input: {
     },
   })
 
-  for (const userId of new Set(input.recipientUserIds)) {
-    if (userId !== input.actor.userId) {
-      realtime.sendToUser(userId, 'notification.created', notification)
-    }
-  }
+  realtime.sendToUsers(
+    input.recipientUserIds.filter((userId) => userId !== input.actor.userId),
+    'notification.created',
+    notification,
+  )
 
   return notification
 }

@@ -1,7 +1,8 @@
 import { z } from 'zod'
+import { messageContentSchema } from '../../lib/messaging'
 
 export const createDirectMessageSchema = z
   .object({
-    content: z.string().trim().min(1).max(1000),
+    content: messageContentSchema,
   })
   .strict()

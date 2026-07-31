@@ -1,16 +1,18 @@
 import { createHash, randomBytes } from 'crypto';
 import { Prisma, User } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
-import jwt, { JwtPayload } from 'jsonwebtoken';
 import { config } from '../../config';
 import { AppError } from '../../errors';
 import { prisma } from '../../db';
+import { signAccessToken } from '../../lib/access-token';
 import { getRedisClient } from '../../lib/redis';
+import {
+  normalizedEmailSchema,
+  normalizeEmail,
+} from '../../lib/validation';
 import {
   hashPassword,
   accountName,
-  isValidEmail,
-  normalizeEmail,
   safeEqual,
   safeReturnTo,
   verifyPassword,
@@ -38,11 +40,6 @@ export interface UserPublic {
   auth_provider: 'password' | 'google';
 }
 
-export interface AccessTokenPrincipal {
-  userId: string;
-  expiresAt: number;
-}
-
 interface OAuthStateRecord {
   nonce: string;
   returnTo: string;
@@ -54,15 +51,11 @@ interface RefreshSessionRecord {
 }
 
 function registrationEmail(value: unknown): string {
-  if (typeof value !== 'string') {
+  const result = normalizedEmailSchema.safeParse(value);
+  if (!result.success) {
     throw new AppError('INVALID_EMAIL', 400, 'A valid email address is required');
   }
-
-  const email = normalizeEmail(value);
-  if (!isValidEmail(email)) {
-    throw new AppError('INVALID_EMAIL', 400, 'A valid email address is required');
-  }
-  return email;
+  return result.data;
 }
 
 function registrationPassword(value: unknown): string {
@@ -139,13 +132,14 @@ export async function authenticateWithPassword(input: {
   password: unknown;
   clientKey: string;
 }): Promise<UserPublic> {
-  const email = typeof input.email === 'string' ? normalizeEmail(input.email) : '';
+  const parsedEmail = normalizedEmailSchema.safeParse(input.email);
+  const email = parsedEmail.success ? parsedEmail.data : '';
   const password =
     typeof input.password === 'string' && input.password.length <= 128 ? input.password : '';
   const attemptKey = loginAttemptKey(email, input.clientKey);
   await assertLoginAllowed(attemptKey);
 
-  const user = isValidEmail(email)
+  const user = parsedEmail.success
     ? await prisma.user.findFirst({
         where: { email: { equals: email, mode: 'insensitive' } },
       })
@@ -183,37 +177,6 @@ function refreshKey(token: string): string {
 
 function userSessionsKey(userId: string): string {
   return `${USER_REFRESH_SESSIONS_PREFIX}${userId}`;
-}
-
-function signAccessToken(userId: string): string {
-  return jwt.sign({}, config.jwtAccessSecret, {
-    algorithm: 'HS256',
-    subject: userId,
-    issuer: config.jwtIssuer,
-    audience: config.jwtAudience,
-    expiresIn: config.accessTokenTtlSeconds,
-  });
-}
-
-export function verifyAccessTokenPrincipal(token: string): AccessTokenPrincipal {
-  const payload = jwt.verify(token, config.jwtAccessSecret, {
-    algorithms: ['HS256'],
-    issuer: config.jwtIssuer,
-    audience: config.jwtAudience,
-  }) as JwtPayload;
-
-  if (!payload.sub) throw new Error('Access token subject is missing');
-  if (typeof payload.exp !== 'number') {
-    throw new Error('Access token expiration is missing');
-  }
-  return {
-    userId: payload.sub,
-    expiresAt: payload.exp * 1_000,
-  };
-}
-
-export function verifyAccessToken(token: string): string {
-  return verifyAccessTokenPrincipal(token).userId;
 }
 
 export async function beginGoogleOAuth(returnToValue: unknown): Promise<{

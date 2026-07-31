@@ -1,34 +1,33 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { prisma } from '../../db'
+import { uuidSchema } from '../../lib/validation'
 import { realtime, RealtimeError } from '../../realtime'
 import { isUserOnline } from '../presence/presence.state'
 
-const workspaceIdSchema = z.string().uuid()
-
 export const workspaceSubscriptionSchema = z
   .object({
-    workspace_id: workspaceIdSchema,
+    workspace_id: uuidSchema,
   })
   .strict()
 
 export const workspaceChangeEventSchema = z
   .object({
-    event_id: z.string().uuid(),
-    workspace_id: workspaceIdSchema,
+    event_id: uuidSchema,
+    workspace_id: uuidSchema,
     entity: z.enum(['workspace', 'member', 'list', 'card']),
     action: z.enum(['created', 'updated', 'deleted', 'moved']),
-    entity_id: z.string().uuid(),
-    list_ids: z.array(z.string().uuid()).max(2),
-    actor_user_id: z.string().uuid(),
+    entity_id: uuidSchema,
+    list_ids: z.array(uuidSchema).max(2),
+    actor_user_id: uuidSchema,
     occurred_at: z.string().datetime(),
   })
   .strict()
 
 export const workspacePresenceEventSchema = z
   .object({
-    workspace_id: workspaceIdSchema,
-    user_id: z.string().uuid(),
+    workspace_id: uuidSchema,
+    user_id: uuidSchema,
     online: z.boolean(),
   })
   .strict()

@@ -44,7 +44,7 @@ export class ConflictError extends AppError {
   }
 }
 
-export function sendError(res: Response, error: unknown): void {
+function sendError(res: Response, error: unknown): void {
   if (error instanceof AppError) {
     res.status(error.statusCode).json({
       status_code: error.statusCode,
