@@ -3,7 +3,6 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding-bottom: var(--workspace-index-toolbox-space);
   overflow: hidden;
   background: #f3f4f6;
   box-sizing: border-box;
@@ -31,7 +30,7 @@
 .home-content {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 36px;
+  padding: 32px 36px calc(32px + var(--workspace-index-toolbox-space)) 36px;
 }
 
 .project-section {
@@ -67,15 +66,13 @@
 }
 
 .card-menu-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
   border: none;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 8px;
-  font-size: 18px;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 16px;
   font-weight: 700;
   color: #6b7280;
   cursor: pointer;
@@ -84,20 +81,28 @@
   justify-content: center;
   line-height: 1;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, background 0.15s;
 }
+
 .project-card-wrapper:hover .card-menu-btn,
 .project-card-wrapper:focus-within .card-menu-btn {
   opacity: 1;
 }
+
 .card-menu-btn:hover {
   background: #f3f4f6;
   color: #111827;
 }
 
+.card-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .card-menu-dropdown {
   position: absolute;
-  top: 52px;
+  bottom: 44px;
   right: 12px;
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -107,6 +112,7 @@
   min-width: 120px;
   overflow: hidden;
 }
+
 .card-menu-item {
   display: block;
   width: 100%;
@@ -118,12 +124,15 @@
   cursor: pointer;
   color: #374151;
 }
+
 .card-menu-item:hover {
   background: #f9fafb;
 }
+
 .card-menu-item--danger {
   color: #ef4444;
 }
+
 .card-menu-item--danger:hover {
   background: #fef2f2;
 }
@@ -170,10 +179,6 @@
   flex-direction: column;
   align-items: flex-start;
   padding: 16px 18px;
-}
-
-.project-card--with-menu .card-body {
-  padding-right: 56px;
 }
 
 .card-name {
@@ -271,7 +276,6 @@
 .home-footer {
   padding: 14px 20px 18px;
   background: #f3f4f6;
-  flex-shrink: 0;
 }
 
 @media (max-width: 1180px) {
@@ -341,10 +345,6 @@
     padding: 14px 16px;
   }
 
-  .project-card--with-menu .card-body {
-    padding-right: 64px;
-  }
-
   .card-name {
     min-height: 40px;
     font-size: 15px;
@@ -352,15 +352,13 @@
   }
 
   .card-menu-btn {
-    top: 9px;
-    right: 9px;
     width: 44px;
     height: 44px;
     opacity: 1;
   }
 
   .card-menu-dropdown {
-    top: 55px;
+    bottom: 52px;
     right: 9px;
     min-width: 144px;
   }
