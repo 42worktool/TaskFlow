@@ -21,6 +21,8 @@ interface ApiRequestInit extends Omit<RequestInit, 'body'> {
   json?: unknown
 }
 
+const EXPLICIT_LOGOUT_KEY = 'ft.auth.explicit-logout'
+
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   INVALID_EMAIL: '올바른 이메일 주소를 입력해 주세요.',
   INVALID_NAME: '이름은 2자 이상 80자 이하로 입력해 주세요.',
@@ -54,6 +56,27 @@ let refreshInFlight: {
   controller: AbortController
   promise: Promise<boolean>
 } | null = null
+
+function hasExplicitLogout(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      window.localStorage.getItem(EXPLICIT_LOGOUT_KEY) === '1'
+    )
+  } catch {
+    return false
+  }
+}
+
+function setExplicitLogout(value: boolean): void {
+  try {
+    if (typeof window === 'undefined') return
+    if (value) window.localStorage.setItem(EXPLICIT_LOGOUT_KEY, '1')
+    else window.localStorage.removeItem(EXPLICIT_LOGOUT_KEY)
+  } catch {
+    // Authentication still works when browser storage is unavailable.
+  }
+}
 
 function clearAuth(): void {
   authState.user = null
@@ -106,6 +129,7 @@ function applyAuthenticatedSession(
   authGeneration += 1
   authAttempt += 1
   abortRefresh()
+  setExplicitLogout(false)
   authState.user = session.user
   authState.accessToken = session.access_token
   authState.initialized = true
@@ -139,6 +163,11 @@ async function requestRefresh(
   expectedGeneration = authGeneration,
 ): Promise<boolean> {
   if (expectedGeneration !== authGeneration) return false
+  if (hasExplicitLogout()) {
+    clearAuth()
+    authState.initialized = true
+    return false
+  }
   const generation = expectedGeneration
   if (refreshInFlight?.generation === generation) return refreshInFlight.promise
 
@@ -210,6 +239,7 @@ export async function getAccessToken(forceRefresh = false): Promise<string | nul
 }
 
 export function startGoogleLogin(returnTo = '/workspaces'): void {
+  setExplicitLogout(false)
   const url = new URL('/api/auth/oauth/google', window.location.origin)
   url.searchParams.set('return_to', returnTo)
   window.location.assign(url.toString())
@@ -283,6 +313,7 @@ export async function apiRequest<T>(
 }
 
 export async function logout(): Promise<void> {
+  setExplicitLogout(true)
   invalidateAuthenticatedSession()
   // Local invalidation happens before the request so late refresh responses
   // cannot restore the session while logout is in progress.

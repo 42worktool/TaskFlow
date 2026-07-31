@@ -12,7 +12,20 @@
 .home-body {
   flex: 1;
   display: flex;
+  min-height: 0;
   overflow: hidden;
+}
+
+.workspace-home-inbox {
+  width: 330px;
+  min-width: 280px;
+  max-width: min(36vw, 390px);
+  flex: 0 0 330px;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid #e5e7eb;
+  background: #fff;
 }
 
 .home-content {
@@ -285,6 +298,19 @@
 
   .home-content {
     padding: 24px 16px 32px;
+  }
+
+  .home-shell--inbox-open .home-content,
+  .home-shell--inbox-open .home-footer {
+    display: none;
+  }
+
+  .workspace-home-inbox {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 auto;
+    border-right: 0;
   }
 
   .project-section {

@@ -144,7 +144,6 @@ function suppressDropClick(target: 'inbox' | 'chat'): void {
 
 function selectInbox(): void {
   if (consumeSuppressedClick('inbox')) return
-  if (!hasWorkspaceContext.value) return
   if (compactViewport.value) {
     closeMessenger()
     if (props.inboxOpen) return
@@ -343,22 +342,15 @@ onBeforeUnmount(() => {
         data-card-drop-target="toolbox-inbox"
         class="workspace-toolbox__item"
         :class="{
-          'workspace-toolbox__item--active':
-            hasWorkspaceContext && inboxOpen,
+          'workspace-toolbox__item--active': inboxOpen,
           'workspace-toolbox__item--card-drop-ready': inboxDropReady,
           'workspace-toolbox__item--card-drop-over': inboxDropOver,
         }"
         type="button"
-        :disabled="!hasWorkspaceContext || toolboxDropPending === 'inbox'"
-        :title="
-          hasWorkspaceContext
-            ? '개인 인박스'
-            : '먼저 워크스페이스를 선택하세요.'
-        "
-        :aria-controls="
-          hasWorkspaceContext ? 'workspace-inbox-panel' : undefined
-        "
-        :aria-expanded="hasWorkspaceContext ? inboxOpen : undefined"
+        :disabled="toolboxDropPending === 'inbox'"
+        title="개인 인박스"
+        aria-controls="workspace-inbox-panel"
+        :aria-expanded="inboxOpen"
         @click="selectInbox"
         @dragenter="handleToolboxDragMove"
         @dragover="handleToolboxDragMove"

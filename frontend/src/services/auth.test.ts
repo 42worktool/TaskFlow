@@ -13,6 +13,24 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve }
 }
 
+function memoryStorage(): Storage {
+  const values = new Map<string, string>()
+  return {
+    get length() {
+      return values.size
+    },
+    clear: () => values.clear(),
+    getItem: (key) => values.get(key) ?? null,
+    key: (index) => [...values.keys()][index] ?? null,
+    removeItem: (key) => {
+      values.delete(key)
+    },
+    setItem: (key, value) => {
+      values.set(key, value)
+    },
+  }
+}
+
 const session = {
   user: {
     id: 'user-1',
@@ -20,6 +38,7 @@ const session = {
     name: 'Realtime User',
     profile_image_url: null,
     created_at: '2026-07-28T00:00:00.000Z',
+    auth_provider: 'password' as const,
   },
   access_token: 'late-access-token',
   token_type: 'Bearer' as const,
@@ -30,6 +49,78 @@ describe('auth session generation', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.resetModules()
+  })
+
+  it('does not restore an explicitly logged-out session after a reload', async () => {
+    const storage = memoryStorage()
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === '/api/auth/logout') {
+        return Promise.resolve(new Response(null, { status: 204 }))
+      }
+      throw new Error(`Refresh must not run after logout: ${String(input)}`)
+    })
+    vi.stubGlobal('window', { localStorage: storage })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const firstModule = await import('./auth')
+    firstModule.authState.initialized = true
+    firstModule.authState.user = session.user
+    firstModule.authState.accessToken = session.access_token
+    await firstModule.logout()
+
+    vi.resetModules()
+    const reloadedModule = await import('./auth')
+    await reloadedModule.initializeAuth()
+
+    expect(reloadedModule.authState.user).toBeNull()
+    expect(reloadedModule.authState.accessToken).toBeNull()
+    expect(reloadedModule.authState.initialized).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/auth/logout',
+      expect.any(Object),
+    )
+  })
+
+  it('allows a successful login after an explicit logout', async () => {
+    const storage = memoryStorage()
+    storage.setItem('ft.auth.explicit-logout', '1')
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === '/api/auth/login') {
+        return Promise.resolve(
+          new Response(JSON.stringify(session), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      if (String(input) === '/api/auth/refresh') {
+        return Promise.resolve(
+          new Response(JSON.stringify(session), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      }
+      throw new Error(`Unexpected request: ${String(input)}`)
+    })
+    vi.stubGlobal('window', { localStorage: storage })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const firstModule = await import('./auth')
+    await firstModule.loginWithPassword('user@example.com', 'password')
+    expect(storage.getItem('ft.auth.explicit-logout')).toBeNull()
+
+    vi.resetModules()
+    const reloadedModule = await import('./auth')
+    await reloadedModule.initializeAuth()
+
+    expect(reloadedModule.authState.user).toEqual(session.user)
+    expect(reloadedModule.authState.accessToken).toBe(session.access_token)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/auth/refresh',
+      expect.any(Object),
+    )
   })
 
   it('does not let a late refresh response restore a logged-out session', async () => {
