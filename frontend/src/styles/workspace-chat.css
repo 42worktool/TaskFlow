@@ -152,7 +152,7 @@
   font-size: 9px;
 }
 
-.workspace-chat-message-body > p {
+.workspace-chat-message-body>p {
   margin: 0;
   padding: 8px 10px;
   border-radius: 4px 11px 11px;
@@ -165,7 +165,7 @@
   white-space: pre-wrap;
 }
 
-.workspace-chat-message--mine .workspace-chat-message-body > p {
+.workspace-chat-message--mine .workspace-chat-message-body>p {
   border-radius: 11px 4px 11px 11px;
   background: #dbeafe;
 }
@@ -175,6 +175,7 @@
 }
 
 .workspace-chat-card-link {
+  display: inline-block;
   max-width: 100%;
   margin-top: 5px;
   padding: 4px 8px;
@@ -205,10 +206,9 @@
 }
 
 .workspace-chat-card-link-error {
-  margin: 0 0 7px;
   color: #b91c1c;
   font-size: 10px;
-  line-height: 1.4;
+  /* line-height: 1.4; */
 }
 
 .workspace-chat-composer textarea {
@@ -245,7 +245,8 @@
 }
 
 .chat-attach-button,
-.chat-send-button {
+.chat-send-button,
+.workspace-chat-card-link--deleted {
   border: 0;
   border-radius: 7px;
   font-size: 11px;
@@ -256,6 +257,14 @@
   padding: 7px 9px;
   background: #f1f5f9;
   color: #475569;
+}
+
+.workspace-chat-card-link--deleted {
+  display: inline-block;
+  padding: 7px 9px;
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: default;
 }
 
 .chat-send-button {
@@ -290,14 +299,14 @@
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
 }
 
-.workspace-chat-card-options > p {
+.workspace-chat-card-options>p {
   margin: 0;
   padding: 12px;
   color: #64748b;
   font-size: 12px;
 }
 
-.workspace-chat-card-options > button {
+.workspace-chat-card-options>button {
   width: 100%;
   padding: 8px 9px;
   border: 0;
@@ -306,7 +315,7 @@
   text-align: left;
 }
 
-.workspace-chat-card-options > button:hover {
+.workspace-chat-card-options>button:hover {
   background: #eff6ff;
 }
 

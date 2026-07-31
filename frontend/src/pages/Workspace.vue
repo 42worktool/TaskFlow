@@ -143,7 +143,6 @@ onMounted(refreshList)
               <RouterLink
                 :to="`/workspaces/${ws.id}/board`"
                 class="project-card"
-                :class="{ 'project-card--with-menu': hasWorkspaceMenu(ws) }"
               >
                 <div class="card-color-bar" :style="{ background: workspaceColor(ws.id) }" />
                 <div class="card-body">
@@ -154,20 +153,21 @@ onMounted(refreshList)
                   >{{ ws.is_public ? '공개' : '비공개' }}</span>
                   <div class="card-footer">
                     <span class="card-members">멤버 {{ ws.members.length }}명</span>
-                    <span class="card-arrow">→</span>
+                    <div class="card-footer-actions">
+                      <button
+                        v-if="hasWorkspaceMenu(ws)"
+                        class="card-menu-btn"
+                        type="button"
+                        :aria-label="`${ws.name} 프로젝트 메뉴`"
+                        :aria-expanded="menuOpen === ws.id"
+                        @click.stop.prevent="toggleMenu(ws.id)"
+                      >
+                        ⋯
+                      </button>
+                    </div>
                   </div>
                 </div>
               </RouterLink>
-              <button
-                v-if="hasWorkspaceMenu(ws)"
-                class="card-menu-btn"
-                type="button"
-                :aria-label="`${ws.name} 프로젝트 메뉴`"
-                :aria-expanded="menuOpen === ws.id"
-                @click.stop="toggleMenu(ws.id)"
-              >
-                ⋯
-              </button>
               <div
                 v-if="hasWorkspaceMenu(ws) && menuOpen === ws.id"
                 class="card-menu-dropdown"
@@ -204,11 +204,11 @@ onMounted(refreshList)
             </button>
           </div>
         </section>
-      </main>
-    </div>
 
-    <div class="home-footer">
-      <LegalFooter variant="light" />
+        <div class="home-footer">
+          <LegalFooter variant="light" />
+        </div>
+      </main>
     </div>
 
     <WorkspaceToolbox

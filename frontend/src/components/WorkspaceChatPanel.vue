@@ -499,13 +499,19 @@ onUnmounted(() => {
             </div>
             <p>{{ message.content }}</p>
             <button
-              v-if="message.card_id"
+              v-if="message.card_id && cardTitles.has(message.card_id)"
               type="button"
               class="workspace-chat-card-link"
               @click="openLinkedCard(message.card_id)"
             >
-              ▣ {{ cardTitles.get(message.card_id) ?? '연결된 카드' }}
+              ▣ {{ cardTitles.get(message.card_id) }}
             </button>
+            <span
+              v-else
+              class="workspace-chat-card-link workspace-chat-card-link-error"
+            >
+              ▣ 카드 삭제됨
+          </span>
           </div>
         </article>
       </div>
