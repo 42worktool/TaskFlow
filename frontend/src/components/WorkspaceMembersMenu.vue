@@ -91,25 +91,6 @@ onUnmounted(() => {
 <template>
   <div ref="root" class="workspace-members-menu">
     <button
-      v-if="canManage"
-      type="button"
-      class="workspace-members-manage-trigger"
-      aria-label="팀원 관리 열기"
-      @click="requestManage"
-    >
-      <svg
-        class="workspace-members-manage-trigger-icon"
-        viewBox="0 0 24 24"
-        aria-hidden="true"
-      >
-        <path
-          d="M15 12a4 4 0 1 0-8 0 4 4 0 0 0 8 0Zm-11 8a7 7 0 0 1 14 0M18 8v6M15 11h6"
-        />
-      </svg>
-      <span>팀원 관리</span>
-    </button>
-
-    <button
       ref="trigger"
       type="button"
       class="workspace-members-trigger"

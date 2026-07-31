@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
+import InboxCardsPanel from '../components/InboxCardsPanel.vue'
 import LegalFooter from '../components/LegalFooter.vue'
 import WorkspaceFormModal from '../components/WorkspaceFormModal.vue'
 import WorkspaceToolbox from '../components/WorkspaceToolbox.vue'
@@ -15,6 +16,7 @@ import {
 } from '../utils/workspacePermissions'
 
 const showCreate = ref(false)
+const inboxOpen = ref(false)
 const myWorkspaces = ref<Workspace[]>([])
 const openWorkspaces = ref<Workspace[]>([])
 
@@ -58,6 +60,14 @@ function toggleMenu(wsId: string) {
   menuOpen.value = menuOpen.value === wsId ? null : wsId
 }
 
+function toggleInbox() {
+  inboxOpen.value = !inboxOpen.value
+}
+
+function closeInbox() {
+  inboxOpen.value = false
+}
+
 function canEditWorkspace(ws: Workspace): boolean {
   return hasWorkspaceRole(
     workspaceRoleFor(ws, authState.user?.id),
@@ -96,11 +106,24 @@ onMounted(refreshList)
 </script>
 
 <template>
-  <div class="home-shell" @click="menuOpen = null">
+  <div
+    class="home-shell"
+    :class="{ 'home-shell--inbox-open': inboxOpen }"
+    @click="menuOpen = null"
+  >
     <!-- Header -->
     <AppHeader />
 
     <div class="home-body">
+      <aside
+        v-if="inboxOpen"
+        id="workspace-inbox-panel"
+        class="workspace-home-inbox"
+        aria-label="인박스"
+      >
+        <InboxCardsPanel :allow-drag="false" />
+      </aside>
+
       <!-- Content -->
       <main class="home-content">
         <section
@@ -188,7 +211,11 @@ onMounted(refreshList)
       <LegalFooter variant="light" />
     </div>
 
-    <WorkspaceToolbox />
+    <WorkspaceToolbox
+      :inbox-open="inboxOpen"
+      @toggle-inbox="toggleInbox"
+      @close-inbox="closeInbox"
+    />
 
     <WorkspaceFormModal
       v-if="showCreate"

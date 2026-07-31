@@ -426,7 +426,7 @@ onUnmounted(() => {
         :class="{
           'messenger-window--open': messengerState.open,
           'messenger-window--directory-collapsed':
-            messengerState.directoryCollapsed,
+            messengerState.directoryCollapsed && !compactViewport,
           'messenger-window--mobile-page': compactViewport,
           'messenger-window--with-toolbox': toolboxRoute,
         }"
@@ -487,9 +487,11 @@ onUnmounted(() => {
 
         <div class="messenger-shell">
           <nav
-            v-show="directoryVisible"
+            v-show="compactViewport ? directoryVisible : true"
             id="messenger-directory"
             class="messenger-directory"
+            :aria-hidden="directoryVisible ? 'false' : 'true'"
+            :inert="!directoryVisible"
             aria-label="메신저 대화 목록"
           >
             <div class="messenger-directory-heading">
