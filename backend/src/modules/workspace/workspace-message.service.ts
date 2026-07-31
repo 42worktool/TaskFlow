@@ -1,6 +1,11 @@
 import { prisma } from '../../db'
 import { NotFoundError } from '../../errors'
 import { createdBy } from '../../lib/audit'
+import {
+  MESSAGE_HISTORY_LIMIT,
+  newestMessageOrder,
+} from '../../lib/messaging'
+import { userSummarySelect } from '../../lib/user-summary'
 import { requireWorkspaceRole } from '../../lib/workspace-permissions'
 import { realtime } from '../../realtime'
 import {
@@ -9,12 +14,6 @@ import {
   type WorkspaceMessageDto,
 } from './workspace-message.dto'
 import { publishWorkspaceChange } from './workspace.realtime'
-
-const messageAuthorSelect = {
-  id: true,
-  name: true,
-  profile_image_url: true,
-} as const
 
 async function deliverWorkspaceMessageCreated(
   message: WorkspaceMessageDto,
@@ -28,13 +27,11 @@ async function deliverWorkspaceMessageCreated(
       },
       select: { user_id: true },
     })
-    for (const member of members) {
-      realtime.sendToUser(
-        member.user_id,
-        'workspace.message_created',
-        event,
-      )
-    }
+    realtime.sendToUsers(
+      members.map((member) => member.user_id),
+      'workspace.message_created',
+      event,
+    )
   } catch (error) {
     console.warn(
       '[realtime] failed to deliver "workspace.message_created"',
@@ -51,12 +48,9 @@ export async function listWorkspaceMessages(input: {
 
   const messages = await prisma.workspaceMessage.findMany({
     where: { workspace_id: input.workspaceId },
-    include: { user: { select: messageAuthorSelect } },
-    orderBy: [
-      { created_at: 'desc' },
-      { id: 'desc' },
-    ],
-    take: 100,
+    include: { user: { select: userSummarySelect } },
+    orderBy: newestMessageOrder,
+    take: MESSAGE_HISTORY_LIMIT,
   })
 
   return messages.reverse().map(toWorkspaceMessageDto)
@@ -95,7 +89,7 @@ export async function createWorkspaceMessage(input: {
         card_id: cardId,
         content: input.content,
       },
-      include: { user: { select: messageAuthorSelect } },
+      include: { user: { select: userSummarySelect } },
     })
 
     if (cardId) {

@@ -1,4 +1,5 @@
 import type { RequestHandler } from 'express'
+import { authenticatedUserId } from '../../middleware/auth'
 import * as svc from './workspace.service'
 import {
   changeWorkspaceRoleSchema,
@@ -8,14 +9,16 @@ import {
 } from './workspace.validation'
 
 export const list: RequestHandler = async (req, res) => {
-  const workspaces = await svc.listWorkspaces({ userId: req.user!.id })
+  const workspaces = await svc.listWorkspaces({
+    userId: authenticatedUserId(req),
+  })
   res.status(200).json(workspaces)
 }
 
 export const create: RequestHandler = async (req, res) => {
   const body = createWorkspaceSchema.parse(req.body)
   const workspace = await svc.createWorkspace({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     name: body.name,
     isPublic: body.is_public,
   })
@@ -24,7 +27,7 @@ export const create: RequestHandler = async (req, res) => {
 
 export const getOne: RequestHandler = async (req, res) => {
   const workspace = await svc.getWorkspace({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     workspaceId: req.params.workspaceId as string,
   })
   res.status(200).json(workspace)
@@ -33,7 +36,7 @@ export const getOne: RequestHandler = async (req, res) => {
 export const update: RequestHandler = async (req, res) => {
   const data = updateWorkspaceSchema.parse(req.body)
   const workspace = await svc.updateWorkspace({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     workspaceId: req.params.workspaceId as string,
     ...(data.name !== undefined ? { name: data.name } : {}),
     ...('is_public' in data ? { isPublic: data.is_public } : {}),
@@ -43,7 +46,7 @@ export const update: RequestHandler = async (req, res) => {
 
 export const remove: RequestHandler = async (req, res) => {
   await svc.deleteWorkspace({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     workspaceId: req.params.workspaceId as string,
   })
   res.status(200).json({ ok: true })
@@ -52,7 +55,7 @@ export const remove: RequestHandler = async (req, res) => {
 export const inviteMember: RequestHandler = async (req, res) => {
   const data = inviteWorkspaceMemberSchema.parse(req.body)
   await svc.inviteWorkspaceMember({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     workspaceId: req.params.workspaceId as string,
     email: data.email,
     role: data.role,
@@ -62,7 +65,7 @@ export const inviteMember: RequestHandler = async (req, res) => {
 
 export const acceptInvite: RequestHandler = async (req, res) => {
   const workspace = await svc.acceptInvite({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     token: req.params.token as string,
   })
   res.status(200).json(workspace)
@@ -71,7 +74,7 @@ export const acceptInvite: RequestHandler = async (req, res) => {
 export const changeMemberRole: RequestHandler = async (req, res) => {
   const body = changeWorkspaceRoleSchema.parse(req.body)
   const workspace = await svc.changeMemberRole({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     workspaceId: req.params.workspaceId as string,
     targetUserId: req.params.userId as string,
     role: body.role,
@@ -81,7 +84,7 @@ export const changeMemberRole: RequestHandler = async (req, res) => {
 
 export const removeMember: RequestHandler = async (req, res) => {
   await svc.removeMember({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     workspaceId: req.params.workspaceId as string,
     targetUserId: req.params.userId as string,
   })

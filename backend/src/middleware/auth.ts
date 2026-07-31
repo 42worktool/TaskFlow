@@ -1,27 +1,38 @@
 import { NextFunction, Request, Response } from 'express';
-import { verifyAccessToken } from '../modules/auth/auth.service';
+import { verifyAccessToken } from '../lib/access-token';
+import { AppError } from '../errors';
 
-export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+export function authenticatedUserId(req: Pick<Request, 'user'>): string {
+  if (!req.user) {
+    throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
+  }
+  return req.user.id;
+}
+
+export async function requireAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const authorization = req.get('authorization');
   if (!authorization?.startsWith('Bearer ')) {
-    res.status(401).json({
-      status_code: 401,
-      error: 'UNAUTHORIZED',
-      message: 'A Bearer access token is required',
-    });
+    next(
+      new AppError(
+        'UNAUTHORIZED',
+        401,
+        'A Bearer access token is required',
+      ),
+    );
     return;
   }
 
   try {
-    const userId = verifyAccessToken(authorization.slice('Bearer '.length));
-    req.auth = { userId };
-    req.user = { id: userId };
+    const principal = verifyAccessToken(authorization.slice('Bearer '.length));
+    req.user = { id: principal.userId };
     next();
   } catch {
-    res.status(401).json({
-      status_code: 401,
-      error: 'INVALID_ACCESS_TOKEN',
-      message: 'The access token is invalid or expired',
-    });
+    next(
+      new AppError(
+        'INVALID_ACCESS_TOKEN',
+        401,
+        'The access token is invalid or expired',
+      ),
+    );
   }
 }

@@ -6,25 +6,28 @@
 // soft delete via deleted_at, role checks via the shared workspace helper.
 // ============================================================
 import { prisma } from '../../db'
-import {
-  ForbiddenError,
-  NotFoundError,
-} from '../../errors'
+import { NotFoundError } from '../../errors'
 import { createdBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
 import {
-  getWorkspaceRole,
+  requireWorkspaceReadAccess,
   requireWorkspaceRole,
 } from '../../lib/workspace-permissions'
 import { toBoardListDto, toListDto } from './list.dto'
 import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 
 async function assertReadAccess(userId: string, workspaceId: string): Promise<void> {
-  const ws = await prisma.workspace.findFirst({ where: { id: workspaceId, deleted_at: null } })
-  if (!ws) throw new NotFoundError()
-  if (ws.is_public) return
-  const role = await getWorkspaceRole(workspaceId, userId)
-  if (!role) throw new ForbiddenError()
+  const workspace = await prisma.workspace.findFirst({
+    where: { id: workspaceId, deleted_at: null },
+    select: {
+      is_public: true,
+      members: {
+        where: { user_id: userId, deleted_at: null },
+        select: { user_id: true },
+      },
+    },
+  })
+  requireWorkspaceReadAccess(workspace, userId)
 }
 
 /**

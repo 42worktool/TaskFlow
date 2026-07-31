@@ -1,9 +1,8 @@
 import { z } from 'zod'
+import { normalizedEmailSchema } from '../../lib/validation'
 
 export const friendRequestSchema = z
   .object({
-    email: z.string().trim().toLowerCase().email().max(254),
+    email: normalizedEmailSchema,
   })
   .strict()
-
-export const friendUserIdSchema = z.string().uuid().toLowerCase()

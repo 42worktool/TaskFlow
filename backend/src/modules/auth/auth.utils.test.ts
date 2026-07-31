@@ -3,8 +3,6 @@ import test from 'node:test';
 import {
   hashPassword,
   accountName,
-  isValidEmail,
-  normalizeEmail,
   safeEqual,
   safeReturnTo,
   verifyPassword,
@@ -18,16 +16,6 @@ test('accountName trims valid names and rejects invalid values consistently', ()
     assert.equal(error.code, 'INVALID_NAME');
     return true;
   });
-});
-
-test('normalizeEmail trims and lowercases an address', () => {
-  assert.equal(normalizeEmail('  User@Example.COM '), 'user@example.com');
-});
-
-test('isValidEmail accepts a normal address and rejects malformed input', () => {
-  assert.equal(isValidEmail('user@example.com'), true);
-  assert.equal(isValidEmail('not-an-email'), false);
-  assert.equal(isValidEmail('a@b'), false);
 });
 
 test('password hashing verifies the original password without storing it', async () => {

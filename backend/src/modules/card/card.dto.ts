@@ -1,4 +1,8 @@
 import type { Attachment, Card, Comment } from '@prisma/client'
+import {
+  toUserSummary,
+  type SelectedUserSummary,
+} from '../../lib/user-summary'
 
 export function toCardDto(card: Card) {
   return {
@@ -15,13 +19,9 @@ export function toCardDto(card: Card) {
 }
 
 export function toCardMemberDto(member: {
-  user: { id: string; name: string; profile_image_url: string | null }
+  user: SelectedUserSummary
 }) {
-  return {
-    user_id: member.user.id,
-    name: member.user.name,
-    profile_image_url: member.user.profile_image_url,
-  }
+  return toUserSummary(member.user)
 }
 
 export function toAttachmentDto(attachment: Attachment) {
@@ -35,7 +35,7 @@ export function toAttachmentDto(attachment: Attachment) {
 }
 
 type CommentWithUser = Comment & {
-  user: { id: string; name: string; profile_image_url: string | null }
+  user: SelectedUserSummary
 }
 
 interface CardLabelWithLabel {
@@ -58,11 +58,7 @@ export function toCommentDto(comment: CommentWithUser) {
   return {
     id: comment.id,
     card_id: comment.card_id,
-    author: {
-      user_id: comment.user.id,
-      name: comment.user.name,
-      profile_image_url: comment.user.profile_image_url,
-    },
+    author: toUserSummary(comment.user),
     comment_str: comment.comment_str,
     created_at: comment.created_at,
     updated_at: comment.updated_at,

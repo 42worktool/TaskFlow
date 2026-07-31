@@ -3,9 +3,10 @@
 // ============================================================
 import { Router } from 'express'
 import * as ctrl from './card.controller'
-import { requireAuth } from '../../middleware/auth'
+import { uuidParam } from '../../middleware/validation'
 
 export const commentRouter = Router()
+commentRouter.param('comment_id', uuidParam)
 
-commentRouter.patch('/:comment_id', requireAuth, ctrl.updateComment)
-commentRouter.delete('/:comment_id', requireAuth, ctrl.deleteComment)
+commentRouter.patch('/:comment_id', ctrl.updateComment)
+commentRouter.delete('/:comment_id', ctrl.deleteComment)

@@ -1,29 +1,27 @@
-import type { FriendRequest, Friendship, User } from '@prisma/client'
-
-const friendUserSelect = {
-  id: true,
-  name: true,
-  profile_image_url: true,
-} as const
+import type { FriendRequest, Friendship } from '@prisma/client'
+import {
+  userSummarySelect,
+  type SelectedUserSummary,
+} from '../../lib/user-summary'
 
 export const friendshipInclude = {
-  user_low: { select: friendUserSelect },
-  user_high: { select: friendUserSelect },
+  user_low: { select: userSummarySelect },
+  user_high: { select: userSummarySelect },
 } as const
 
 export const friendRequestInclude = {
-  user_low: { select: friendUserSelect },
-  user_high: { select: friendUserSelect },
+  user_low: { select: userSummarySelect },
+  user_high: { select: userSummarySelect },
 } as const
 
 type FriendshipWithUsers = Friendship & {
-  user_low: Pick<User, 'id' | 'name' | 'profile_image_url'>
-  user_high: Pick<User, 'id' | 'name' | 'profile_image_url'>
+  user_low: SelectedUserSummary
+  user_high: SelectedUserSummary
 }
 
 type FriendRequestWithUsers = FriendRequest & {
-  user_low: Pick<User, 'id' | 'name' | 'profile_image_url'>
-  user_high: Pick<User, 'id' | 'name' | 'profile_image_url'>
+  user_low: SelectedUserSummary
+  user_high: SelectedUserSummary
 }
 
 export interface FriendDto {

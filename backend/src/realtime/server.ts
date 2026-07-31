@@ -226,6 +226,12 @@ export class RealtimeServer {
     }
   }
 
+  sendToUsers(userIds: Iterable<string>, event: string, data?: unknown): void {
+    for (const userId of new Set(userIds)) {
+      this.sendToUser(userId, event, data);
+    }
+  }
+
   leaveUserChannel(userId: string, channel: string): void {
     const connectionIds = this.userConnections.get(userId);
     if (!connectionIds) return;
