@@ -188,7 +188,6 @@ test('getList returns one list with cards under the board read policy', async (t
       workspace_id: WORKSPACE_ID,
       name: 'Todo',
       sequence: 1,
-      is_done: false,
       created_at: now,
       created_by: USER_ID,
       updated_at: now,
@@ -230,7 +229,7 @@ test('getList returns one list with cards under the board read policy', async (t
   })
 })
 
-test('updateList persists and exposes the completion marker', async (t) => {
+test('updateList persists and exposes the name', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { realtime }, { updateList }] = await Promise.all([
     import('../../db'),
@@ -254,7 +253,6 @@ test('updateList persists and exposes the completion marker', async (t) => {
       workspace_id: WORKSPACE_ID,
       name: 'Done',
       sequence: 1,
-      is_done: true,
       created_at: now,
       created_by: USER_ID,
       updated_at: now,
@@ -268,12 +266,12 @@ test('updateList persists and exposes the completion marker', async (t) => {
   const result = await updateList({
     userId: USER_ID,
     listId: LIST_ID,
-    isDone: true,
+    name: 'Done',
   })
 
   assert.deepEqual(updateArgs.data, {
-    is_done: true,
+    name: 'Done',
     updated_by: USER_ID,
   })
-  assert.equal(result.is_done, true)
+  assert.equal(result.name, 'Done')
 })

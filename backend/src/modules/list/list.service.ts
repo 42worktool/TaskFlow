@@ -74,7 +74,6 @@ export async function createList(input: {
   userId: string
   workspaceId: string
   name: string
-  isDone?: boolean
 }) {
   await requireWorkspaceRole(input.workspaceId, input.userId, 'MEMBER')
 
@@ -88,7 +87,6 @@ export async function createList(input: {
       workspace_id: input.workspaceId,
       name: input.name,
       sequence: (agg._max.sequence ?? 0) + 1,
-      is_done: input.isDone ?? false,
       ...createdBy(input.userId),
     },
   })
@@ -105,13 +103,12 @@ export async function createList(input: {
 }
 
 /**
- * Update a list's name and/or completion marker. Requires MEMBER+.
+ * Update a list's name. Requires MEMBER+.
  */
 export async function updateList(input: {
   userId: string
   listId: string
-  name?: string
-  isDone?: boolean
+  name: string
 }) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
@@ -120,8 +117,7 @@ export async function updateList(input: {
   const updated = await prisma.list.update({
     where: { id: input.listId },
     data: {
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.isDone !== undefined ? { is_done: input.isDone } : {}),
+      name: input.name,
       ...updatedBy(input.userId),
     },
   })

@@ -29,7 +29,6 @@ export const create: RequestHandler = async (req, res) => {
     userId: authenticatedUserId(req),
     workspaceId: req.params.workspaceId as string,
     name: body.name,
-    isDone: body.is_done,
   })
   res.status(201).json(list)
 }
@@ -39,8 +38,7 @@ export const update: RequestHandler = async (req, res) => {
   const list = await svc.updateList({
     userId: authenticatedUserId(req),
     listId: req.params.list_id as string,
-    ...(body.name !== undefined ? { name: body.name } : {}),
-    ...(body.is_done !== undefined ? { isDone: body.is_done } : {}),
+    name: body.name,
   })
   res.status(200).json(list)
 }

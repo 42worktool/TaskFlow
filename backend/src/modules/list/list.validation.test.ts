@@ -6,21 +6,16 @@ import {
   updateListSchema,
 } from './list.validation'
 
-test('list validation accepts explicit completion state and strict partial updates', () => {
+test('list validation accepts names and strict partial updates', () => {
   assert.deepEqual(createListSchema.parse({ name: 'Todo' }), {
     name: 'Todo',
-    is_done: false,
   })
-  assert.equal(
-    createListSchema.parse({ name: 'Done', is_done: true }).is_done,
-    true,
-  )
-  assert.deepEqual(updateListSchema.parse({ is_done: true }), {
-    is_done: true,
+  assert.deepEqual(updateListSchema.parse({ name: 'Done' }), {
+    name: 'Done',
   })
   assert.throws(() => createListSchema.parse({ name: '' }))
-  assert.throws(() => updateListSchema.parse({}))
-  assert.throws(() => updateListSchema.parse({ name: 'Todo', extra: true }))
+  assert.throws(() => updateListSchema.parse({ name: '' }))
+  assert.throws(() => createListSchema.parse({ name: 'Todo', extra: true }))
 })
 
 test('list ordering requires at least one neighbor', () => {

@@ -110,7 +110,6 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
       {
         id: 'todo-list',
         name: 'Todo',
-        is_done: false,
         cards: [
           { is_completed: true },
           { is_completed: false },
@@ -119,7 +118,6 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
       {
         id: 'done-list',
         name: 'Done',
-        is_done: true,
         cards: [
           { is_completed: true },
           { is_completed: true },
@@ -209,14 +207,12 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
     {
       list_id: 'todo-list',
       name: 'Todo',
-      is_done: false,
       card_count: 2,
       completed_card_count: 1,
     },
     {
       list_id: 'done-list',
       name: 'Done',
-      is_done: true,
       card_count: 3,
       completed_card_count: 2,
     },
