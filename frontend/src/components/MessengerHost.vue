@@ -535,14 +535,6 @@ onUnmounted(() => {
           >
             <div class="messenger-directory-heading">
               <strong>대화</strong>
-              <button
-                type="button"
-                :disabled="directoryLoading"
-                aria-label="대화 목록 새로고침"
-                @click="loadDirectory"
-              >
-                ↻
-              </button>
             </div>
 
             <button

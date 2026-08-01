@@ -295,18 +295,6 @@ onUnmounted(() => {
 
 <template>
   <div class="friends-panel-content">
-    <div class="friends-heading">
-      <p>요청을 수락한 사용자만 친구 목록과 온라인 상태에 표시됩니다.</p>
-      <button
-        type="button"
-        class="secondary-button"
-        :disabled="loading || busyAction !== null"
-        @click="loadFriendData()"
-      >
-        새로고침
-      </button>
-    </div>
-
       <section class="friend-panel friend-invite-panel">
         <div>
           <h2>친구 요청 보내기</h2>
