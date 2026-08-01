@@ -125,7 +125,6 @@ async function main() {
       workspace_id: DEV_WORKSPACE_ID,
       name: 'Done',
       sequence: 3072.0,
-      is_done: true,
       created_by: user.id,
       updated_by: user.id,
       cards: {

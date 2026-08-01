@@ -28,7 +28,6 @@ const emit = defineEmits<{
   'delete-card': [cardId: string]
   'toggle-card-completion': [card: Card]
   'rename-list': [listId: string, name: string]
-  'toggle-list-done': [listId: string, isDone: boolean]
   'delete-list': [listId: string]
 }>()
 
@@ -146,10 +145,7 @@ const vFocus = {
 <template>
   <section
     class="task-list"
-    :class="{
-      'task-list--readonly': !canEdit,
-      'task-list--done': list.is_done,
-    }"
+    :class="{ 'task-list--readonly': !canEdit }"
   >
     <div class="list-header">
       <input
@@ -164,42 +160,9 @@ const vFocus = {
       />
       <span v-else class="list-name" @click="startRename">{{ list.name }}</span>
       <div class="list-header-actions">
-        <button
-          v-if="canEdit"
-          class="list-done-toggle"
-          :class="{ 'list-done-toggle--active': list.is_done }"
-          type="button"
-          :aria-label="
-            list.is_done
-              ? `${list.name}의 완료 단계 표시 해제`
-              : `${list.name}을(를) 완료 단계로 표시`
-          "
-          :aria-pressed="list.is_done"
-          :title="
-            list.is_done ? '완료 단계 표시 해제' : '완료 단계로 표시'
-          "
-          @pointerdown.stop
-          @click.stop="emit('toggle-list-done', list.id, !list.is_done)"
-        >
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <circle cx="10" cy="10" r="7.5" />
-            <path d="m6.5 10 2.2 2.2 4.8-5" />
-          </svg>
-        </button>
-        <span
-          v-else-if="list.is_done"
-          class="list-done-label"
-        >
-          완료
-        </span>
         <span
           class="list-count"
-          :style="{
-            background:
-              list.is_done
-                ? '#16a34a'
-                : (badgeColors[list.name] ?? '#6b7280'),
-          }"
+          :style="{ background: badgeColors[list.name] ?? '#6b7280' }"
         >
           {{ list.cards.length }}
         </span>

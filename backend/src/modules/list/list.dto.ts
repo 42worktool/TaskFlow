@@ -7,7 +7,6 @@ export function toListDto(list: List) {
     workspace_id: list.workspace_id,
     name: list.name,
     sequence: list.sequence,
-    is_done: list.is_done,
   }
 }
 

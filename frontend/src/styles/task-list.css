@@ -10,11 +10,6 @@
   max-height: 100%;
 }
 
-.task-list--done {
-  border-color: rgba(22, 163, 74, 0.32);
-  background: #e7eee9;
-}
-
 .list-header {
   display: flex;
   align-items: center;
@@ -52,57 +47,6 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-}
-
-.list-done-toggle {
-  width: 24px;
-  height: 24px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: #94a3b8;
-  cursor: pointer;
-}
-
-.list-done-toggle:hover {
-  background: rgba(255, 255, 255, 0.7);
-  color: #475569;
-}
-
-.list-done-toggle:disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
-}
-
-.list-done-toggle:disabled:hover {
-  background: transparent;
-  color: #94a3b8;
-}
-
-.list-done-toggle--active {
-  color: #16a34a;
-}
-
-.list-done-toggle svg {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.list-done-label {
-  padding: 3px 6px;
-  border-radius: 999px;
-  background: #dcfce7;
-  color: #15803d;
-  font-size: 10px;
-  font-weight: 700;
 }
 
 .list-count {

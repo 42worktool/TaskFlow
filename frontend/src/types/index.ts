@@ -88,7 +88,6 @@ export interface List {
   workspace_id: UUID
   name: string
   sequence: number
-  is_done: boolean
 }
 
 export interface Card {
@@ -226,7 +225,6 @@ export interface DashboardDailyFlow {
 export interface DashboardListStatus {
   list_id: UUID
   name: string
-  is_done: boolean
   card_count: number
   completed_card_count: number
 }

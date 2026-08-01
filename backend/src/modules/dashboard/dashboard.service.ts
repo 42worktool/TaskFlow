@@ -88,7 +88,6 @@ export async function getWorkspaceDashboard(input: {
       select: {
         id: true,
         name: true,
-        is_done: true,
         cards: {
           where: { deleted_at: null },
           select: {
@@ -167,7 +166,6 @@ export async function getWorkspaceDashboard(input: {
   const listSummaries = lists.map((list) => ({
     list_id: list.id,
     name: list.name,
-    is_done: list.is_done,
     card_count: list.cards.length,
     completed_card_count: list.cards.filter((card) => card.is_completed).length,
   }))
