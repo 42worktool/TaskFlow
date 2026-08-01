@@ -2,7 +2,12 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { FriendAPI } from '../api/friend'
 import { realtime } from '../services/realtime'
-import { parseFriendPresenceEvent } from '../services/realtime/protocol'
+import {
+  parseFriend,
+  parseFriendPresenceEvent,
+  parseFriendRequest,
+  parseFriendUserIdEvent,
+} from '../services/realtime/protocol'
 import type { Friend, FriendRequest } from '../types'
 
 const emit = defineEmits<{
@@ -26,6 +31,10 @@ let reloadAfterMutation = false
 const livePresence = new Map<string, { online: boolean; sequence: number }>()
 let removePresenceListener: (() => void) | null = null
 let removeRealtimeStateListener: (() => void) | null = null
+let removeRequestCreatedListener: (() => void) | null = null
+let removeRequestAcceptedListener: (() => void) | null = null
+let removeRequestDeletedListener: (() => void) | null = null
+let removeFriendRemovedListener: (() => void) | null = null
 
 function applyNewerPresence(friend: Friend, presenceAtStart: number): void {
   const live = livePresence.get(friend.id)
@@ -81,6 +90,42 @@ function receiveFriendPresence(value: unknown): void {
   })
   const friend = friends.value.find((item) => item.id === event.user_id)
   if (friend) friend.online = event.online
+}
+
+function receiveFriendRequestCreated(value: unknown): void {
+  const request = parseFriendRequest(value)
+  if (!request) return
+  if (incomingRequests.value.some((item) => item.id === request.id)) return
+  incomingRequests.value = [request, ...incomingRequests.value]
+}
+
+function receiveFriendRequestAccepted(value: unknown): void {
+  const friend = parseFriend(value)
+  if (!friend) return
+  outgoingRequests.value = outgoingRequests.value.filter(
+    (item) => item.id !== friend.id,
+  )
+  friends.value = [
+    friend,
+    ...friends.value.filter((item) => item.id !== friend.id),
+  ]
+}
+
+function receiveFriendRequestDeleted(value: unknown): void {
+  const event = parseFriendUserIdEvent(value)
+  if (!event) return
+  incomingRequests.value = incomingRequests.value.filter(
+    (item) => item.id !== event.user_id,
+  )
+  outgoingRequests.value = outgoingRequests.value.filter(
+    (item) => item.id !== event.user_id,
+  )
+}
+
+function receiveFriendRemoved(value: unknown): void {
+  const event = parseFriendUserIdEvent(value)
+  if (!event) return
+  friends.value = friends.value.filter((item) => item.id !== event.user_id)
 }
 
 function refreshAfterReconnect(): void {
@@ -214,6 +259,22 @@ onMounted(() => {
     'friend.presence_changed',
     receiveFriendPresence,
   )
+  removeRequestCreatedListener = realtime.on(
+    'friend.request_created',
+    receiveFriendRequestCreated,
+  )
+  removeRequestAcceptedListener = realtime.on(
+    'friend.request_accepted',
+    receiveFriendRequestAccepted,
+  )
+  removeRequestDeletedListener = realtime.on(
+    'friend.request_deleted',
+    receiveFriendRequestDeleted,
+  )
+  removeFriendRemovedListener = realtime.on(
+    'friend.removed',
+    receiveFriendRemoved,
+  )
   removeRealtimeStateListener = realtime.onStateChange((state) => {
     if (state === 'connected') refreshAfterReconnect()
   })
@@ -223,6 +284,10 @@ onMounted(() => {
 onUnmounted(() => {
   loadGeneration += 1
   removePresenceListener?.()
+  removeRequestCreatedListener?.()
+  removeRequestAcceptedListener?.()
+  removeRequestDeletedListener?.()
+  removeFriendRemovedListener?.()
   removeRealtimeStateListener?.()
   livePresence.clear()
 })

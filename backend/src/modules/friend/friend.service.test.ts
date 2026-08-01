@@ -6,6 +6,22 @@ const USER_B = '00000000-0000-4000-8000-000000000002'
 const USER_C = '00000000-0000-4000-8000-000000000003'
 const CREATED_AT = new Date('2026-07-29T00:00:00.000Z')
 
+function setRequiredEnvironment(): void {
+  Object.assign(process.env, {
+    APP_ORIGIN: 'http://localhost:5173',
+    JWT_ACCESS_SECRET: 'test-secret-that-is-at-least-32-characters',
+    GOOGLE_CLIENT_ID: 'test-client',
+    GOOGLE_CLIENT_SECRET: 'test-secret',
+    GOOGLE_REDIRECT_URI:
+      'http://localhost:3000/api/auth/oauth/callback/google',
+    REDIS_URL: 'redis://localhost:6379',
+    SMTP_HOST: 'localhost',
+    SMTP_USER: 'test',
+    SMTP_PASS: 'test',
+    SMTP_FROM: 'test@example.com',
+  })
+}
+
 function stubMethod(
   t: TestContext,
   target: object,
@@ -60,8 +76,10 @@ function stubTransaction(t: TestContext, prisma: object): void {
 }
 
 test('friend service keeps pending requests separate from friendships', async (t) => {
-  const [{ prisma }, friendService] = await Promise.all([
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, friendService] = await Promise.all([
     import('../../db'),
+    import('../../realtime'),
     import('./friend.service'),
   ])
 
@@ -143,6 +161,10 @@ test('friend service keeps pending requests separate from friendships', async (t
       upsert = args
       return friendRequest(USER_B, USER_A)
     })
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args: unknown[]) => {
+      deliveries.push(args)
+    })
 
     const request = await friendService.sendFriendRequest({
       userId: USER_A,
@@ -150,6 +172,18 @@ test('friend service keeps pending requests separate from friendships', async (t
     })
 
     assert.equal(request.id, USER_B)
+    assert.deepEqual(deliveries, [
+      [
+        USER_B,
+        'friend.request_created',
+        {
+          id: USER_A,
+          name: 'Alice',
+          profile_image_url: null,
+          requested_at: CREATED_AT.toISOString(),
+        },
+      ],
+    ])
     assert.deepEqual(userQuery, {
       where: {
         email: { equals: 'bob@example.com', mode: 'insensitive' },
@@ -301,6 +335,10 @@ test('friend service keeps pending requests separate from friendships', async (t
       friendshipUpsert = args
       return friendship()
     })
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args: unknown[]) => {
+      deliveries.push(args)
+    })
 
     const accepted = await friendService.acceptFriendRequest({
       userId: USER_A,
@@ -308,6 +346,19 @@ test('friend service keeps pending requests separate from friendships', async (t
     })
 
     assert.equal(accepted.id, USER_B)
+    assert.deepEqual(deliveries, [
+      [
+        USER_B,
+        'friend.request_accepted',
+        {
+          id: USER_A,
+          name: 'Alice',
+          profile_image_url: null,
+          friends_since: CREATED_AT.toISOString(),
+          online: false,
+        },
+      ],
+    ])
     assert.deepEqual(friendshipUpsert, {
       where: {
         user_low_id_user_high_id: {
@@ -364,6 +415,10 @@ test('friend service keeps pending requests separate from friendships', async (t
       deletion = args
       return { count: 1 }
     })
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args: unknown[]) => {
+      deliveries.push(args)
+    })
 
     await friendService.deleteFriendRequest({
       userId: USER_B,
@@ -376,6 +431,9 @@ test('friend service keeps pending requests separate from friendships', async (t
         user_high_id: USER_B,
       },
     })
+    assert.deepEqual(deliveries, [
+      [USER_A, 'friend.request_deleted', { user_id: USER_B }],
+    ])
   })
 
   await t.test('removes only the accepted canonical pair', async (t) => {
@@ -384,11 +442,18 @@ test('friend service keeps pending requests separate from friendships', async (t
       deletion = args
       return { count: 1 }
     })
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args: unknown[]) => {
+      deliveries.push(args)
+    })
 
     await friendService.removeFriend({
       userId: USER_B,
       friendUserId: USER_A,
     })
+    assert.deepEqual(deliveries, [
+      [USER_A, 'friend.removed', { user_id: USER_B }],
+    ])
 
     assert.deepEqual(deletion, {
       where: {

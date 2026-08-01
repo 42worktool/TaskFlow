@@ -196,6 +196,10 @@ export interface FriendPresenceEvent {
   online: boolean
 }
 
+export interface FriendUserIdEvent {
+  user_id: UUID
+}
+
 export interface DashboardSummary {
   current_total: number
   current_done: number

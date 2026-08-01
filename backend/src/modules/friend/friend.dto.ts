@@ -1,4 +1,5 @@
 import type { FriendRequest, Friendship, User } from '@prisma/client'
+import { z } from 'zod'
 
 const friendUserSelect = {
   id: true,
@@ -16,15 +17,21 @@ export const friendRequestInclude = {
   user_high: { select: friendUserSelect },
 } as const
 
-type FriendshipWithUsers = Friendship & {
+export type FriendshipWithUsers = Friendship & {
   user_low: Pick<User, 'id' | 'name' | 'profile_image_url'>
   user_high: Pick<User, 'id' | 'name' | 'profile_image_url'>
 }
 
-type FriendRequestWithUsers = FriendRequest & {
+export type FriendRequestWithUsers = FriendRequest & {
   user_low: Pick<User, 'id' | 'name' | 'profile_image_url'>
   user_high: Pick<User, 'id' | 'name' | 'profile_image_url'>
 }
+
+export const friendUserIdEventSchema = z
+  .object({
+    user_id: z.uuid(),
+  })
+  .strict()
 
 export interface FriendDto {
   id: string

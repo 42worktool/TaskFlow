@@ -44,7 +44,9 @@ import {
 import { realtime } from '../services/realtime'
 import {
   parseDirectMessage,
+  parseFriend,
   parseFriendPresenceEvent,
+  parseFriendUserIdEvent,
   parseWorkspaceMessage,
 } from '../services/realtime/protocol'
 import type { Friend, Workspace } from '../types'
@@ -205,6 +207,31 @@ function receiveFriendPresence(value: unknown): void {
   }
 }
 
+function receiveFriendRequestAccepted(value: unknown): void {
+  const friend = parseFriend(value)
+  if (!friend) return
+  directoryFriends.value = [
+    friend,
+    ...directoryFriends.value.filter((item) => item.id !== friend.id),
+  ]
+}
+
+function receiveFriendRemoved(value: unknown): void {
+  const event = parseFriendUserIdEvent(value)
+  if (!event) return
+  directoryFriends.value = directoryFriends.value.filter(
+    (item) => item.id !== event.user_id,
+  )
+  markDirectConversationRead(event.user_id)
+  if (
+    messengerState.activeRoom?.kind === 'dm' &&
+    messengerState.activeRoom.friend.id === event.user_id
+  ) {
+    messengerState.activeRoom = null
+    showMessengerDirectory()
+  }
+}
+
 function visibleMessengerRoom(): VisibleMessengerRoom | null {
   if (
     !messengerState.open ||
@@ -309,6 +336,8 @@ function returnToDirectory(): void {
 }
 
 let removeFriendPresenceListener: (() => void) | null = null
+let removeFriendRequestAcceptedListener: (() => void) | null = null
+let removeFriendRemovedListener: (() => void) | null = null
 let removeWorkspaceMessageListener: (() => void) | null = null
 let removeDirectMessageListener: (() => void) | null = null
 let removeWorkspaceActivityListener: (() => void) | null = null
@@ -376,6 +405,14 @@ onMounted(() => {
     'friend.presence_changed',
     receiveFriendPresence,
   )
+  removeFriendRequestAcceptedListener = realtime.on(
+    'friend.request_accepted',
+    receiveFriendRequestAccepted,
+  )
+  removeFriendRemovedListener = realtime.on(
+    'friend.removed',
+    receiveFriendRemoved,
+  )
   removeWorkspaceMessageListener = realtime.on(
     'workspace.message_created',
     receiveWorkspaceMessage,
@@ -396,6 +433,8 @@ onMounted(() => {
 onUnmounted(() => {
   directoryLoadGeneration += 1
   removeFriendPresenceListener?.()
+  removeFriendRequestAcceptedListener?.()
+  removeFriendRemovedListener?.()
   removeWorkspaceMessageListener?.()
   removeDirectMessageListener?.()
   removeWorkspaceActivityListener?.()

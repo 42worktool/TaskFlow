@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   parseDirectMessage,
+  parseFriend,
   parseFriendPresenceEvent,
+  parseFriendRequest,
+  parseFriendUserIdEvent,
   parseWorkspaceChangedEvent,
   parseWorkspaceMemberPresenceEvent,
   parseWorkspaceMessage,
@@ -35,6 +38,47 @@ describe('friend presence protocol', () => {
     expect(
       parseFriendPresenceEvent({ user_id: '', online: false }),
     ).toBeNull()
+  })
+})
+
+describe('friend request lifecycle protocol', () => {
+  const request = {
+    id: FRIEND_ID,
+    name: 'Bob',
+    profile_image_url: null,
+    requested_at: OCCURRED_AT,
+  }
+  const friend = {
+    id: FRIEND_ID,
+    name: 'Bob',
+    profile_image_url: null,
+    friends_since: OCCURRED_AT,
+    online: false,
+  }
+
+  it('accepts a friend request created/deleted payload', () => {
+    expect(parseFriendRequest(request)).toEqual(request)
+    expect(parseFriendUserIdEvent({ user_id: FRIEND_ID })).toEqual({
+      user_id: FRIEND_ID,
+    })
+  })
+
+  it('rejects malformed friend request payloads', () => {
+    expect(parseFriendRequest({ ...request, id: 'not-a-uuid' })).toBeNull()
+    expect(parseFriendRequest({ ...request, name: '' })).toBeNull()
+    expect(
+      parseFriendRequest({ ...request, requested_at: 'not-a-date' }),
+    ).toBeNull()
+    expect(parseFriendUserIdEvent({ user_id: 'user-1' })).toBeNull()
+  })
+
+  it('accepts a friend request accepted payload', () => {
+    expect(parseFriend(friend)).toEqual(friend)
+  })
+
+  it('rejects malformed friend payloads', () => {
+    expect(parseFriend({ ...friend, online: 'yes' })).toBeNull()
+    expect(parseFriend({ ...friend, friends_since: 'not-a-date' })).toBeNull()
   })
 })
 
