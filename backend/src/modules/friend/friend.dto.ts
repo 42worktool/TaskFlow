@@ -24,7 +24,6 @@ export type FriendRequestWithUsers = FriendRequest & {
   user_low: SelectedUserSummary
   user_high: SelectedUserSummary
 }
-}
 
 export const friendUserIdEventSchema = z
   .object({
