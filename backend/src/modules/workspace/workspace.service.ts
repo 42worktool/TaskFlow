@@ -366,19 +366,31 @@ export async function inviteWorkspaceMember(input: {
 /**
  * Preview an invite without consuming it.
  */
-export async function previewInvite(input: { token: string }) {
+export async function previewInvite(input: { userId: string; token: string }) {
   const invitation = await workspaceInvitationStore.preview(input.token)
   if (!invitation) throw new InviteTokenError()
 
   const workspace = await prisma.workspace.findFirst({
     where: { id: invitation.workspaceId, deleted_at: null },
-    select: { name: true },
+    select: {
+      name: true,
+      members: {
+        where: {
+          user_id: input.userId,
+          deleted_at: null,
+        },
+        select: { role: true },
+      },
+    },
   })
   if (!workspace) throw new InviteTokenError()
+  const existing = workspace.members[0]
 
   return {
     workspace_name: workspace.name,
     role: invitation.role,
+    already_member: Boolean(existing),
+    ...(existing && { current_role: existing.role }),
   }
 }
 
@@ -387,6 +399,19 @@ export async function previewInvite(input: { token: string }) {
  * Returns the workspace DTO on success.
  */
 export async function acceptInvite(input: { userId: string; token: string }) {
+  const pendingInvitation = await workspaceInvitationStore.preview(input.token)
+  if (!pendingInvitation) throw new InviteTokenError()
+
+  const ws = await prisma.workspace.findFirst({
+    where: { id: pendingInvitation.workspaceId, deleted_at: null },
+    include: workspaceInclude,
+  })
+  if (!ws) throw new InviteTokenError()
+
+  if (ws.members.some((member) => member.user_id === input.userId)) {
+    return toWorkspaceDto(ws, { includeMemberEmail: true })
+  }
+
   const invitation = await workspaceInvitationStore.take(input.token)
   if (!invitation) throw new InviteTokenError()
 
@@ -395,13 +420,6 @@ export async function acceptInvite(input: { userId: string; token: string }) {
     select: { name: true, profile_image_url: true },
   })
   if (!invitee) throw new InviteTokenError()
-
-  const ws = await prisma.workspace.findFirst({
-    where: { id: invitation.workspaceId, deleted_at: null },
-    include: workspaceInclude,
-  })
-
-  if (!ws) throw new InviteTokenError()
 
   const existing = await prisma.workspaceMember.findUnique({
     where: {

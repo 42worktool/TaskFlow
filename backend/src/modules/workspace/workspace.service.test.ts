@@ -401,7 +401,7 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
   }
 
   await t.test('rejects an invalid invitation token', async (t) => {
-    stubMethod(t, workspaceInvitationStore, 'take', async () => null)
+    stubMethod(t, workspaceInvitationStore, 'preview', async () => null)
     await assert.rejects(
       () => acceptInvite({ userId: USER_ID, token: 'invalid' }),
       (error: unknown) =>
@@ -421,19 +421,42 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
     })
     stubMethod(t, prisma.workspace, 'findFirst', async () => ({
       name: 'Workspace',
+      members: [],
     }))
 
-    const preview = await previewInvite({ token: 'token' })
+    const preview = await previewInvite({ userId: USER_ID, token: 'token' })
 
     assert.deepEqual(preview, {
       workspace_name: 'Workspace',
       role: 'MEMBER',
+      already_member: false,
     })
     assert.equal(takeCount, 0)
   })
 
+  await t.test('shows OWNER as an active member', async (t) => {
+    stubMethod(t, workspaceInvitationStore, 'preview', async () => invitation)
+    stubMethod(t, prisma.workspace, 'findFirst', async () => ({
+      name: 'Workspace',
+      members: [{ role: 'OWNER' }],
+    }))
+
+    const preview = await previewInvite({ userId: USER_ID, token: 'token' })
+
+    assert.deepEqual(preview, {
+      workspace_name: 'Workspace',
+      role: 'MEMBER',
+      already_member: true,
+      current_role: 'OWNER',
+    })
+  })
+
   await t.test('takes the token before accepting with a different account email', async (t) => {
     const operationOrder: string[] = []
+    stubMethod(t, workspaceInvitationStore, 'preview', async () => {
+      operationOrder.push('preview')
+      return invitation
+    })
     stubMethod(t, workspaceInvitationStore, 'take', async () => {
       operationOrder.push('take')
       return invitation
@@ -479,23 +502,34 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
       (deliveries[0]?.[2] as { kind?: unknown }).kind,
       'workspace.member_joined',
     )
-    assert.deepEqual(operationOrder, ['take', 'membership', 'notification'])
+    assert.deepEqual(operationOrder, [
+      'preview',
+      'take',
+      'membership',
+      'notification',
+    ])
   })
 
-  await t.test('takes without notifying when the recipient is already a member', async (t) => {
-    stubMethod(t, workspaceInvitationStore, 'take', async () => invitation)
-    stubMethod(t, prisma.user, 'findFirst', async () => ({
-      name: 'Invitee',
-      profile_image_url: null,
-    }))
-    stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
-    stubMethod(t, prisma.workspaceMember, 'findUnique', async () => ({ deleted_at: null }))
+  await t.test('keeps an active member role without taking the token', async (t) => {
+    stubMethod(t, workspaceInvitationStore, 'preview', async () => invitation)
+    let takeCount = 0
+    stubMethod(t, workspaceInvitationStore, 'take', async () => {
+      takeCount += 1
+      return invitation
+    })
+    const activeWorkspace = workspaceForRoleChange('ADMIN', 'OWNER')
+    stubMethod(t, prisma.workspace, 'findFirst', async () => activeWorkspace)
     const deliveries: unknown[][] = []
     stubMethod(t, realtime, 'sendToUser', (...args) => deliveries.push(args))
 
     const accepted = await acceptInvite({ userId: USER_ID, token: 'token' })
 
     assert.equal(accepted.id, WORKSPACE_ID)
+    assert.equal(
+      accepted.members.find((member) => member.user_id === USER_ID)?.role,
+      'ADMIN',
+    )
+    assert.equal(takeCount, 0)
     assert.equal(deliveries.length, 0)
   })
 })

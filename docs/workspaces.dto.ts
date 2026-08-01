@@ -75,10 +75,13 @@ export interface InviteMemberResponse {
 export interface InvitationPreviewResponse {
   workspace_name: string;
   role: Exclude<Role, 'OWNER'>;
+  already_member: boolean;
+  current_role?: Role;
 }
 
 // POST /api/workspaces/invite/{token} -> 200
-// Atomically removes the one-time bearer invitation before creating membership.
+// Active members keep their current role and do not consume the invitation.
+// Otherwise, atomically removes the invitation before creating or restoring membership.
 export type AcceptInviteResponse = WorkspaceDto;
 
 // PUT /api/workspaces/{workspace_id}/members/{user_id} -> 200, ADMIN+

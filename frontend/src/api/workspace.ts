@@ -6,6 +6,8 @@ type ManageableWorkspaceRole = Exclude<WorkspaceRole, 'OWNER'>
 export interface WorkspaceInvitationPreview {
   workspace_name: string
   role: ManageableWorkspaceRole
+  already_member: boolean
+  current_role?: WorkspaceRole
 }
 
 export const WorkspaceAPI = {

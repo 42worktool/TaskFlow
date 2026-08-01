@@ -73,6 +73,7 @@ export const acceptInvite: RequestHandler = async (req, res) => {
 
 export const previewInvite: RequestHandler = async (req, res) => {
   const invitation = await svc.previewInvite({
+    userId: authenticatedUserId(req),
     token: req.params.token as string,
   })
   res.status(200).json(invitation)

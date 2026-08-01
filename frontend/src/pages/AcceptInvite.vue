@@ -3,6 +3,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { WorkspaceAPI, type WorkspaceInvitationPreview } from '../api/workspace'
 import { authState, logout } from '../services/auth'
+import type { WorkspaceRole } from '../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,9 +12,19 @@ const loading = ref(true)
 const accepting = ref(false)
 const invitation = ref<WorkspaceInvitationPreview | null>(null)
 const token = route.params.token as string
+const roleLabels: Record<WorkspaceRole, string> = {
+  OWNER: '소유자',
+  ADMIN: '관리자',
+  MEMBER: '멤버',
+  VIEWER: '뷰어',
+}
 const roleLabel = computed(() => {
-  const labels = { ADMIN: '관리자', MEMBER: '멤버', VIEWER: '뷰어' } as const
-  return invitation.value ? labels[invitation.value.role] : ''
+  return invitation.value ? roleLabels[invitation.value.role] : ''
+})
+const currentRoleLabel = computed(() => {
+  return invitation.value?.current_role
+    ? roleLabels[invitation.value.current_role]
+    : ''
 })
 
 onMounted(async () => {
@@ -60,7 +71,11 @@ async function switchAccount() {
       <template v-else-if="invitation">
         <p class="invite-eyebrow">워크스페이스 초대</p>
         <h1>{{ invitation.workspace_name }}</h1>
-        <p class="invite-copy">
+        <p v-if="invitation.already_member" class="invite-copy">
+          이미 <strong>{{ currentRoleLabel }}</strong> 역할로 참여 중입니다.
+          현재 권한은 변경되지 않습니다.
+        </p>
+        <p v-else class="invite-copy">
           현재 로그인한 TaskFlow 계정으로 <strong>{{ roleLabel }}</strong> 역할에 참여합니다.
         </p>
         <div class="account-summary">
@@ -76,7 +91,15 @@ async function switchAccount() {
             :disabled="accepting"
             @click="acceptInvitation"
           >
-            {{ accepting ? '참여하는 중…' : '초대 수락' }}
+            {{
+              accepting
+                ? invitation.already_member
+                  ? '이동하는 중…'
+                  : '참여하는 중…'
+                : invitation.already_member
+                  ? '워크스페이스로 이동'
+                  : '초대 수락'
+            }}
           </button>
           <button
             class="secondary-button"

@@ -36,6 +36,7 @@ describe('WorkspaceAPI', () => {
     const preview = {
       workspace_name: 'Design',
       role: 'MEMBER' as const,
+      already_member: false,
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(preview).mockResolvedValueOnce({
       id: 'workspace-1',

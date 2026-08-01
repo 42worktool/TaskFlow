@@ -16,9 +16,10 @@ POST /api/workspaces/:workspaceId/members
 
 GET /api/workspaces/invite/:token
   -> require a signed-in account
-  -> return workspace name and role without consuming the token
+  -> return workspace name, invited role, and current membership without consuming the token
 
 POST /api/workspaces/invite/:token
+  -> return without consuming the token when the account is already an active member
   -> atomically read and delete the Redis invitation with GETDEL
   -> create or restore the workspace membership
   -> notify already-connected workspace members
@@ -26,10 +27,12 @@ POST /api/workspaces/invite/:token
 
 The delivery address is not an account binding: a recipient may accept with a
 different TaskFlow account after confirming that account in the UI. The token is
-removed before the database membership write, so concurrent acceptance has one
-winner. If the database write then fails, the invitation must be sent again. An
-expired, malformed, consumed, or deleted-workspace token is rejected. The final
-workspace owner rules remain enforced by the normal member-management service.
+not consumed and the role is not changed when that account is already an active
+member. Otherwise, the token is removed before the database membership write,
+so concurrent acceptance has one winner. If the database write then fails, the
+invitation must be sent again. An expired, malformed, consumed, or
+deleted-workspace token is rejected. The final workspace owner rules remain
+enforced by the normal member-management service.
 
 ## Configuration
 
