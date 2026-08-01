@@ -51,8 +51,9 @@ provider endpoint intended for that mode, such as Gmail on port 587.
 - `backend/src/lib/mail-rate-limiter.ts`: five messages per recipient per hour.
 - `backend/src/lib/mail-queue.ts`: Redis list and a dedicated blocking worker
   connection.
-- `backend/src/lib/workspace-invitation-store.ts`: opaque invitation creation,
-  hashed Redis storage, preview, and atomic one-time removal.
+- `backend/src/modules/workspace/workspace-invitation.store.ts`: opaque
+  invitation creation, hashed Redis storage, preview, and atomic one-time
+  removal.
 - `backend/src/modules/workspace/workspace.service.ts`: authorization, token
   queueing, preview, and membership acceptance.
 

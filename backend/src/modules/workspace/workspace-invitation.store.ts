@@ -1,36 +1,25 @@
 import { createHash, randomBytes } from 'node:crypto'
-import type { Role } from '@prisma/client'
-import { getRedisClient } from './redis'
+import { getRedisClient } from '../../lib/redis'
+import {
+  workspaceInvitationSchema,
+  workspaceInvitationTokenSchema,
+  type WorkspaceInvitation,
+} from './workspace.validation'
 
 const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 const INVITE_KEY_PREFIX = 'workspace:invite:'
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
-
-export interface WorkspaceInvitation {
-  workspaceId: string
-  role: Exclude<Role, 'OWNER'>
-  deliveryEmail: string
-  createdBy: string
-}
 
 function invitationKey(token: string): string | null {
-  if (!TOKEN_PATTERN.test(token)) return null
-  const digest = createHash('sha256').update(token).digest('hex')
+  const parsed = workspaceInvitationTokenSchema.safeParse(token)
+  if (!parsed.success) return null
+  const digest = createHash('sha256').update(parsed.data).digest('hex')
   return `${INVITE_KEY_PREFIX}${digest}`
 }
 
 function parseInvitation(raw: string): WorkspaceInvitation | null {
   try {
-    const value = JSON.parse(raw) as Partial<WorkspaceInvitation>
-    if (
-      typeof value.workspaceId !== 'string' ||
-      !['ADMIN', 'MEMBER', 'VIEWER'].includes(value.role ?? '') ||
-      typeof value.deliveryEmail !== 'string' ||
-      typeof value.createdBy !== 'string'
-    ) {
-      return null
-    }
-    return value as WorkspaceInvitation
+    const parsed = workspaceInvitationSchema.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : null
   } catch {
     return null
   }
@@ -38,11 +27,12 @@ function parseInvitation(raw: string): WorkspaceInvitation | null {
 
 async function create(input: WorkspaceInvitation): Promise<string> {
   const redis = await getRedisClient()
+  const invitation = workspaceInvitationSchema.parse(input)
 
   for (;;) {
     const token = randomBytes(32).toString('base64url')
     const key = invitationKey(token)!
-    const created = await redis.set(key, JSON.stringify(input), {
+    const created = await redis.set(key, JSON.stringify(invitation), {
       EX: INVITE_TTL_SECONDS,
       NX: true,
     })

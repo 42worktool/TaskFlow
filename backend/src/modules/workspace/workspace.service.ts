@@ -19,7 +19,7 @@ import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
 import { normalizeEmail } from '../../lib/validation'
-import { workspaceInvitationStore } from '../../lib/workspace-invitation-store'
+import { workspaceInvitationStore } from './workspace-invitation.store'
 import { notifyWorkspaceMemberJoined } from '../notification/notification.service'
 import { isUserOnline } from '../presence/presence.state'
 import { realtime } from '../../realtime'
@@ -349,8 +349,6 @@ export async function inviteWorkspaceMember(input: {
   const token = await workspaceInvitationStore.create({
     workspaceId: input.workspaceId,
     role: input.role,
-    deliveryEmail: email,
-    createdBy: input.userId,
   })
   const inviteUrl = `${config.appOrigin}/invite/${token}`
 

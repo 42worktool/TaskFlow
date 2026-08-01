@@ -392,14 +392,12 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
   ] = await Promise.all([
     import('../../db'),
     import('../../realtime'),
-    import('../../lib/workspace-invitation-store'),
+    import('./workspace-invitation.store'),
     import('./workspace.service'),
   ])
   const invitation = {
     workspaceId: WORKSPACE_ID,
     role: 'MEMBER' as const,
-    deliveryEmail: 'invitee@example.com',
-    createdBy: OWNER_ID,
   }
 
   await t.test('rejects an invalid invitation token', async (t) => {
