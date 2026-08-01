@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { prisma } from '../../db'
+import { uuidSchema } from '../../lib/validation'
 import {
   realtime,
   type RealtimeConnectionDisconnectedInfo,
@@ -11,11 +12,12 @@ import {
   isUserOnline,
   removePresenceConnection,
 } from './presence.state'
+import { otherUserId } from '../friend/friend-pair'
 import { publishWorkspacePresenceChanged } from '../workspace/workspace.realtime'
 
 export const friendPresenceEventSchema = z
   .object({
-    user_id: z.string().uuid(),
+    user_id: uuidSchema,
     online: z.boolean(),
   })
   .strict()
@@ -75,16 +77,10 @@ async function notifyPresence(userId: string, online: boolean): Promise<void> {
     online,
   })
   const friendIds = new Set(
-    friendships.map((friendship) =>
-      friendship.user_low_id === userId
-        ? friendship.user_high_id
-        : friendship.user_low_id,
-    ),
+    friendships.map((friendship) => otherUserId(friendship, userId)),
   )
 
-  for (const friendId of friendIds) {
-    realtime.sendToUser(friendId, 'friend.presence_changed', event)
-  }
+  realtime.sendToUsers(friendIds, 'friend.presence_changed', event)
   for (const workspaceId of new Set(
     memberships.map((membership) => membership.workspace_id),
   )) {

@@ -12,13 +12,14 @@ import { AppError, ForbiddenError, NotFoundError } from '../../errors'
 import type { Prisma, WorkspaceMember, Role } from '@prisma/client'
 import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import {
-  hasMinimumWorkspaceRole,
+  requireMinimumWorkspaceRole,
+  requireWorkspaceReadAccess,
   requireWorkspaceRole,
 } from '../../lib/workspace-permissions'
 import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
-import { normalizeEmail } from '../auth/auth.utils'
+import { normalizeEmail } from '../../lib/validation'
 import { notifyWorkspaceMemberJoined } from '../notification/notification.service'
 import { isUserOnline } from '../presence/presence.state'
 import { realtime } from '../../realtime'
@@ -39,15 +40,6 @@ interface InvitePayload {
   workspace_id: string
   role: Role
   email: string
-}
-
-// ------------------------------------------------------------
-// Workspace-specific application errors.
-// ------------------------------------------------------------
-class LastOwnerError extends AppError {
-  constructor() {
-    super('LAST_OWNER', 409, 'cannot remove the last owner')
-  }
 }
 
 class InviteTokenError extends AppError {
@@ -79,33 +71,15 @@ async function requireManagedWorkspace(
   if (!workspace) throw new NotFoundError()
 
   const callerRole = workspace.members.find((member) => member.user_id === callerId)?.role
-  if (!callerRole || !hasMinimumWorkspaceRole(callerRole, minRole)) {
-    throw new ForbiddenError()
-  }
+  requireMinimumWorkspaceRole(callerRole ?? null, minRole)
   return workspace
 }
 
-function requireRemovableOwner(
-  members: WorkspaceMember[],
-  targetMembership: WorkspaceMember,
-  newRole?: Role,
-): void {
-  if (targetMembership.role !== 'OWNER' || newRole === 'OWNER') return
-  if (members.filter((member) => member.role === 'OWNER').length <= 1) {
-    throw new LastOwnerError()
-  }
-}
-
 function requireRoleChangeAllowed(
-  members: WorkspaceMember[],
-  callerId: string,
   targetMembership: WorkspaceMember,
   newRole: Role,
 ): void {
-  const callerRole = members.find((member) => member.user_id === callerId)?.role
-
   if (
-    (callerRole !== 'OWNER' && callerRole !== 'ADMIN') ||
     targetMembership.role === 'OWNER' ||
     newRole === 'OWNER'
   ) {
@@ -164,12 +138,9 @@ export async function getWorkspace(input: { userId: string; workspaceId: string 
     include: workspaceInclude,
   })
 
-  if (!ws) throw new NotFoundError()
+  const { workspace, isMember } = requireWorkspaceReadAccess(ws, input.userId)
 
-  const isMember = ws.members.some((member) => member.user_id === input.userId)
-  if (!isMember && !ws.is_public) throw new ForbiddenError()
-
-  return toWorkspaceDto(ws, { includeMemberEmail: isMember })
+  return toWorkspaceDto(workspace, { includeMemberEmail: isMember })
 }
 
 /**
@@ -180,26 +151,23 @@ export async function createWorkspace(input: {
   name: string
   isPublic: boolean
 }) {
-  const ws = await prisma.$transaction(async (tx) => {
-    const created = await tx.workspace.create({
-      data: {
-        name: input.name,
-        is_public: input.isPublic,
-        ...createdBy(input.userId),
-        members: {
-          create: {
-            user_id: input.userId,
-            role: 'OWNER',
-            ...createdBy(input.userId),
-          },
+  const workspace = await prisma.workspace.create({
+    data: {
+      name: input.name,
+      is_public: input.isPublic,
+      ...createdBy(input.userId),
+      members: {
+        create: {
+          user_id: input.userId,
+          role: 'OWNER',
+          ...createdBy(input.userId),
         },
       },
-      include: workspaceInclude,
-    })
-    return created
+    },
+    include: workspaceInclude,
   })
 
-  return toWorkspaceDto(ws, { includeMemberEmail: true })
+  return toWorkspaceDto(workspace, { includeMemberEmail: true })
 }
 
 /**
@@ -293,8 +261,6 @@ export async function changeMemberRole(
     if (!targetMembership) throw new NotFoundError()
 
     requireRoleChangeAllowed(
-      ws.members,
-      input.userId,
       targetMembership,
       input.role,
     )
@@ -333,7 +299,7 @@ export async function changeMemberRole(
 
 /**
  * Remove a member from the workspace. Caller must be ADMIN+.
- * Prevents removing the sole OWNER.
+ * ADMIN and OWNER memberships cannot be removed.
  */
 export async function removeMember(input: {
   userId: string
@@ -353,7 +319,12 @@ export async function removeMember(input: {
     )
     if (!targetMembership) throw new NotFoundError()
 
-    requireRemovableOwner(ws.members, targetMembership)
+    if (
+      targetMembership.role === 'ADMIN' ||
+      targetMembership.role === 'OWNER'
+    ) {
+      throw new ForbiddenError()
+    }
 
     await tx.workspaceMember.update({
       where: {

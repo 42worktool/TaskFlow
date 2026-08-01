@@ -9,7 +9,6 @@ const list = {
   workspace_id: 'workspace-id',
   name: 'Todo',
   sequence: 1,
-  is_done: false,
   created_at: timestamp,
   created_by: null,
   updated_at: timestamp,
@@ -24,7 +23,6 @@ test('list DTOs expose the existing list and nested-card contracts', () => {
     workspace_id: 'workspace-id',
     name: 'Todo',
     sequence: 1,
-    is_done: false,
   })
 
   const card = {

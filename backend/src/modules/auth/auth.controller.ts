@@ -1,6 +1,7 @@
 import type { CookieOptions, RequestHandler, Response } from 'express';
 import { config } from '../../config';
-import { AppError, sendError } from '../../errors';
+import { AppError } from '../../errors';
+import { authenticatedUserId } from '../../middleware/auth';
 import * as authService from './auth.service';
 
 const OAUTH_STATE_COOKIE = 'ft_oauth_state';
@@ -117,15 +118,14 @@ export const googleCallback: RequestHandler = async (req, res) => {
   }
 };
 
-export const refresh: RequestHandler = async (req, res) => {
+export const refresh: RequestHandler = async (req, res, next) => {
   const currentToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (typeof currentToken !== 'string') {
-    res.status(401).json({
-      status_code: 401,
-      error: 'MISSING_REFRESH_TOKEN',
-      message: 'Refresh cookie is missing',
-    });
-    return;
+    throw new AppError(
+      'MISSING_REFRESH_TOKEN',
+      401,
+      'Refresh cookie is missing',
+    );
   }
 
   try {
@@ -139,7 +139,7 @@ export const refresh: RequestHandler = async (req, res) => {
     });
   } catch (error) {
     res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions);
-    sendError(res, error);
+    next(error);
   }
 };
 
@@ -157,18 +157,20 @@ export const logout: RequestHandler = async (req, res) => {
 };
 
 export const me: RequestHandler = async (req, res) => {
-  if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
-  res.json(await authService.getCurrentUser(req.auth.userId));
+  res.json(await authService.getCurrentUser(authenticatedUserId(req)));
 };
 
 export const updateAccount: RequestHandler = async (req, res) => {
-  if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
-  res.json(await authService.updateCurrentUser(req.auth.userId, req.body?.name));
+  res.json(
+    await authService.updateCurrentUser(
+      authenticatedUserId(req),
+      req.body?.name,
+    ),
+  );
 };
 
 export const deleteAccount: RequestHandler = async (req, res) => {
-  if (!req.auth) throw new AppError('UNAUTHORIZED', 401, 'Authentication required');
-  await authService.deleteCurrentUser(req.auth.userId);
+  await authService.deleteCurrentUser(authenticatedUserId(req));
   res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions);
   res.status(204).send();
 };

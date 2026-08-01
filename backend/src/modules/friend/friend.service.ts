@@ -1,7 +1,7 @@
 import { prisma } from '../../db'
 import { AppError, NotFoundError } from '../../errors'
 import { realtime } from '../../realtime'
-import { normalizeEmail } from '../auth/auth.utils'
+import { normalizeEmail } from '../../lib/validation'
 import {
   friendUserIdEventSchema,
   friendRequestInclude,
@@ -11,13 +11,8 @@ import {
   type FriendRequestWithUsers,
   type FriendshipWithUsers,
 } from './friend.dto'
+import { canonicalFriendPair, otherUserId } from './friend-pair'
 import { isUserOnline } from '../presence/presence.state'
-
-class CannotFriendSelfError extends AppError {
-  constructor() {
-    super('CANNOT_FRIEND_SELF', 400, 'you cannot add yourself as a friend')
-  }
-}
 
 class FriendNotFoundError extends NotFoundError {
   constructor() {
@@ -46,7 +41,6 @@ class FriendRequestNotFoundError extends AppError {
     super('FRIEND_REQUEST_NOT_FOUND', 404, 'friend request not found')
   }
 }
-
 function publishFriendRequestCreated(
   recipientUserId: string,
   request: FriendRequestWithUsers,
@@ -112,17 +106,6 @@ function publishFriendRemoved(recipientUserId: string, actorUserId: string): voi
     )
   }
 }
-
-export function canonicalFriendPair(
-  userId: string,
-  friendUserId: string,
-): { user_low_id: string; user_high_id: string } {
-  if (userId === friendUserId) throw new CannotFriendSelfError()
-  return userId < friendUserId
-    ? { user_low_id: userId, user_high_id: friendUserId }
-    : { user_low_id: friendUserId, user_high_id: userId }
-}
-
 export async function listFriends(input: { userId: string }) {
   const friendships = await prisma.friendship.findMany({
     where: {
@@ -136,10 +119,7 @@ export async function listFriends(input: { userId: string }) {
   })
 
   return friendships.map((friendship) => {
-    const friendUserId =
-      friendship.user_low_id === input.userId
-        ? friendship.user_high_id
-        : friendship.user_low_id
+    const friendUserId = otherUserId(friendship, input.userId)
     return toFriendDto(
       friendship,
       input.userId,

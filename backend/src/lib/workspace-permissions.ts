@@ -1,6 +1,6 @@
 import type { Prisma, Role } from '@prisma/client'
 import { prisma } from '../db'
-import { ForbiddenError } from '../errors'
+import { ForbiddenError, NotFoundError } from '../errors'
 
 export type WorkspacePermissionClient = Pick<
   Prisma.TransactionClient,
@@ -14,11 +14,40 @@ const ROLE_RANK: Readonly<Record<Role, number>> = {
   OWNER: 4,
 }
 
+type ReadableWorkspace = {
+  is_public: boolean
+  members: readonly { user_id: string }[]
+}
+
 export function hasMinimumWorkspaceRole(
   role: Role,
   minimumRole: Role,
 ): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[minimumRole]
+}
+
+export function requireMinimumWorkspaceRole(
+  role: Role | null,
+  minimumRole: Role,
+): Role {
+  if (!role || !hasMinimumWorkspaceRole(role, minimumRole)) {
+    throw new ForbiddenError()
+  }
+  return role
+}
+
+export function requireWorkspaceReadAccess<T extends ReadableWorkspace>(
+  workspace: T | null,
+  userId: string,
+): { workspace: T; isMember: boolean } {
+  if (!workspace) throw new NotFoundError()
+
+  const isMember = workspace.members.some(
+    (member) => member.user_id === userId,
+  )
+  if (!workspace.is_public && !isMember) throw new ForbiddenError()
+
+  return { workspace, isMember }
 }
 
 export async function getWorkspaceRole(
@@ -45,8 +74,5 @@ export async function requireWorkspaceRole(
   client: WorkspacePermissionClient = prisma,
 ): Promise<Role> {
   const role = await getWorkspaceRole(workspaceId, userId, client)
-  if (!role || !hasMinimumWorkspaceRole(role, minimumRole)) {
-    throw new ForbiddenError()
-  }
-  return role
+  return requireMinimumWorkspaceRole(role, minimumRole)
 }

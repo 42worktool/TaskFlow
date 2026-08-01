@@ -60,29 +60,11 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
       {
         actor_user_id: USER_ID,
         operation: 'INSERT',
-        event_type: 'CARD_CREATED',
-        target_type: 'CARD',
-        target_id: 'card-1',
-        transaction_id: 101n,
-        created_at: new Date('2026-07-01T01:00:00.000Z'),
-      },
-      {
-        actor_user_id: USER_ID,
-        operation: 'INSERT',
-        event_type: 'COMMENT_CREATED',
-        target_type: 'COMMENT',
-        target_id: 'comment-1',
-        transaction_id: 101n,
-        created_at: new Date('2026-07-01T01:00:01.000Z'),
-      },
-      {
-        actor_user_id: DELETED_USER_ID,
-        operation: 'UPDATE',
-        event_type: 'CARD_COMPLETED',
-        target_type: 'CARD',
-        target_id: 'card-1',
-        transaction_id: 102n,
-        created_at: new Date('2026-07-02T02:00:00.000Z'),
+        event_type: 'LIST_CREATED',
+        target_type: 'LIST',
+        target_id: 'list-1',
+        transaction_id: 104n,
+        created_at: new Date('2026-07-03T03:00:00.000Z'),
       },
       {
         actor_user_id: null,
@@ -94,31 +76,31 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
         created_at: new Date('2026-07-02T03:00:00.000Z'),
       },
       {
-        actor_user_id: USER_ID,
-        operation: 'INSERT',
-        event_type: 'LIST_CREATED',
-        target_type: 'LIST',
-        target_id: 'list-1',
-        transaction_id: 104n,
-        created_at: new Date('2026-07-03T03:00:00.000Z'),
+        actor_user_id: DELETED_USER_ID,
+        operation: 'UPDATE',
+        event_type: 'CARD_COMPLETED',
+        target_type: 'CARD',
+        target_id: 'card-1',
+        transaction_id: 102n,
+        created_at: new Date('2026-07-02T02:00:00.000Z'),
       },
       {
         actor_user_id: USER_ID,
         operation: 'INSERT',
-        event_type: 'WORKSPACE_CREATED',
-        target_type: 'WORKSPACE',
-        target_id: WORKSPACE_ID,
-        transaction_id: 105n,
-        created_at: new Date('2026-07-03T04:00:00.000Z'),
+        event_type: 'COMMENT_CREATED',
+        target_type: 'COMMENT',
+        target_id: 'comment-1',
+        transaction_id: 101n,
+        created_at: new Date('2026-07-01T01:00:01.000Z'),
       },
       {
         actor_user_id: USER_ID,
         operation: 'INSERT',
-        event_type: 'LIST_CREATED',
-        target_type: 'LIST',
-        target_id: 'old-list',
-        transaction_id: 104n,
-        created_at: new Date('2026-06-30T03:00:00.000Z'),
+        event_type: 'CARD_CREATED',
+        target_type: 'CARD',
+        target_id: 'card-1',
+        transaction_id: 101n,
+        created_at: new Date('2026-07-01T01:00:00.000Z'),
       },
     ]
   })
@@ -128,7 +110,6 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
       {
         id: 'todo-list',
         name: 'Todo',
-        is_done: false,
         cards: [
           { is_completed: true },
           { is_completed: false },
@@ -137,7 +118,6 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
       {
         id: 'done-list',
         name: 'Done',
-        is_done: true,
         cards: [
           { is_completed: true },
           { is_completed: true },
@@ -227,14 +207,12 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
     {
       list_id: 'todo-list',
       name: 'Todo',
-      is_done: false,
       card_count: 2,
       completed_card_count: 1,
     },
     {
       list_id: 'done-list',
       name: 'Done',
-      is_done: true,
       card_count: 3,
       completed_card_count: 2,
     },
@@ -272,12 +250,6 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
   })
   assert.equal(result.recent_activity[1].actor, null)
   assert.equal(result.recent_activity[2].actor, null)
-  assert.equal(
-    result.recent_activity.some(
-      (activity) => activity.event_type === 'WORKSPACE_CREATED',
-    ),
-    false,
-  )
   assert.doesNotThrow(() => JSON.stringify(result))
 })
 
@@ -329,15 +301,20 @@ test('dashboard applies a seven-day window and caps the newest activity feed at 
     members: [],
   }))
   stubMethod(t, prisma.activityLog, 'findMany', async () =>
-    Array.from({ length: 52 }, (_, index) => ({
-      actor_user_id: null,
-      operation: 'UPDATE',
-      event_type: 'CARD_UPDATED',
-      target_type: 'CARD',
-      target_id: `card-${index}`,
-      transaction_id: BigInt(index + 1),
-      created_at: new Date(`2026-07-30T00:00:${String(index).padStart(2, '0')}.000Z`),
-    })),
+    Array.from({ length: 52 }, (_, index) => {
+      const descendingIndex = 51 - index
+      return {
+        actor_user_id: null,
+        operation: 'UPDATE',
+        event_type: 'CARD_UPDATED',
+        target_type: 'CARD',
+        target_id: `card-${descendingIndex}`,
+        transaction_id: BigInt(descendingIndex + 1),
+        created_at: new Date(
+          `2026-07-30T00:00:${String(descendingIndex).padStart(2, '0')}.000Z`,
+        ),
+      }
+    }),
   )
   stubMethod(t, prisma.list, 'findMany', async () => [])
 

@@ -1,15 +1,22 @@
 import type { RequestHandler } from 'express'
+import { authenticatedUserId } from '../../middleware/auth'
 import * as friendService from './friend.service'
-import { friendRequestSchema, friendUserIdSchema } from './friend.validation'
+import { friendRequestSchema } from './friend.validation'
+
+interface FriendUserParams {
+  friendUserId: string
+}
 
 export const list: RequestHandler = async (req, res) => {
-  const friends = await friendService.listFriends({ userId: req.user!.id })
+  const friends = await friendService.listFriends({
+    userId: authenticatedUserId(req),
+  })
   res.status(200).json(friends)
 }
 
 export const listRequests: RequestHandler = async (req, res) => {
   const requests = await friendService.listFriendRequests({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
   })
   res.status(200).json(requests)
 }
@@ -17,35 +24,32 @@ export const listRequests: RequestHandler = async (req, res) => {
 export const sendRequest: RequestHandler = async (req, res) => {
   const body = friendRequestSchema.parse(req.body)
   const request = await friendService.sendFriendRequest({
-    userId: req.user!.id,
+    userId: authenticatedUserId(req),
     email: body.email,
   })
   res.status(201).json(request)
 }
 
-export const acceptRequest: RequestHandler = async (req, res) => {
-  const requesterUserId = friendUserIdSchema.parse(req.params.friendUserId)
+export const acceptRequest: RequestHandler<FriendUserParams> = async (req, res) => {
   const friend = await friendService.acceptFriendRequest({
-    userId: req.user!.id,
-    requesterUserId,
+    userId: authenticatedUserId(req),
+    requesterUserId: req.params.friendUserId,
   })
   res.status(201).json(friend)
 }
 
-export const deleteRequest: RequestHandler = async (req, res) => {
-  const otherUserId = friendUserIdSchema.parse(req.params.friendUserId)
+export const deleteRequest: RequestHandler<FriendUserParams> = async (req, res) => {
   await friendService.deleteFriendRequest({
-    userId: req.user!.id,
-    otherUserId,
+    userId: authenticatedUserId(req),
+    otherUserId: req.params.friendUserId,
   })
   res.status(204).send()
 }
 
-export const remove: RequestHandler = async (req, res) => {
-  const friendUserId = friendUserIdSchema.parse(req.params.friendUserId)
+export const remove: RequestHandler<FriendUserParams> = async (req, res) => {
   await friendService.removeFriend({
-    userId: req.user!.id,
-    friendUserId,
+    userId: authenticatedUserId(req),
+    friendUserId: req.params.friendUserId,
   })
   res.status(204).send()
 }

@@ -3,11 +3,8 @@ import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { openApiDocument } from './docs/openapi';
 import { authRouter, googleCallback } from './modules/auth';
-import { workspaceRouter } from './modules/workspace';
-import { listRouter } from './modules/list';
-import { cardRouter, commentRouter, inboxRouter } from './modules/card';
-import { friendRouter } from './modules/friend';
 import { errorHandler } from './errors';
+import { protectedApiRouter } from './routes/protected-api.router';
 
 const app = express();
 
@@ -35,12 +32,7 @@ app.use(
 app.get('/oauth/google', googleCallback);
 
 app.use('/api/auth', authRouter);
-app.use('/api/workspaces', workspaceRouter);
-app.use('/api/lists', listRouter);
-app.use('/api/cards', cardRouter);
-app.use('/api/comments', commentRouter);
-app.use('/api/friends', friendRouter);
-app.use('/api/inbox', inboxRouter);
+app.use('/api', protectedApiRouter);
 app.use(errorHandler);
 
 export default app;

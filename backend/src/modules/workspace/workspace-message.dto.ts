@@ -1,25 +1,21 @@
-import type { User, WorkspaceMessage } from '@prisma/client'
+import type { WorkspaceMessage } from '@prisma/client'
 import { z } from 'zod'
+import { messageBaseDtoSchema } from '../../lib/messaging'
+import {
+  toUserSummary,
+  type SelectedUserSummary,
+} from '../../lib/user-summary'
+import { uuidSchema } from '../../lib/validation'
 
-export const workspaceMessageDtoSchema = z
-  .object({
-    id: z.string().uuid(),
-    workspace_id: z.string().uuid(),
-    card_id: z.string().uuid().nullable(),
-    content: z.string().min(1).max(1000),
-    created_at: z.string().datetime(),
-    author: z
-      .object({
-        user_id: z.string().uuid(),
-        name: z.string().min(1),
-        profile_image_url: z.string().nullable(),
-      })
-      .strict(),
+export const workspaceMessageDtoSchema = messageBaseDtoSchema
+  .extend({
+    workspace_id: uuidSchema,
+    card_id: uuidSchema.nullable(),
   })
   .strict()
 
 type WorkspaceMessageWithAuthor = WorkspaceMessage & {
-  user: Pick<User, 'id' | 'name' | 'profile_image_url'>
+  user: SelectedUserSummary
 }
 
 export type WorkspaceMessageDto = z.infer<typeof workspaceMessageDtoSchema>
@@ -33,10 +29,6 @@ export function toWorkspaceMessageDto(
     card_id: message.card_id,
     content: message.content,
     created_at: message.created_at.toISOString(),
-    author: {
-      user_id: message.user.id,
-      name: message.user.name,
-      profile_image_url: message.user.profile_image_url,
-    },
+    author: toUserSummary(message.user),
   })
 }

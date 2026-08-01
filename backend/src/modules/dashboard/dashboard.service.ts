@@ -1,10 +1,7 @@
-import type {
-  ActivityEventType,
-  ActivityOperation,
-  ActivityTargetType,
-} from '@prisma/client'
+import type { ActivityTargetType } from '@prisma/client'
 import { prisma } from '../../db'
-import { ForbiddenError, NotFoundError } from '../../errors'
+import { userSummarySelect } from '../../lib/user-summary'
+import { requireWorkspaceReadAccess } from '../../lib/workspace-permissions'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -15,16 +12,6 @@ const TARGET_TYPES: ActivityTargetType[] = [
   'CARD',
   'COMMENT',
 ]
-
-type DashboardActivityLog = {
-  actor_user_id: string | null
-  operation: ActivityOperation
-  event_type: ActivityEventType
-  target_type: ActivityTargetType
-  target_id: string
-  transaction_id: bigint
-  created_at: Date
-}
 
 function startOfUtcDay(value: Date): Date {
   return new Date(Date.UTC(
@@ -47,34 +34,23 @@ function roundPercentage(done: number, total: number): number {
   return Math.round((done / total) * 1000) / 10
 }
 
-async function requireDashboardReadAccess(
-  workspaceId: string,
-  userId: string,
-): Promise<void> {
-  const workspace = await prisma.workspace.findFirst({
-    where: { id: workspaceId, deleted_at: null },
-    select: {
-      is_public: true,
-      members: {
-        where: { user_id: userId, deleted_at: null },
-        select: { user_id: true },
-      },
-    },
-  })
-
-  if (!workspace) throw new NotFoundError()
-  if (!workspace.is_public && workspace.members.length === 0) {
-    throw new ForbiddenError()
-  }
-}
-
 export async function getWorkspaceDashboard(input: {
   userId: string
   workspaceId: string
   periodDays: 7 | 30 | 90 | 365
   now?: Date
 }) {
-  await requireDashboardReadAccess(input.workspaceId, input.userId)
+  const workspace = await prisma.workspace.findFirst({
+    where: { id: input.workspaceId, deleted_at: null },
+    select: {
+      is_public: true,
+      members: {
+        where: { user_id: input.userId, deleted_at: null },
+        select: { user_id: true },
+      },
+    },
+  })
+  requireWorkspaceReadAccess(workspace, input.userId)
 
   const generatedAt = input.now ?? new Date()
   const today = startOfUtcDay(generatedAt)
@@ -112,7 +88,6 @@ export async function getWorkspaceDashboard(input: {
       select: {
         id: true,
         name: true,
-        is_done: true,
         cards: {
           where: { deleted_at: null },
           select: {
@@ -139,16 +114,7 @@ export async function getWorkspaceDashboard(input: {
   let completedInPeriod = 0
   let reopenedInPeriod = 0
 
-  const periodLogs = (logs as DashboardActivityLog[])
-    .filter(
-      (log) =>
-        log.event_type !== 'WORKSPACE_CREATED' &&
-        log.created_at >= periodStart &&
-        log.created_at < tomorrow,
-    )
-    .sort((left, right) => right.created_at.getTime() - left.created_at.getTime())
-
-  for (const log of periodLogs) {
+  for (const log of logs) {
     const date = utcDateKey(log.created_at)
     const activity = activityByDate.get(date) ?? {
       transactions: new Set<string>(),
@@ -178,7 +144,7 @@ export async function getWorkspaceDashboard(input: {
     flowByDate.set(date, flow)
   }
 
-  const recentLogs = periodLogs.slice(0, 50)
+  const recentLogs = logs.slice(0, 50)
   const actorIds = Array.from(
     new Set(
       recentLogs
@@ -192,11 +158,7 @@ export async function getWorkspaceDashboard(input: {
           id: { in: actorIds },
           deleted_at: null,
         },
-        select: {
-          id: true,
-          name: true,
-          profile_image_url: true,
-        },
+        select: userSummarySelect,
       })
     : []
   const actorById = new Map(actors.map((actor) => [actor.id, actor]))
@@ -204,7 +166,6 @@ export async function getWorkspaceDashboard(input: {
   const listSummaries = lists.map((list) => ({
     list_id: list.id,
     name: list.name,
-    is_done: list.is_done,
     card_count: list.cards.length,
     completed_card_count: list.cards.filter((card) => card.is_completed).length,
   }))

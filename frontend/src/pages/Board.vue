@@ -557,19 +557,6 @@ async function onRenameList(listId: string, name: string) {
   }
 }
 
-async function onToggleListDone(listId: string, isDone: boolean) {
-  if (!props.canEditBoard) return
-  try {
-    await ListAPI.update(listId, { is_done: isDone })
-    queueFullRefresh()
-  } catch (e) {
-    error.value =
-      e instanceof Error
-        ? e.message
-        : '리스트의 완료 단계를 변경하지 못했습니다.'
-  }
-}
-
 async function onDeleteList(listId: string) {
   if (!props.canEditBoard) return
   try {
@@ -710,7 +697,6 @@ onUnmounted(() => {
           @delete-card="onDeleteCard"
           @toggle-card-completion="onToggleCardCompletion"
           @rename-list="onRenameList"
-          @toggle-list-done="onToggleListDone"
           @delete-list="onDeleteList"
         />
       </template>
