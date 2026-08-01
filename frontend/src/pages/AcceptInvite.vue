@@ -64,9 +64,12 @@ async function switchAccount() {
         <p class="invite-status">초대 정보를 불러오는 중입니다…</p>
       </template>
       <template v-else-if="error && !invitation">
+        <p class="invite-eyebrow">워크스페이스 초대</p>
         <h1>초대를 확인할 수 없습니다</h1>
         <p class="error" role="alert">{{ error }}</p>
-        <RouterLink to="/workspaces" class="home-link">워크스페이스로 이동</RouterLink>
+        <div class="invite-actions">
+          <RouterLink to="/workspaces" class="accept-button">워크스페이스로 이동</RouterLink>
+        </div>
       </template>
       <template v-else-if="invitation">
         <p class="invite-eyebrow">워크스페이스 초대</p>
