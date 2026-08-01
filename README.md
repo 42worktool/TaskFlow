@@ -20,7 +20,7 @@ HTTP controllers or the Vue component tree.
 - Rotating Redis-backed refresh sessions and short-lived JWT access tokens.
 - Public and private workspaces with `OWNER`, `ADMIN`, `MEMBER`, and `VIEWER`
   roles.
-- Email invitation links bound to the invited account.
+- Redis-backed, one-time email invitation links accepted by any signed-in account.
 - Kanban lists and cards with drag-and-drop reordering.
 - Realtime list-level board synchronization across workspace members.
 - Editable card titles, descriptions, start dates, and deadlines.
@@ -294,7 +294,7 @@ guessing an identity where the repository does not prove one.
 | --- | --- | --- |
 | Authentication and account | Password login, Google OAuth, refresh rotation, account edit/delete, OpenAPI | `Sean Kim`; frontend integration by `KHR416` / `wchoe` |
 | Workspace and permissions | CRUD, role checks, member removal, final-owner guard, public data projection | `Saususge`, `copilot-swe-agent[bot]`, `seankim96` |
-| Email invitations | JWT invitation link, account binding, Redis queue, per-address limit | `Saususge`, `seankim96` |
+| Email invitations | One-time Redis invitation, explicit account confirmation, mail queue, per-address limit | `Saususge`, `seankim96` |
 | Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
 | Personal inbox | API-backed cards, board/inbox drag round trip, and edge scrolling | `seankim96` |
 | Calendar and search | Range-bar workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
@@ -374,7 +374,8 @@ requirements.
   invitation workstream in the project plan.
 - Coordinated workspace/member management requirements.
 - Challenge: invitations span authorization, email, and account lifecycle.
-  Resolution: used signed, expiring, email-bound links with a queued SMTP send.
+  Resolution: used expiring, one-time bearer links with explicit account
+  confirmation and a queued SMTP send.
 
 ### yeonjuki — Tech Lead
 

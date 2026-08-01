@@ -70,8 +70,16 @@ export interface InviteMemberResponse {
   ok: true;
 }
 
+// GET /api/workspaces/invite/{token} -> 200
+// Reads invitation metadata without claiming or consuming the token.
+export interface InvitationPreviewResponse {
+  workspace_id: string;
+  workspace_name: string;
+  role: Exclude<Role, 'OWNER'>;
+}
+
 // POST /api/workspaces/invite/{token} -> 200
-// The authenticated user's normalized email must match the invitation email.
+// The signed-in account claims and consumes the one-time bearer invitation.
 export type AcceptInviteResponse = WorkspaceDto;
 
 // PUT /api/workspaces/{workspace_id}/members/{user_id} -> 200, ADMIN+

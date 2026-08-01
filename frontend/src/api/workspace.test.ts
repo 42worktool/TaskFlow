@@ -31,4 +31,28 @@ describe('WorkspaceAPI', () => {
       },
     )
   })
+
+  it('previews an invitation before explicitly accepting it', async () => {
+    const preview = {
+      workspace_id: 'workspace-1',
+      workspace_name: 'Design',
+      role: 'MEMBER' as const,
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(preview).mockResolvedValueOnce({
+      id: 'workspace-1',
+    })
+
+    await expect(WorkspaceAPI.previewInvite('invite-token')).resolves.toBe(preview)
+    await WorkspaceAPI.acceptInvite('invite-token')
+
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      1,
+      '/api/workspaces/invite/invite-token',
+    )
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      2,
+      '/api/workspaces/invite/invite-token',
+      { method: 'POST' },
+    )
+  })
 })

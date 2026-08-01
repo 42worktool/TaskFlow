@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import test, { type TestContext } from 'node:test'
-import jwt from 'jsonwebtoken'
 import type { Role } from '@prisma/client'
 
 const USER_ID = '00000000-0000-4000-8000-000000000001'
@@ -383,31 +382,32 @@ test('workspace member removal protects ADMIN and OWNER targets', async (t) => {
   }
 })
 
-test('workspace invitation acceptance is bound to the invited email', async (t) => {
+test('workspace invitations are one-time bearer invitations', async (t) => {
   setRequiredEnvironment()
   const [
     { prisma },
-    { config },
     { realtime },
-    { acceptInvite, generateInviteToken },
+    { workspaceInvitationStore },
+    { acceptInvite, previewInvite },
   ] = await Promise.all([
     import('../../db'),
-    import('../../config'),
     import('../../realtime'),
+    import('../../lib/workspace-invitation-store'),
     import('./workspace.service'),
   ])
+  const invitation = {
+    workspaceId: WORKSPACE_ID,
+    role: 'MEMBER' as const,
+    deliveryEmail: 'invitee@example.com',
+    createdBy: OWNER_ID,
+    status: 'claimed' as const,
+    claimedBy: USER_ID,
+  }
 
-  await t.test('rejects a token that is not a workspace invitation', async () => {
-    const accessLikeToken = jwt.sign({}, config.jwtAccessSecret, {
-      algorithm: 'HS256',
-      subject: USER_ID,
-      issuer: config.jwtIssuer,
-      audience: config.jwtAudience,
-      expiresIn: 60,
-    })
-
+  await t.test('rejects an invalid invitation token', async (t) => {
+    stubMethod(t, workspaceInvitationStore, 'claim', async () => ({ status: 'missing' }))
     await assert.rejects(
-      () => acceptInvite({ userId: USER_ID, token: accessLikeToken }),
+      () => acceptInvite({ userId: USER_ID, token: 'invalid' }),
       (error: unknown) =>
         typeof error === 'object' &&
         error !== null &&
@@ -416,68 +416,50 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
     )
   })
 
-  await t.test('rejects a different signed-in account', async (t) => {
-    stubMethod(t, prisma.user, 'findFirst', async () => ({
-      email: 'other@example.com',
-      name: 'Other',
-      profile_image_url: null,
-    }))
-    const deliveries: unknown[][] = []
-    stubMethod(t, realtime, 'sendToUser', (...args) => {
-      deliveries.push(args)
-    })
-
+  await t.test('rejects an invitation claimed by another account', async (t) => {
+    stubMethod(t, workspaceInvitationStore, 'claim', async () => ({ status: 'claimed' }))
     await assert.rejects(
-      () =>
-        acceptInvite({
-          userId: USER_ID,
-          token: generateInviteToken(
-            WORKSPACE_ID,
-            'MEMBER',
-            'invitee@example.com',
-          ),
-        }),
+      () => acceptInvite({ userId: USER_ID, token: 'token' }),
       (error: unknown) =>
         typeof error === 'object' &&
         error !== null &&
         'code' in error &&
-        error.code === 'INVITE_EMAIL_MISMATCH',
+        error.code === 'INVITE_ALREADY_CLAIMED',
     )
-    assert.equal(deliveries.length, 0)
   })
 
-  await t.test('does not notify when an active member reuses the link', async (t) => {
-    stubMethod(t, prisma.user, 'findFirst', async () => ({
-      email: 'invitee@example.com',
-      name: 'Invitee',
-      profile_image_url: null,
+  await t.test('previews without consuming the invitation', async (t) => {
+    stubMethod(t, workspaceInvitationStore, 'preview', async () => ({
+      status: 'available',
+      invitation: { ...invitation, status: 'available', claimedBy: null },
     }))
-    stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
-    stubMethod(t, prisma.workspaceMember, 'findUnique', async () => ({
-      deleted_at: null,
+    let consumeCount = 0
+    stubMethod(t, workspaceInvitationStore, 'consume', async () => {
+      consumeCount += 1
+      return true
+    })
+    stubMethod(t, prisma.workspace, 'findFirst', async () => ({
+      id: WORKSPACE_ID,
+      name: 'Workspace',
     }))
-    const deliveries: unknown[][] = []
-    stubMethod(t, realtime, 'sendToUser', (...args) => {
-      deliveries.push(args)
-    })
 
-    const accepted = await acceptInvite({
-      userId: USER_ID,
-      token: generateInviteToken(
-        WORKSPACE_ID,
-        'MEMBER',
-        'invitee@example.com',
-      ),
-    })
+    const preview = await previewInvite({ userId: USER_ID, token: 'token' })
 
-    assert.equal(accepted.id, WORKSPACE_ID)
-    assert.equal(deliveries.length, 0)
+    assert.deepEqual(preview, {
+      workspace_id: WORKSPACE_ID,
+      workspace_name: 'Workspace',
+      role: 'MEMBER',
+    })
+    assert.equal(consumeCount, 0)
   })
 
-  await t.test('accepts a case-insensitive email match', async (t) => {
+  await t.test('accepts with a different TaskFlow account email', async (t) => {
+    stubMethod(t, workspaceInvitationStore, 'claim', async () => ({
+      status: 'available',
+      invitation,
+    }))
     stubMethod(t, prisma.user, 'findFirst', async () => ({
-      email: 'invitee@example.com',
-      name: 'Invitee',
+      name: 'Other',
       profile_image_url: null,
     }))
     stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
@@ -490,6 +472,10 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
       membershipCreate = args
       return {}
     })
+    stubMethod(t, workspaceInvitationStore, 'consume', async () => {
+      operationOrder.push('consume')
+      return true
+    })
     const deliveries: unknown[][] = []
     stubMethod(t, realtime, 'sendToUser', (...args) => {
       operationOrder.push('notification')
@@ -498,11 +484,7 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
 
     const accepted = await acceptInvite({
       userId: USER_ID,
-      token: generateInviteToken(
-        WORKSPACE_ID,
-        'MEMBER',
-        'Invitee@Example.COM',
-      ),
+      token: 'token',
     })
 
     assert.equal(accepted.id, WORKSPACE_ID)
@@ -522,7 +504,28 @@ test('workspace invitation acceptance is bound to the invited email', async (t) 
       (deliveries[0]?.[2] as { kind?: unknown }).kind,
       'workspace.member_joined',
     )
-    assert.deepEqual(operationOrder, ['membership', 'notification'])
+    assert.deepEqual(operationOrder, ['membership', 'consume', 'notification'])
+  })
+
+  await t.test('consumes without notifying when the claimant is already a member', async (t) => {
+    stubMethod(t, workspaceInvitationStore, 'claim', async () => ({
+      status: 'available',
+      invitation,
+    }))
+    stubMethod(t, workspaceInvitationStore, 'consume', async () => true)
+    stubMethod(t, prisma.user, 'findFirst', async () => ({
+      name: 'Invitee',
+      profile_image_url: null,
+    }))
+    stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
+    stubMethod(t, prisma.workspaceMember, 'findUnique', async () => ({ deleted_at: null }))
+    const deliveries: unknown[][] = []
+    stubMethod(t, realtime, 'sendToUser', (...args) => deliveries.push(args))
+
+    const accepted = await acceptInvite({ userId: USER_ID, token: 'token' })
+
+    assert.equal(accepted.id, WORKSPACE_ID)
+    assert.equal(deliveries.length, 0)
   })
 })
 

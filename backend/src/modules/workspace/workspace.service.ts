@@ -5,7 +5,6 @@
 // Authorization checks are done here; the controller only handles
 // HTTP concerns (parsing, validation, status codes).
 // ============================================================
-import jwt from 'jsonwebtoken'
 import { prisma } from '../../db'
 import { config } from '../../config'
 import { AppError, ForbiddenError, NotFoundError } from '../../errors'
@@ -20,6 +19,7 @@ import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
 import { normalizeEmail } from '../../lib/validation'
+import { workspaceInvitationStore } from '../../lib/workspace-invitation-store'
 import { notifyWorkspaceMemberJoined } from '../notification/notification.service'
 import { isUserOnline } from '../presence/presence.state'
 import { realtime } from '../../realtime'
@@ -32,28 +32,18 @@ import {
   workspaceChannel,
 } from './workspace.realtime'
 
-const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
-const WORKSPACE_INVITE_AUDIENCE = 'workspace-invite'
-const INVITE_ROLES = new Set<Role>(['ADMIN', 'MEMBER', 'VIEWER'])
-
-interface InvitePayload {
-  workspace_id: string
-  role: Role
-  email: string
-}
-
 class InviteTokenError extends AppError {
   constructor() {
     super('INVITE_TOKEN_INVALID', 400, 'invalid or expired invite token')
   }
 }
 
-class InviteEmailMismatchError extends AppError {
+class InviteAlreadyClaimedError extends AppError {
   constructor() {
     super(
-      'INVITE_EMAIL_MISMATCH',
-      403,
-      'this invitation was sent to another email address',
+      'INVITE_ALREADY_CLAIMED',
+      409,
+      'this invitation has already been claimed by another account',
     )
   }
 }
@@ -352,52 +342,6 @@ export async function removeMember(input: {
   )
 }
 
-/**
- * Generate a signed invite token. The caller sends this link by email.
- */
-export function generateInviteToken(
-  workspaceId: string,
-  role: Exclude<Role, 'OWNER'>,
-  email: string,
-): string {
-  return jwt.sign(
-    { workspace_id: workspaceId, role, email },
-    config.jwtAccessSecret,
-    {
-      algorithm: 'HS256',
-      issuer: config.jwtIssuer,
-      audience: WORKSPACE_INVITE_AUDIENCE,
-      expiresIn: INVITE_TTL_SECONDS,
-    },
-  )
-}
-
-function verifyInviteToken(token: string): InvitePayload {
-  try {
-    const payload = jwt.verify(token, config.jwtAccessSecret, {
-      algorithms: ['HS256'],
-      issuer: config.jwtIssuer,
-      audience: WORKSPACE_INVITE_AUDIENCE,
-    })
-    if (
-      typeof payload !== 'object' ||
-      typeof payload.workspace_id !== 'string' ||
-      typeof payload.email !== 'string' ||
-      !INVITE_ROLES.has(payload.role as Role)
-    ) {
-      throw new InviteTokenError()
-    }
-    return {
-      workspace_id: payload.workspace_id,
-      role: payload.role as Role,
-      email: normalizeEmail(payload.email),
-    }
-  } catch (error) {
-    if (error instanceof InviteTokenError) throw error
-    throw new InviteTokenError()
-  }
-}
-
 export async function inviteWorkspaceMember(input: {
   userId: string
   workspaceId: string
@@ -410,37 +354,66 @@ export async function inviteWorkspaceMember(input: {
     workspaceId: input.workspaceId,
   })
   await requireWorkspaceRole(input.workspaceId, input.userId, 'ADMIN')
+  await checkMailRateLimit(email)
 
-  const token = generateInviteToken(
-    input.workspaceId,
-    input.role,
-    email,
-  )
+  const token = await workspaceInvitationStore.create({
+    workspaceId: input.workspaceId,
+    role: input.role,
+    deliveryEmail: email,
+    createdBy: input.userId,
+  })
   const inviteUrl = `${config.appOrigin}/invite/${token}`
 
-  await checkMailRateLimit(email)
-  await enqueue({
-    to: email,
-    ...inviteEmail(workspace.name, inviteUrl),
-  })
+  try {
+    await enqueue({
+      to: email,
+      ...inviteEmail(workspace.name, inviteUrl),
+    })
+  } catch (error) {
+    await workspaceInvitationStore.discard(token)
+    throw error
+  }
 }
 
 /**
- * Accept an invite: verify the token and add the user as a member.
+ * Preview an invite without claiming or consuming it.
+ */
+export async function previewInvite(input: { userId: string; token: string }) {
+  const result = await workspaceInvitationStore.preview(input.token, input.userId)
+  if (result.status === 'missing') throw new InviteTokenError()
+  if (result.status === 'claimed') throw new InviteAlreadyClaimedError()
+
+  const workspace = await prisma.workspace.findFirst({
+    where: { id: result.invitation.workspaceId, deleted_at: null },
+    select: { id: true, name: true },
+  })
+  if (!workspace) throw new InviteTokenError()
+
+  return {
+    workspace_id: workspace.id,
+    workspace_name: workspace.name,
+    role: result.invitation.role,
+  }
+}
+
+/**
+ * Claim an invite for the signed-in user and add them as a member.
  * Returns the workspace DTO on success.
  */
 export async function acceptInvite(input: { userId: string; token: string }) {
-  const payload = verifyInviteToken(input.token)
+  const claimed = await workspaceInvitationStore.claim(input.token, input.userId)
+  if (claimed.status === 'missing') throw new InviteTokenError()
+  if (claimed.status === 'claimed') throw new InviteAlreadyClaimedError()
+  const invitation = claimed.invitation
+
   const invitee = await prisma.user.findFirst({
     where: { id: input.userId, deleted_at: null },
-    select: { email: true, name: true, profile_image_url: true },
+    select: { name: true, profile_image_url: true },
   })
-  if (!invitee || normalizeEmail(invitee.email) !== payload.email) {
-    throw new InviteEmailMismatchError()
-  }
+  if (!invitee) throw new InviteTokenError()
 
   const ws = await prisma.workspace.findFirst({
-    where: { id: payload.workspace_id, deleted_at: null },
+    where: { id: invitation.workspaceId, deleted_at: null },
     include: workspaceInclude,
   })
 
@@ -449,13 +422,14 @@ export async function acceptInvite(input: { userId: string; token: string }) {
   const existing = await prisma.workspaceMember.findUnique({
     where: {
       workspace_id_user_id: {
-        workspace_id: payload.workspace_id,
+        workspace_id: invitation.workspaceId,
         user_id: input.userId,
       },
     },
   })
 
   if (existing?.deleted_at === null) {
+    await workspaceInvitationStore.consume(input.token, input.userId)
     return toWorkspaceDto(ws, { includeMemberEmail: true })
   }
 
@@ -463,27 +437,29 @@ export async function acceptInvite(input: { userId: string; token: string }) {
     await prisma.workspaceMember.update({
       where: {
         workspace_id_user_id: {
-          workspace_id: payload.workspace_id,
+          workspace_id: invitation.workspaceId,
           user_id: input.userId,
         },
       },
-      data: { role: payload.role, ...restoredBy(input.userId) },
+      data: { role: invitation.role, ...restoredBy(input.userId) },
     })
   } else {
     await prisma.workspaceMember.create({
       data: {
-        workspace_id: payload.workspace_id,
+        workspace_id: invitation.workspaceId,
         user_id: input.userId,
-        role: payload.role,
+        role: invitation.role,
         ...createdBy(input.userId),
       },
     })
   }
 
   const updated = await prisma.workspace.findFirst({
-    where: { id: payload.workspace_id, deleted_at: null },
+    where: { id: invitation.workspaceId, deleted_at: null },
     include: workspaceInclude,
   })
+
+  await workspaceInvitationStore.consume(input.token, input.userId)
 
   notifyWorkspaceMemberJoined({
     recipientUserIds: ws.members.map((member) => member.user_id),
@@ -497,7 +473,7 @@ export async function acceptInvite(input: { userId: string; token: string }) {
   })
 
   publishWorkspaceChange({
-    workspace_id: payload.workspace_id,
+    workspace_id: invitation.workspaceId,
     entity: 'member',
     action: 'created',
     entity_id: input.userId,
@@ -506,7 +482,7 @@ export async function acceptInvite(input: { userId: string; token: string }) {
   })
   if (isUserOnline(input.userId)) {
     publishWorkspacePresenceChanged({
-      workspace_id: payload.workspace_id,
+      workspace_id: invitation.workspaceId,
       user_id: input.userId,
       online: true,
     })
