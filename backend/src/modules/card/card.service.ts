@@ -6,12 +6,14 @@
 // list_id === null are personal inbox cards; access to those is by
 // ownership (user_id), not workspace role.
 // ============================================================
+import path from 'node:path'
 import { prisma } from '../../db'
 import type { Card, List, Prisma, Role } from '@prisma/client'
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../errors'
 import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
 import { userSummarySelect } from '../../lib/user-summary'
+import { UPLOAD_DIR, deleteUploadedFile } from '../../lib/upload'
 import {
   getWorkspaceRole,
   requireWorkspaceRole,
@@ -687,8 +689,7 @@ export async function addAttachment(
   input: {
     userId: string
     cardId: string
-    fileUrl: string
-    fileName: string
+    file: Express.Multer.File
   },
 ) {
   const card = await getCardOrThrow(input.cardId)
@@ -698,8 +699,10 @@ export async function addAttachment(
   const attachment = await prisma.attachment.create({
     data: {
       card_id: input.cardId,
-      file_url: input.fileUrl,
-      file_name: input.fileName,
+      storage_key: input.file.filename,
+      file_name: input.file.originalname,
+      mime_type: input.file.mimetype,
+      size_bytes: input.file.size,
       ...createdBy(input.userId),
     },
   })
@@ -711,6 +714,24 @@ export async function addAttachment(
     action: 'updated',
   })
   return dto
+}
+
+export async function getAttachmentFile(input: {
+  userId: string
+  attachmentId: string
+}): Promise<{ absolutePath: string; fileName: string; mimeType: string | null }> {
+  const attachment = await prisma.attachment.findFirst({
+    where: { id: input.attachmentId, deleted_at: null },
+  })
+  if (!attachment || !attachment.storage_key) throw new NotFoundError()
+  const card = await getCardOrThrow(attachment.card_id)
+  await requireCardRole(card, input.userId)
+
+  return {
+    absolutePath: path.join(UPLOAD_DIR, 'attachments', attachment.storage_key),
+    fileName: attachment.file_name ?? 'file',
+    mimeType: attachment.mime_type,
+  }
 }
 
 export async function removeAttachment(input: {
@@ -729,6 +750,9 @@ export async function removeAttachment(input: {
     where: { id: input.attachmentId },
     data: softDeletedBy(input.userId),
   })
+  if (attachment.storage_key) {
+    await deleteUploadedFile('attachments', attachment.storage_key)
+  }
 
   publishCardChange({
     userId: input.userId,

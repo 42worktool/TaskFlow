@@ -2,13 +2,19 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import LegalFooter from '../components/LegalFooter.vue'
-import { authState, deleteAccount, updateAccount } from '../services/auth'
+import { authState, deleteAccount, removeAvatar, updateAccount, uploadAvatar } from '../services/auth'
+import { AVATAR_MAX_BYTES, AVATAR_MIME_ALLOWLIST } from '../utils/uploadLimits'
 
 const router = useRouter()
 const name = ref(authState.user?.name ?? '')
 const message = ref('')
 const error = ref('')
 const saving = ref(false)
+
+const avatarInput = ref<HTMLInputElement | null>(null)
+const avatarUploading = ref(false)
+const avatarProgress = ref(0)
+const avatarError = ref('')
 
 async function saveProfile() {
   saving.value = true
@@ -21,6 +27,51 @@ async function saveProfile() {
     error.value = caught instanceof Error ? caught.message : '계정 정보를 저장하지 못했습니다.'
   } finally {
     saving.value = false
+  }
+}
+
+function triggerAvatarPicker() {
+  avatarInput.value?.click()
+}
+
+async function onAvatarSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  input.value = ''
+  if (!file) return
+
+  avatarError.value = ''
+  if (file.size > AVATAR_MAX_BYTES) {
+    avatarError.value = '파일 용량은 3MB를 넘을 수 없습니다.'
+    return
+  }
+  if (!AVATAR_MIME_ALLOWLIST.has(file.type)) {
+    avatarError.value = '지원하지 않는 파일 형식입니다.'
+    return
+  }
+
+  avatarUploading.value = true
+  avatarProgress.value = 0
+  try {
+    await uploadAvatar(file, (percent) => {
+      avatarProgress.value = percent
+    })
+  } catch (caught) {
+    avatarError.value = caught instanceof Error ? caught.message : '사진을 업로드하지 못했습니다.'
+  } finally {
+    avatarUploading.value = false
+  }
+}
+
+async function removeAvatarPhoto() {
+  avatarError.value = ''
+  avatarUploading.value = true
+  try {
+    await removeAvatar()
+  } catch (caught) {
+    avatarError.value = caught instanceof Error ? caught.message : '사진을 삭제하지 못했습니다.'
+  } finally {
+    avatarUploading.value = false
   }
 }
 
@@ -53,15 +104,24 @@ async function removeAccount() {
       <p class="account-description">로그인 계정과 내 정보를 관리합니다.</p>
 
       <div class="identity-row">
-        <img
-          v-if="authState.user?.profile_image_url"
-          :src="authState.user.profile_image_url"
-          alt=""
-          class="account-avatar"
-          referrerpolicy="no-referrer"
-        />
-        <div v-else class="account-avatar account-avatar--fallback">
-          {{ authState.user?.name.charAt(0).toUpperCase() }}
+        <div class="account-avatar-wrap">
+          <img
+            v-if="authState.user?.profile_image_url"
+            :src="authState.user.profile_image_url"
+            alt=""
+            class="account-avatar"
+            referrerpolicy="no-referrer"
+          />
+          <div v-else class="account-avatar account-avatar--fallback">
+            {{ authState.user?.name.charAt(0).toUpperCase() }}
+          </div>
+          <input
+            ref="avatarInput"
+            type="file"
+            class="account-avatar-input"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            @change="onAvatarSelected"
+          />
         </div>
         <div>
           <strong>{{ authState.user?.email }}</strong>
@@ -71,6 +131,28 @@ async function removeAccount() {
                 ? 'Google OAuth 연결됨'
                 : '이메일 로그인 사용 중'
             }}
+          </p>
+          <div class="account-avatar-actions">
+            <button
+              type="button"
+              class="account-avatar-btn"
+              :disabled="avatarUploading"
+              @click="triggerAvatarPicker"
+            >
+              {{ avatarUploading ? `업로드 중… ${avatarProgress}%` : '사진 변경' }}
+            </button>
+            <button
+              v-if="authState.user?.profile_image_url"
+              type="button"
+              class="account-avatar-btn account-avatar-btn--danger"
+              :disabled="avatarUploading"
+              @click="removeAvatarPhoto"
+            >
+              삭제
+            </button>
+          </div>
+          <p v-if="avatarError" class="form-message form-message--error" role="alert">
+            {{ avatarError }}
           </p>
         </div>
       </div>

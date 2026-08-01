@@ -2,6 +2,7 @@ import { NextFunction, Request, Response, Router } from 'express';
 import { config } from '../../config';
 import { AppError } from '../../errors';
 import { requireAuth } from '../../middleware/auth';
+import { avatarUpload } from '../../lib/upload';
 import * as controller from './auth.controller';
 
 function requireSameOrigin(req: Request, _res: Response, next: NextFunction): void {
@@ -30,3 +31,11 @@ authRouter.post('/logout', requireSameOrigin, controller.logout);
 authRouter.get('/me', requireAuth, controller.me);
 authRouter.patch('/account', requireSameOrigin, requireAuth, controller.updateAccount);
 authRouter.delete('/account', requireSameOrigin, requireAuth, controller.deleteAccount);
+authRouter.post(
+  '/account/avatar',
+  requireSameOrigin,
+  requireAuth,
+  avatarUpload.single('file'),
+  controller.uploadAvatar,
+);
+authRouter.delete('/account/avatar', requireSameOrigin, requireAuth, controller.removeAvatar);

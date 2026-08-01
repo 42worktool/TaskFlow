@@ -28,8 +28,17 @@ export function toAttachmentDto(attachment: Attachment) {
   return {
     id: attachment.id,
     card_id: attachment.card_id,
-    file_url: attachment.file_url,
+    // Attachments uploaded through the file-storage flow have a storage_key
+    // and are served through the authenticated download route below. Rows
+    // created under the old {file_url, file_name} JSON-body flow (before file
+    // uploads were stored on disk) have no storage_key; their original
+    // external file_url is preserved as-is so those links keep working.
+    file_url: attachment.storage_key
+      ? `/api/cards/attachments/${attachment.id}/download`
+      : attachment.file_url,
     file_name: attachment.file_name,
+    mime_type: attachment.mime_type,
+    size_bytes: attachment.size_bytes,
     created_at: attachment.created_at,
   }
 }

@@ -132,6 +132,86 @@ export async function listWorkspaces(input: { userId: string }) {
  * Get a single workspace by ID.
  * Accessible if the user is a member OR the workspace is public.
  */
+/**
+ * First visit to a public workspace by a non-member auto-provisions a VIEWER
+ * membership, mirroring acceptInvite's find-then-restore-or-create pattern
+ * (WorkspaceMember's PK is (workspace_id, user_id), so a prior removal leaves
+ * a soft-deleted row that must be restored rather than re-created).
+ */
+/**
+ * Restore a soft-deleted membership or create a fresh one. WorkspaceMember's
+ * PK is (workspace_id, user_id), so a prior removal must be restored rather
+ * than re-created. Shared by acceptInvite and joinPublicWorkspaceAsViewer.
+ */
+async function upsertActiveMembership(
+  workspaceId: string,
+  userId: string,
+  role: Role,
+): Promise<void> {
+  const existing = await prisma.workspaceMember.findUnique({
+    where: { workspace_id_user_id: { workspace_id: workspaceId, user_id: userId } },
+  })
+
+  if (existing) {
+    await prisma.workspaceMember.update({
+      where: { workspace_id_user_id: { workspace_id: workspaceId, user_id: userId } },
+      data: { role, ...restoredBy(userId) },
+    })
+  } else {
+    await prisma.workspaceMember.create({
+      data: { workspace_id: workspaceId, user_id: userId, role, ...createdBy(userId) },
+    })
+  }
+}
+
+/** Notification + realtime fan-out after a membership is created/restored. */
+function announceMemberJoined(
+  workspace: { id: string; name: string; members: { user_id: string }[] },
+  actor: { userId: string; name: string; profileImageUrl: string | null },
+): void {
+  notifyWorkspaceMemberJoined({
+    recipientUserIds: workspace.members.map((member) => member.user_id),
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
+    actor,
+  })
+
+  publishWorkspaceChange({
+    workspace_id: workspace.id,
+    entity: 'member',
+    action: 'created',
+    entity_id: actor.userId,
+    list_ids: [],
+    actor_user_id: actor.userId,
+  })
+  if (isUserOnline(actor.userId)) {
+    publishWorkspacePresenceChanged({
+      workspace_id: workspace.id,
+      user_id: actor.userId,
+      online: true,
+    })
+  }
+}
+
+async function joinPublicWorkspaceAsViewer(
+  workspace: { id: string; name: string; members: { user_id: string }[] },
+  userId: string,
+): Promise<void> {
+  await upsertActiveMembership(workspace.id, userId, 'VIEWER')
+
+  const joiner = await prisma.user.findFirst({
+    where: { id: userId, deleted_at: null },
+    select: { name: true, profile_image_url: true },
+  })
+  if (joiner) {
+    announceMemberJoined(workspace, {
+      userId,
+      name: joiner.name,
+      profileImageUrl: joiner.profile_image_url,
+    })
+  }
+}
+
 export async function getWorkspace(input: { userId: string; workspaceId: string }) {
   const ws = await prisma.workspace.findFirst({
     where: { id: input.workspaceId, deleted_at: null },
@@ -139,6 +219,15 @@ export async function getWorkspace(input: { userId: string; workspaceId: string 
   })
 
   const { workspace, isMember } = requireWorkspaceReadAccess(ws, input.userId)
+
+  if (workspace.is_public && !isMember) {
+    await joinPublicWorkspaceAsViewer(workspace, input.userId)
+    const refreshed = await prisma.workspace.findFirst({
+      where: { id: workspace.id, deleted_at: null },
+      include: workspaceInclude,
+    })
+    return toWorkspaceDto(refreshed!, { includeMemberEmail: true })
+  }
 
   return toWorkspaceDto(workspace, { includeMemberEmail: isMember })
 }
@@ -459,58 +548,18 @@ export async function acceptInvite(input: { userId: string; token: string }) {
     return toWorkspaceDto(ws, { includeMemberEmail: true })
   }
 
-  if (existing) {
-    await prisma.workspaceMember.update({
-      where: {
-        workspace_id_user_id: {
-          workspace_id: payload.workspace_id,
-          user_id: input.userId,
-        },
-      },
-      data: { role: payload.role, ...restoredBy(input.userId) },
-    })
-  } else {
-    await prisma.workspaceMember.create({
-      data: {
-        workspace_id: payload.workspace_id,
-        user_id: input.userId,
-        role: payload.role,
-        ...createdBy(input.userId),
-      },
-    })
-  }
+  await upsertActiveMembership(payload.workspace_id, input.userId, payload.role)
 
   const updated = await prisma.workspace.findFirst({
     where: { id: payload.workspace_id, deleted_at: null },
     include: workspaceInclude,
   })
 
-  notifyWorkspaceMemberJoined({
-    recipientUserIds: ws.members.map((member) => member.user_id),
-    workspaceId: ws.id,
-    workspaceName: ws.name,
-    actor: {
-      userId: input.userId,
-      name: invitee.name,
-      profileImageUrl: invitee.profile_image_url,
-    },
+  announceMemberJoined(ws, {
+    userId: input.userId,
+    name: invitee.name,
+    profileImageUrl: invitee.profile_image_url,
   })
-
-  publishWorkspaceChange({
-    workspace_id: payload.workspace_id,
-    entity: 'member',
-    action: 'created',
-    entity_id: input.userId,
-    list_ids: [],
-    actor_user_id: input.userId,
-  })
-  if (isUserOnline(input.userId)) {
-    publishWorkspacePresenceChanged({
-      workspace_id: payload.workspace_id,
-      user_id: input.userId,
-      online: true,
-    })
-  }
 
   return toWorkspaceDto(updated!, { includeMemberEmail: true })
 }

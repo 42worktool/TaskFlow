@@ -304,11 +304,14 @@ model CardLabel {
 
 // 카드 첨부파일. 파일 자체는 외부 스토리지에 두고 URL만 저장한다.
 model Attachment {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  card_id    String    @db.Uuid
-  file_url   String?
-  file_name  String?
-  created_at DateTime  @default(now())
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  card_id     String    @db.Uuid
+  file_url    String?
+  file_name   String?
+  storage_key String?   @db.VarChar(255)
+  mime_type   String?   @db.VarChar(127)
+  size_bytes  Int?
+  created_at  DateTime  @default(now())
   created_by String?   @db.Uuid
   updated_at DateTime  @default(now()) @updatedAt
   updated_by String?   @db.Uuid

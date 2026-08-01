@@ -11,6 +11,9 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_PROXY_TARGET || 'http://localhost:3000',
       },
+      '/uploads': {
+        target: process.env.VITE_PROXY_TARGET || 'http://localhost:3000',
+      },
       '/ws': {
         target: process.env.VITE_PROXY_TARGET || 'http://localhost:3000',
         ws: true,

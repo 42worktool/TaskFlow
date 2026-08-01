@@ -878,3 +878,197 @@ test('updateCardDates validates against dates read under the card lock', async (
   assert.equal(updateCalls, 0)
   assert.equal(publishCalls, 0)
 })
+
+const ATTACHMENT_ID = '00000000-0000-4000-8000-000000000009'
+
+function attachment(overrides: Partial<{
+  id: string
+  card_id: string
+  file_url: string | null
+  file_name: string | null
+  storage_key: string | null
+  mime_type: string | null
+  size_bytes: number | null
+}> = {}) {
+  const now = new Date('2026-07-27T00:00:00.000Z')
+  return {
+    id: ATTACHMENT_ID,
+    card_id: CARD_ID,
+    file_url: null,
+    file_name: 'notes.pdf',
+    storage_key: 'stored-notes.pdf',
+    mime_type: 'application/pdf',
+    size_bytes: 2048,
+    created_at: now,
+    created_by: USER_ID,
+    updated_at: now,
+    updated_by: USER_ID,
+    deleted_at: null,
+    deleted_by: null,
+    ...overrides,
+  }
+}
+
+function multerFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {
+  return {
+    fieldname: 'file',
+    originalname: 'notes.pdf',
+    encoding: '7bit',
+    mimetype: 'application/pdf',
+    filename: 'stored-notes.pdf',
+    size: 2048,
+    destination: '',
+    path: '',
+    buffer: Buffer.from(''),
+    stream: undefined as unknown as Express.Multer.File['stream'],
+    ...overrides,
+  }
+}
+
+test('addAttachment stores the uploaded file metadata for a workspace member', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { addAttachment }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.card, 'findFirst', async () =>
+    card({ list_id: SOURCE_LIST_ID }))
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  let createArgs: unknown
+  stubMethod(t, prisma.attachment, 'create', async (args: { data: Record<string, unknown> }) => {
+    createArgs = args
+    return attachment({ ...(args.data as object) } as never)
+  })
+  stubMethod(t, realtime, 'publish', () => {})
+
+  const dto = await addAttachment({
+    userId: USER_ID,
+    cardId: CARD_ID,
+    file: multerFile(),
+  })
+
+  assert.deepEqual(createArgs, {
+    data: {
+      card_id: CARD_ID,
+      storage_key: 'stored-notes.pdf',
+      file_name: 'notes.pdf',
+      mime_type: 'application/pdf',
+      size_bytes: 2048,
+      created_by: USER_ID,
+      updated_by: USER_ID,
+    },
+  })
+  assert.equal(dto.file_url, `/api/cards/attachments/${ATTACHMENT_ID}/download`)
+  assert.equal(dto.mime_type, 'application/pdf')
+  assert.equal(dto.size_bytes, 2048)
+})
+
+test('addAttachment rejects a viewer without write access', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { addAttachment }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.card, 'findFirst', async () =>
+    card({ list_id: SOURCE_LIST_ID }))
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'VIEWER' }))
+
+  await assert.rejects(
+    () => addAttachment({ userId: USER_ID, cardId: CARD_ID, file: multerFile() }),
+    /Forbidden/,
+  )
+})
+
+test('getAttachmentFile resolves the on-disk path for a workspace member', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { UPLOAD_DIR }, { getAttachmentFile }] = await Promise.all([
+    import('../../db'),
+    import('../../lib/upload'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.attachment, 'findFirst', async () => attachment())
+  stubMethod(t, prisma.card, 'findFirst', async () =>
+    card({ list_id: SOURCE_LIST_ID }))
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'VIEWER' }))
+
+  const file = await getAttachmentFile({ userId: USER_ID, attachmentId: ATTACHMENT_ID })
+
+  assert.equal(file.absolutePath, `${UPLOAD_DIR}/attachments/stored-notes.pdf`)
+  assert.equal(file.fileName, 'notes.pdf')
+  assert.equal(file.mimeType, 'application/pdf')
+})
+
+test('getAttachmentFile rejects a user with no workspace membership', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { getAttachmentFile }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.attachment, 'findFirst', async () => attachment())
+  stubMethod(t, prisma.card, 'findFirst', async () =>
+    card({ list_id: SOURCE_LIST_ID }))
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => null)
+
+  await assert.rejects(
+    () => getAttachmentFile({ userId: USER_ID, attachmentId: ATTACHMENT_ID }),
+    /Forbidden/,
+  )
+})
+
+test('getAttachmentFile rejects a soft-deleted attachment', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { getAttachmentFile }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.attachment, 'findFirst', async () => null)
+
+  await assert.rejects(
+    () => getAttachmentFile({ userId: USER_ID, attachmentId: ATTACHMENT_ID }),
+    /NotFound|Resource not found/,
+  )
+})
+
+test('removeAttachment soft-deletes the row', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { removeAttachment }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.attachment, 'findFirst', async () => attachment())
+  stubMethod(t, prisma.card, 'findFirst', async () =>
+    card({ list_id: SOURCE_LIST_ID }))
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  let updateArgs: unknown
+  stubMethod(t, prisma.attachment, 'update', async (args: unknown) => {
+    updateArgs = args
+    return attachment({ deleted_at: new Date('2026-07-27T00:00:00.000Z') } as never)
+  })
+  stubMethod(t, realtime, 'publish', () => {})
+
+  // deleteUploadedFile() runs for real against a nonexistent path here (the
+  // fixture's storage_key was never actually written to disk); it swallows
+  // ENOENT internally, so this only exercises the soft-delete + permission path.
+  // Direct file-cleanup coverage lives in lib/upload.test.ts.
+  await removeAttachment({ userId: USER_ID, attachmentId: ATTACHMENT_ID })
+
+  assert.deepEqual((updateArgs as { where: { id: string } }).where, { id: ATTACHMENT_ID })
+})

@@ -6,6 +6,7 @@ import { AppError } from '../../errors';
 import { prisma } from '../../db';
 import { signAccessToken } from '../../lib/access-token';
 import { getRedisClient } from '../../lib/redis';
+import { deleteUploadedFile } from '../../lib/upload';
 import {
   normalizedEmailSchema,
   normalizeEmail,
@@ -413,4 +414,32 @@ export async function deleteCurrentUser(userId: string): Promise<void> {
   const indexKey = userSessionsKey(userId);
   const sessionKeys = await redis.sMembers(indexKey);
   await redis.del([...sessionKeys, indexKey]);
+}
+
+const AVATAR_URL_PREFIX = '/uploads/avatars/';
+
+async function replaceAvatarUrl(userId: string, url: string | null): Promise<UserPublic> {
+  const previous = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { profile_image_url: true },
+  });
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { profile_image_url: url },
+  });
+
+  if (previous?.profile_image_url?.startsWith(AVATAR_URL_PREFIX)) {
+    await deleteUploadedFile('avatars', previous.profile_image_url.slice(AVATAR_URL_PREFIX.length));
+  }
+
+  return publicUser(user);
+}
+
+export async function updateAvatar(userId: string, file: Express.Multer.File): Promise<UserPublic> {
+  return replaceAvatarUrl(userId, `${AVATAR_URL_PREFIX}${file.filename}`);
+}
+
+export async function removeAvatar(userId: string): Promise<UserPublic> {
+  return replaceAvatarUrl(userId, null);
 }

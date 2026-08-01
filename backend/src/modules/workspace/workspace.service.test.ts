@@ -109,8 +109,9 @@ function workspaceForRoleChange(callerRole: Role, targetRole: Role) {
 
 test('public workspace reads hide member email addresses', async (t) => {
   setRequiredEnvironment()
-  const [{ prisma }, { getWorkspace, listWorkspaces }] = await Promise.all([
+  const [{ prisma }, { realtime }, { getWorkspace, listWorkspaces }] = await Promise.all([
     import('../../db'),
+    import('../../realtime'),
     import('./workspace.service'),
   ])
   const publicWorkspace = { ...workspace(), is_public: true }
@@ -130,15 +131,61 @@ test('public workspace reads hide member email addresses', async (t) => {
     )
   })
 
-  await t.test('sanitizes a public detail response for a nonmember', async (t) => {
+  await t.test(
+    'sanitizes a public detail response for a nonmember, auto-joining them as VIEWER',
+    async (t) => {
+      stubMethod(t, prisma.workspace, 'findFirst', async () => publicWorkspace)
+      stubMethod(t, prisma.workspaceMember, 'findUnique', async () => null)
+      let membershipCreate: unknown
+      stubMethod(t, prisma.workspaceMember, 'create', async (args) => {
+        membershipCreate = args
+        return {}
+      })
+      stubMethod(t, prisma.user, 'findFirst', async () => ({
+        name: 'Visitor',
+        profile_image_url: null,
+      }))
+      stubMethod(t, realtime, 'sendToUser', () => {})
+      stubMethod(t, realtime, 'publish', () => {})
+
+      const result = await getWorkspace({
+        userId: USER_ID,
+        workspaceId: WORKSPACE_ID,
+      })
+
+      // Auto-joining makes them a real member, so the response now behaves
+      // like any other member response (email included), not the sanitized
+      // public-nonmember projection.
+      assert.equal('email' in (result.members[0]?.user ?? {}), true)
+      assert.deepEqual(
+        (membershipCreate as { data: { workspace_id: string; user_id: string; role: string } })
+          .data,
+        {
+          workspace_id: WORKSPACE_ID,
+          user_id: USER_ID,
+          role: 'VIEWER',
+          created_by: USER_ID,
+          updated_by: USER_ID,
+        },
+      )
+    },
+  )
+
+  await t.test('does not re-join an already active public-workspace member', async (t) => {
     stubMethod(t, prisma.workspace, 'findFirst', async () => publicWorkspace)
+    let memberFindUniqueCalls = 0
+    stubMethod(t, prisma.workspaceMember, 'findUnique', async () => {
+      memberFindUniqueCalls += 1
+      return null
+    })
 
     const result = await getWorkspace({
-      userId: USER_ID,
+      userId: OWNER_ID,
       workspaceId: WORKSPACE_ID,
     })
 
-    assert.equal('email' in (result.members[0]?.user ?? {}), false)
+    assert.equal(memberFindUniqueCalls, 0)
+    assert.equal(result.members[0]?.user_id, OWNER_ID)
   })
 
   await t.test('keeps email in a member detail response', async (t) => {
