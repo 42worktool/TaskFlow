@@ -71,7 +71,7 @@ export interface InviteMemberResponse {
 }
 
 // GET /api/workspaces/invite/{token} -> 200
-// Reads invitation metadata without claiming or consuming the token.
+// Reads invitation metadata without consuming the token.
 export interface InvitationPreviewResponse {
   workspace_id: string;
   workspace_name: string;
@@ -79,7 +79,7 @@ export interface InvitationPreviewResponse {
 }
 
 // POST /api/workspaces/invite/{token} -> 200
-// The signed-in account claims and consumes the one-time bearer invitation.
+// Atomically removes the one-time bearer invitation before creating membership.
 export type AcceptInviteResponse = WorkspaceDto;
 
 // PUT /api/workspaces/{workspace_id}/members/{user_id} -> 200, ADMIN+

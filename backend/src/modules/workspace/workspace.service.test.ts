@@ -400,12 +400,10 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
     role: 'MEMBER' as const,
     deliveryEmail: 'invitee@example.com',
     createdBy: OWNER_ID,
-    status: 'claimed' as const,
-    claimedBy: USER_ID,
   }
 
   await t.test('rejects an invalid invitation token', async (t) => {
-    stubMethod(t, workspaceInvitationStore, 'claim', async () => ({ status: 'missing' }))
+    stubMethod(t, workspaceInvitationStore, 'take', async () => null)
     await assert.rejects(
       () => acceptInvite({ userId: USER_ID, token: 'invalid' }),
       (error: unknown) =>
@@ -416,48 +414,34 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
     )
   })
 
-  await t.test('rejects an invitation claimed by another account', async (t) => {
-    stubMethod(t, workspaceInvitationStore, 'claim', async () => ({ status: 'claimed' }))
-    await assert.rejects(
-      () => acceptInvite({ userId: USER_ID, token: 'token' }),
-      (error: unknown) =>
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 'INVITE_ALREADY_CLAIMED',
-    )
-  })
-
   await t.test('previews without consuming the invitation', async (t) => {
-    stubMethod(t, workspaceInvitationStore, 'preview', async () => ({
-      status: 'available',
-      invitation: { ...invitation, status: 'available', claimedBy: null },
-    }))
-    let consumeCount = 0
-    stubMethod(t, workspaceInvitationStore, 'consume', async () => {
-      consumeCount += 1
-      return true
+    stubMethod(t, workspaceInvitationStore, 'preview', async () => invitation)
+    let takeCount = 0
+    stubMethod(t, workspaceInvitationStore, 'take', async () => {
+      takeCount += 1
+      return invitation
     })
     stubMethod(t, prisma.workspace, 'findFirst', async () => ({
       id: WORKSPACE_ID,
       name: 'Workspace',
     }))
 
-    const preview = await previewInvite({ userId: USER_ID, token: 'token' })
+    const preview = await previewInvite({ token: 'token' })
 
     assert.deepEqual(preview, {
       workspace_id: WORKSPACE_ID,
       workspace_name: 'Workspace',
       role: 'MEMBER',
     })
-    assert.equal(consumeCount, 0)
+    assert.equal(takeCount, 0)
   })
 
-  await t.test('accepts with a different TaskFlow account email', async (t) => {
-    stubMethod(t, workspaceInvitationStore, 'claim', async () => ({
-      status: 'available',
-      invitation,
-    }))
+  await t.test('takes the token before accepting with a different account email', async (t) => {
+    const operationOrder: string[] = []
+    stubMethod(t, workspaceInvitationStore, 'take', async () => {
+      operationOrder.push('take')
+      return invitation
+    })
     stubMethod(t, prisma.user, 'findFirst', async () => ({
       name: 'Other',
       profile_image_url: null,
@@ -465,16 +449,11 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
     stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
     stubMethod(t, prisma.workspaceMember, 'findUnique', async () => null)
 
-    const operationOrder: string[] = []
     let membershipCreate: unknown
     stubMethod(t, prisma.workspaceMember, 'create', async (args) => {
       operationOrder.push('membership')
       membershipCreate = args
       return {}
-    })
-    stubMethod(t, workspaceInvitationStore, 'consume', async () => {
-      operationOrder.push('consume')
-      return true
     })
     const deliveries: unknown[][] = []
     stubMethod(t, realtime, 'sendToUser', (...args) => {
@@ -504,15 +483,11 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
       (deliveries[0]?.[2] as { kind?: unknown }).kind,
       'workspace.member_joined',
     )
-    assert.deepEqual(operationOrder, ['membership', 'consume', 'notification'])
+    assert.deepEqual(operationOrder, ['take', 'membership', 'notification'])
   })
 
-  await t.test('consumes without notifying when the claimant is already a member', async (t) => {
-    stubMethod(t, workspaceInvitationStore, 'claim', async () => ({
-      status: 'available',
-      invitation,
-    }))
-    stubMethod(t, workspaceInvitationStore, 'consume', async () => true)
+  await t.test('takes without notifying when the recipient is already a member', async (t) => {
+    stubMethod(t, workspaceInvitationStore, 'take', async () => invitation)
     stubMethod(t, prisma.user, 'findFirst', async () => ({
       name: 'Invitee',
       profile_image_url: null,

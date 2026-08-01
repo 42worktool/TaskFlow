@@ -19,18 +19,17 @@ GET /api/workspaces/invite/:token
   -> return workspace name and role without consuming the token
 
 POST /api/workspaces/invite/:token
-  -> atomically claim the Redis invitation for the signed-in account
+  -> atomically read and delete the Redis invitation with GETDEL
   -> create or restore the workspace membership
-  -> consume the invitation token
   -> notify already-connected workspace members
 ```
 
 The delivery address is not an account binding: a recipient may accept with a
-different TaskFlow account after confirming that account in the UI. Invitation
-acceptance is retry-safe for the account that claimed the token and consumes the
-token after membership succeeds. An expired, malformed, consumed, or
-deleted-workspace token is rejected. The final workspace owner rules remain
-enforced by the normal member-management service.
+different TaskFlow account after confirming that account in the UI. The token is
+removed before the database membership write, so concurrent acceptance has one
+winner. If the database write then fails, the invitation must be sent again. An
+expired, malformed, consumed, or deleted-workspace token is rejected. The final
+workspace owner rules remain enforced by the normal member-management service.
 
 ## Configuration
 
@@ -53,7 +52,7 @@ provider endpoint intended for that mode, such as Gmail on port 587.
 - `backend/src/lib/mail-queue.ts`: Redis list and a dedicated blocking worker
   connection.
 - `backend/src/lib/workspace-invitation-store.ts`: opaque invitation creation,
-  hashed Redis storage, atomic claiming, and one-time consumption.
+  hashed Redis storage, preview, and atomic one-time removal.
 - `backend/src/modules/workspace/workspace.service.ts`: authorization, token
   queueing, preview, and membership acceptance.
 

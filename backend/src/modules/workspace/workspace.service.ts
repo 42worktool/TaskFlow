@@ -38,16 +38,6 @@ class InviteTokenError extends AppError {
   }
 }
 
-class InviteAlreadyClaimedError extends AppError {
-  constructor() {
-    super(
-      'INVITE_ALREADY_CLAIMED',
-      409,
-      'this invitation has already been claimed by another account',
-    )
-  }
-}
-
 async function requireManagedWorkspace(
   tx: Prisma.TransactionClient,
   wsId: string,
@@ -376,15 +366,14 @@ export async function inviteWorkspaceMember(input: {
 }
 
 /**
- * Preview an invite without claiming or consuming it.
+ * Preview an invite without consuming it.
  */
-export async function previewInvite(input: { userId: string; token: string }) {
-  const result = await workspaceInvitationStore.preview(input.token, input.userId)
-  if (result.status === 'missing') throw new InviteTokenError()
-  if (result.status === 'claimed') throw new InviteAlreadyClaimedError()
+export async function previewInvite(input: { token: string }) {
+  const invitation = await workspaceInvitationStore.preview(input.token)
+  if (!invitation) throw new InviteTokenError()
 
   const workspace = await prisma.workspace.findFirst({
-    where: { id: result.invitation.workspaceId, deleted_at: null },
+    where: { id: invitation.workspaceId, deleted_at: null },
     select: { id: true, name: true },
   })
   if (!workspace) throw new InviteTokenError()
@@ -392,19 +381,17 @@ export async function previewInvite(input: { userId: string; token: string }) {
   return {
     workspace_id: workspace.id,
     workspace_name: workspace.name,
-    role: result.invitation.role,
+    role: invitation.role,
   }
 }
 
 /**
- * Claim an invite for the signed-in user and add them as a member.
+ * Consume an invite and add the signed-in user as a member.
  * Returns the workspace DTO on success.
  */
 export async function acceptInvite(input: { userId: string; token: string }) {
-  const claimed = await workspaceInvitationStore.claim(input.token, input.userId)
-  if (claimed.status === 'missing') throw new InviteTokenError()
-  if (claimed.status === 'claimed') throw new InviteAlreadyClaimedError()
-  const invitation = claimed.invitation
+  const invitation = await workspaceInvitationStore.take(input.token)
+  if (!invitation) throw new InviteTokenError()
 
   const invitee = await prisma.user.findFirst({
     where: { id: input.userId, deleted_at: null },
@@ -429,7 +416,6 @@ export async function acceptInvite(input: { userId: string; token: string }) {
   })
 
   if (existing?.deleted_at === null) {
-    await workspaceInvitationStore.consume(input.token, input.userId)
     return toWorkspaceDto(ws, { includeMemberEmail: true })
   }
 
@@ -458,8 +444,6 @@ export async function acceptInvite(input: { userId: string; token: string }) {
     where: { id: invitation.workspaceId, deleted_at: null },
     include: workspaceInclude,
   })
-
-  await workspaceInvitationStore.consume(input.token, input.userId)
 
   notifyWorkspaceMemberJoined({
     recipientUserIds: ws.members.map((member) => member.user_id),
