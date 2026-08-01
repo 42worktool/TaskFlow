@@ -34,7 +34,6 @@ describe('WorkspaceAPI', () => {
 
   it('previews an invitation before explicitly accepting it', async () => {
     const preview = {
-      workspace_id: 'workspace-1',
       workspace_name: 'Design',
       role: 'MEMBER' as const,
     }

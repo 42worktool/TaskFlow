@@ -73,7 +73,6 @@ export interface InviteMemberResponse {
 // GET /api/workspaces/invite/{token} -> 200
 // Reads invitation metadata without consuming the token.
 export interface InvitationPreviewResponse {
-  workspace_id: string;
   workspace_name: string;
   role: Exclude<Role, 'OWNER'>;
 }

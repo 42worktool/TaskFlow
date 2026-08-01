@@ -2,7 +2,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { WorkspaceAPI, type WorkspaceInvitationPreview } from '../api/workspace'
-import { authState, initializeAuth, logout } from '../services/auth'
+import { authState, logout } from '../services/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -10,30 +10,13 @@ const error = ref('')
 const loading = ref(true)
 const accepting = ref(false)
 const invitation = ref<WorkspaceInvitationPreview | null>(null)
+const token = route.params.token as string
 const roleLabel = computed(() => {
   const labels = { ADMIN: '관리자', MEMBER: '멤버', VIEWER: '뷰어' } as const
   return invitation.value ? labels[invitation.value.role] : ''
 })
 
-function inviteToken(): string {
-  return typeof route.params.token === 'string' ? route.params.token : ''
-}
-
 onMounted(async () => {
-  await initializeAuth()
-
-  if (!authState.user) {
-    router.replace({ path: '/signin', query: { redirect: route.fullPath } })
-    return
-  }
-
-  const token = inviteToken()
-  if (!token) {
-    error.value = '유효하지 않은 초대 링크입니다.'
-    loading.value = false
-    return
-  }
-
   try {
     invitation.value = await WorkspaceAPI.previewInvite(token)
   } catch (caught) {
@@ -44,8 +27,7 @@ onMounted(async () => {
 })
 
 async function acceptInvitation() {
-  const token = inviteToken()
-  if (!token || accepting.value) return
+  if (accepting.value) return
   error.value = ''
   accepting.value = true
   try {

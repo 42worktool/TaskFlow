@@ -4,7 +4,6 @@ import { apiRequest } from '../services/auth'
 type ManageableWorkspaceRole = Exclude<WorkspaceRole, 'OWNER'>
 
 export interface WorkspaceInvitationPreview {
-  workspace_id: string
   workspace_name: string
   role: ManageableWorkspaceRole
 }

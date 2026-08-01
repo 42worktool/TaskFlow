@@ -420,14 +420,12 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
       return invitation
     })
     stubMethod(t, prisma.workspace, 'findFirst', async () => ({
-      id: WORKSPACE_ID,
       name: 'Workspace',
     }))
 
     const preview = await previewInvite({ token: 'token' })
 
     assert.deepEqual(preview, {
-      workspace_id: WORKSPACE_ID,
       workspace_name: 'Workspace',
       role: 'MEMBER',
     })

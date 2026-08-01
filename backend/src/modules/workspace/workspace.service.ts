@@ -372,12 +372,11 @@ export async function previewInvite(input: { token: string }) {
 
   const workspace = await prisma.workspace.findFirst({
     where: { id: invitation.workspaceId, deleted_at: null },
-    select: { id: true, name: true },
+    select: { name: true },
   })
   if (!workspace) throw new InviteTokenError()
 
   return {
-    workspace_id: workspace.id,
     workspace_name: workspace.name,
     role: invitation.role,
   }
