@@ -45,6 +45,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - uploads_data:/app/uploads
     expose:
       - "3000"
     environment:
@@ -111,3 +112,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:

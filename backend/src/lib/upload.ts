@@ -1,10 +1,10 @@
 // ============================================================
 // upload.ts — multer configuration for local-disk file storage
 //
-// Files persist under UPLOAD_DIR/<subdir>/<uuid>.<ext>. In dev the backend
-// container's ./backend:/app bind mount means anything written under
-// /app/uploads lands directly in the host backend/uploads/ directory, so no
-// dedicated Docker volume is needed.
+// Files persist under UPLOAD_DIR/<subdir>/<uuid>.<ext>. /app/uploads is
+// backed by the named Docker volume `uploads_data` (see docker-compose.yml),
+// so uploaded files survive container recreation instead of living only in
+// the ./backend:/app dev bind mount.
 // ============================================================
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
