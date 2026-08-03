@@ -83,6 +83,14 @@ export function workspaceColor(_wsId: UUID): string {
   return COLORS[Math.abs(hash) % COLORS.length]
 }
 
+export interface Label {
+  id: UUID
+  workspace_id: UUID
+  label_name: string
+  label_color: string
+  created_at: ISODateString
+}
+
 export interface List {
   id: UUID
   workspace_id: UUID

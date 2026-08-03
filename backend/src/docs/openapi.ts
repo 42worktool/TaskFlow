@@ -319,7 +319,107 @@ export const openApiDocument = {
         },
       },
     },
-  },
+    '/api/workspaces/{workspaceId}/labels': {
+        get: {
+          tags: ['Workspace'],
+          summary: '워크스페이스 라벨 목록',
+          operationId: 'listWorkspaceLabels',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: '#/components/parameters/WorkspaceId' }],
+          responses: {
+            '200': {
+              description: '활성 라벨 목록',
+              content: {
+                'application/json': {
+                  schema: { type: 'array', items: { $ref: '#/components/schemas/Label' } },
+                },
+              },
+            },
+            '401': errorResponse('인증 필요'),
+            '403': errorResponse('워크스페이스 접근 권한 없음'),
+            '404': errorResponse('워크스페이스 없음'),
+          },
+        },
+        post: {
+          tags: ['Workspace'],
+          summary: '워크스페이스 라벨 생성',
+          operationId: 'createWorkspaceLabel',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: '#/components/parameters/WorkspaceId' }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateLabelRequest' } } },
+          },
+          responses: {
+            '201': {
+              description: '생성된 라벨',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
+            },
+            '400': errorResponse('라벨 입력값 검증 실패'),
+            '401': errorResponse('인증 필요'),
+            '403': errorResponse('라벨 생성 권한 없음'),
+            '404': errorResponse('워크스페이스 없음'),
+          },
+        },
+      },
+      '/api/labels/{label_id}': {
+        delete: {
+          tags: ['Workspace'],
+          summary: '라벨 삭제',
+          operationId: 'deleteLabel',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: '#/components/parameters/LabelId' }],
+          responses: {
+            '204': { description: '삭제 완료' },
+            '401': errorResponse('인증 필요'),
+            '403': errorResponse('라벨 삭제 권한 없음'),
+            '404': errorResponse('라벨 없음'),
+          },
+        },
+      },
+      '/api/cards/{card_id}/labels': {
+        post: {
+          tags: ['Card'],
+          summary: '카드에 라벨 부착',
+          operationId: 'attachCardLabel',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: '#/components/parameters/CardId' }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/AttachLabelRequest' } } },
+          },
+          responses: {
+            '201': {
+              description: '부착된 라벨',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
+            },
+            '400': errorResponse('같은 워크스페이스의 라벨만 부착 가능'),
+            '401': errorResponse('인증 필요'),
+            '403': errorResponse('라벨 부착 권한 없음'),
+            '404': errorResponse('카드 또는 라벨 없음'),
+            '409': errorResponse('이미 부착된 라벨'),
+          },
+        },
+      },
+      '/api/cards/{card_id}/labels/{label_id}': {
+        delete: {
+          tags: ['Card'],
+          summary: '카드에서 라벨 제거',
+          operationId: 'detachCardLabel',
+          security: [{ bearerAuth: [] }],
+          parameters: [
+            { $ref: '#/components/parameters/CardId' },
+            { $ref: '#/components/parameters/LabelId' },
+          ],
+          responses: {
+            '204': { description: '제거 완료' },
+            '401': errorResponse('인증 필요'),
+            '403': errorResponse('라벨 제거 권한 없음'),
+            '404': errorResponse('카드, 라벨 또는 부착 관계 없음'),
+          },
+        },
+      },
+    },
   components: {
     securitySchemes: {
       bearerAuth: {
@@ -344,7 +444,55 @@ export const openApiDocument = {
         },
       },
     },
+    parameters: {
+      WorkspaceId: {
+        name: 'workspaceId',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      },
+      CardId: {
+        name: 'card_id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      },
+      LabelId: {
+        name: 'label_id',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      },
+    },
     schemas: {
+      Label: {
+        type: 'object',
+        required: ['id', 'workspace_id', 'label_name', 'label_color', 'created_at'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          workspace_id: { type: 'string', format: 'uuid' },
+          label_name: { type: 'string', minLength: 1, maxLength: 50 },
+          label_color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+          created_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      CreateLabelRequest: {
+        type: 'object',
+        required: ['label_name', 'label_color'],
+        additionalProperties: false,
+        properties: {
+          label_name: { type: 'string', minLength: 1, maxLength: 50 },
+          label_color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+        },
+      },
+      AttachLabelRequest: {
+        type: 'object',
+        required: ['label_id'],
+        additionalProperties: false,
+        properties: {
+          label_id: { type: 'string', format: 'uuid' },
+        },
+      },
       HealthResponse: {
         type: 'object',
         required: ['status'],
