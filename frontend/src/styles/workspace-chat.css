@@ -67,16 +67,6 @@
   font-size: 11px;
 }
 
-.chat-refresh-button {
-  width: 30px;
-  height: 30px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  color: #475569;
-  font-size: 17px;
-}
-
 .workspace-chat-messages-region {
   position: relative;
   min-height: 180px;
@@ -159,7 +149,7 @@
   background: #fff;
   color: #1f2937;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.07);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.45;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -219,7 +209,7 @@
   border: 1px solid #cbd5e1;
   border-radius: 9px;
   font: inherit;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .workspace-chat-input-drop-region {
@@ -273,8 +263,7 @@
 }
 
 .chat-send-button:disabled,
-.chat-attach-button:disabled,
-.chat-refresh-button:disabled {
+.chat-attach-button:disabled {
   cursor: default;
   opacity: 0.5;
 }

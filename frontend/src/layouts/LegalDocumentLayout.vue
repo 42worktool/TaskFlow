@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PageHeader from '../components/PageHeader.vue'
+
 withDefaults(defineProps<{ title: string; effectiveDate?: string }>(), {
   effectiveDate: '2026년 7월 22일',
 })
@@ -6,9 +8,7 @@ withDefaults(defineProps<{ title: string; effectiveDate?: string }>(), {
 
 <template>
   <div class="legal-page-shell">
-    <header class="legal-page-header">
-      <RouterLink to="/signin" class="legal-page-logo">TaskFlow</RouterLink>
-    </header>
+    <PageHeader />
     <main class="legal-document">
       <h1>{{ title }}</h1>
       <p class="effective-date">시행일: {{ effectiveDate }}</p>

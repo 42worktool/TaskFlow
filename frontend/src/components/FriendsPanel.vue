@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { FriendAPI } from '../api/friend'
+import PersonAvatar from './PersonAvatar.vue'
 import { realtime } from '../services/realtime'
-import { parseFriendPresenceEvent } from '../services/realtime/protocol'
+import {
+  parseFriend,
+  parseFriendPresenceEvent,
+  parseFriendRequest,
+  parseFriendUserIdEvent,
+} from '../services/realtime/protocol'
 import type { Friend, FriendRequest } from '../types'
 
 const emit = defineEmits<{
@@ -13,6 +19,7 @@ const emit = defineEmits<{
 const friends = ref<Friend[]>([])
 const incomingRequests = ref<FriendRequest[]>([])
 const outgoingRequests = ref<FriendRequest[]>([])
+const activeTab = ref<'incoming' | 'outgoing' | 'friends'>('incoming')
 const friendEmail = ref('')
 const loading = ref(true)
 const hasLoadedData = ref(false)
@@ -26,6 +33,10 @@ let reloadAfterMutation = false
 const livePresence = new Map<string, { online: boolean; sequence: number }>()
 let removePresenceListener: (() => void) | null = null
 let removeRealtimeStateListener: (() => void) | null = null
+let removeRequestCreatedListener: (() => void) | null = null
+let removeRequestAcceptedListener: (() => void) | null = null
+let removeRequestDeletedListener: (() => void) | null = null
+let removeFriendRemovedListener: (() => void) | null = null
 
 function applyNewerPresence(friend: Friend, presenceAtStart: number): void {
   const live = livePresence.get(friend.id)
@@ -81,6 +92,42 @@ function receiveFriendPresence(value: unknown): void {
   })
   const friend = friends.value.find((item) => item.id === event.user_id)
   if (friend) friend.online = event.online
+}
+
+function receiveFriendRequestCreated(value: unknown): void {
+  const request = parseFriendRequest(value)
+  if (!request) return
+  if (incomingRequests.value.some((item) => item.id === request.id)) return
+  incomingRequests.value = [request, ...incomingRequests.value]
+}
+
+function receiveFriendRequestAccepted(value: unknown): void {
+  const friend = parseFriend(value)
+  if (!friend) return
+  outgoingRequests.value = outgoingRequests.value.filter(
+    (item) => item.id !== friend.id,
+  )
+  friends.value = [
+    friend,
+    ...friends.value.filter((item) => item.id !== friend.id),
+  ]
+}
+
+function receiveFriendRequestDeleted(value: unknown): void {
+  const event = parseFriendUserIdEvent(value)
+  if (!event) return
+  incomingRequests.value = incomingRequests.value.filter(
+    (item) => item.id !== event.user_id,
+  )
+  outgoingRequests.value = outgoingRequests.value.filter(
+    (item) => item.id !== event.user_id,
+  )
+}
+
+function receiveFriendRemoved(value: unknown): void {
+  const event = parseFriendUserIdEvent(value)
+  if (!event) return
+  friends.value = friends.value.filter((item) => item.id !== event.user_id)
 }
 
 function refreshAfterReconnect(): void {
@@ -214,6 +261,22 @@ onMounted(() => {
     'friend.presence_changed',
     receiveFriendPresence,
   )
+  removeRequestCreatedListener = realtime.on(
+    'friend.request_created',
+    receiveFriendRequestCreated,
+  )
+  removeRequestAcceptedListener = realtime.on(
+    'friend.request_accepted',
+    receiveFriendRequestAccepted,
+  )
+  removeRequestDeletedListener = realtime.on(
+    'friend.request_deleted',
+    receiveFriendRequestDeleted,
+  )
+  removeFriendRemovedListener = realtime.on(
+    'friend.removed',
+    receiveFriendRemoved,
+  )
   removeRealtimeStateListener = realtime.onStateChange((state) => {
     if (state === 'connected') refreshAfterReconnect()
   })
@@ -223,6 +286,10 @@ onMounted(() => {
 onUnmounted(() => {
   loadGeneration += 1
   removePresenceListener?.()
+  removeRequestCreatedListener?.()
+  removeRequestAcceptedListener?.()
+  removeRequestDeletedListener?.()
+  removeFriendRemovedListener?.()
   removeRealtimeStateListener?.()
   livePresence.clear()
 })
@@ -230,18 +297,6 @@ onUnmounted(() => {
 
 <template>
   <div class="friends-panel-content">
-    <div class="friends-heading">
-      <p>요청을 수락한 사용자만 친구 목록과 온라인 상태에 표시됩니다.</p>
-      <button
-        type="button"
-        class="secondary-button"
-        :disabled="loading || busyAction !== null"
-        @click="loadFriendData()"
-      >
-        새로고침
-      </button>
-    </div>
-
       <section class="friend-panel friend-invite-panel">
         <div>
           <h2>친구 요청 보내기</h2>
@@ -279,164 +334,176 @@ onUnmounted(() => {
       </p>
 
       <template v-else-if="hasLoadedData">
-        <div class="request-grid">
-          <section class="friend-panel">
-            <div class="section-heading">
-              <h2>받은 요청</h2>
+        <section class="friend-panel friend-tabs-panel">
+          <div class="friend-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              class="friend-tab"
+              :class="{ 'friend-tab--active': activeTab === 'incoming' }"
+              :aria-selected="activeTab === 'incoming'"
+              @click="activeTab = 'incoming'"
+            >
+              받은 요청
               <span>{{ incomingRequests.length }}</span>
-            </div>
-            <p v-if="incomingRequests.length === 0" class="empty-state">
-              받은 친구 요청이 없습니다.
-            </p>
-            <ul v-else class="people-list">
-              <li
-                v-for="request in incomingRequests"
-                :key="request.id"
-                class="person-row"
-              >
-                <img
-                  v-if="request.profile_image_url"
-                  :src="request.profile_image_url"
-                  alt=""
-                  class="person-avatar"
-                  referrerpolicy="no-referrer"
-                />
-                <div v-else class="person-avatar person-avatar--fallback">
-                  {{ request.name.charAt(0).toUpperCase() }}
-                </div>
-                <div class="person-meta">
-                  <strong>{{ request.name }}</strong>
-                  <span>{{ formatDate(request.requested_at) }} 요청</span>
-                </div>
-                <div class="person-actions">
-                  <button
-                    type="button"
-                    class="primary-button primary-button--small"
-                    :disabled="busyAction !== null"
-                    @click="acceptRequest(request)"
-                  >
-                    {{
-                      busyAction === `accept:${request.id}`
-                        ? '수락 중…'
-                        : '수락'
-                    }}
-                  </button>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="friend-tab"
+              :class="{ 'friend-tab--active': activeTab === 'outgoing' }"
+              :aria-selected="activeTab === 'outgoing'"
+              @click="activeTab = 'outgoing'"
+            >
+              보낸 요청
+              <span>{{ outgoingRequests.length }}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="friend-tab"
+              :class="{ 'friend-tab--active': activeTab === 'friends' }"
+              :aria-selected="activeTab === 'friends'"
+              @click="activeTab = 'friends'"
+            >
+              친구 목록
+              <span>{{ friends.length }}</span>
+            </button>
+          </div>
+
+          <div class="friend-tab-panel" role="tabpanel">
+            <template v-if="activeTab === 'incoming'">
+              <p v-if="incomingRequests.length === 0" class="empty-state">
+                받은 친구 요청이 없습니다.
+              </p>
+              <ul v-else class="people-list">
+                <li
+                  v-for="request in incomingRequests"
+                  :key="request.id"
+                  class="person-row"
+                >
+                  <PersonAvatar
+                    :name="request.name"
+                    :image-url="request.profile_image_url"
+                  />
+                  <div class="person-meta">
+                    <strong>{{ request.name }}</strong>
+                    <span>{{ formatDate(request.requested_at) }} 요청</span>
+                  </div>
+                  <div class="person-actions">
+                    <button
+                      type="button"
+                      class="primary-button primary-button--small"
+                      :disabled="busyAction !== null"
+                      @click="acceptRequest(request)"
+                    >
+                      {{
+                        busyAction === `accept:${request.id}`
+                          ? '수락 중…'
+                          : '수락'
+                      }}
+                    </button>
+                    <button
+                      type="button"
+                      class="text-button text-button--danger"
+                      :disabled="busyAction !== null"
+                      @click="deleteRequest(request, 'incoming')"
+                    >
+                      {{
+                        busyAction === `incoming:${request.id}`
+                          ? '처리 중…'
+                          : '거절'
+                      }}
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            </template>
+
+            <template v-else-if="activeTab === 'outgoing'">
+              <p v-if="outgoingRequests.length === 0" class="empty-state">
+                대기 중인 친구 요청이 없습니다.
+              </p>
+              <ul v-else class="people-list">
+                <li
+                  v-for="request in outgoingRequests"
+                  :key="request.id"
+                  class="person-row"
+                >
+                  <PersonAvatar
+                    :name="request.name"
+                    :image-url="request.profile_image_url"
+                  />
+                  <div class="person-meta">
+                    <strong>{{ request.name }}</strong>
+                    <span>{{ formatDate(request.requested_at) }}부터 대기 중</span>
+                  </div>
                   <button
                     type="button"
                     class="text-button text-button--danger"
                     :disabled="busyAction !== null"
-                    @click="deleteRequest(request, 'incoming')"
+                    @click="deleteRequest(request, 'outgoing')"
                   >
                     {{
-                      busyAction === `incoming:${request.id}`
-                        ? '처리 중…'
-                        : '거절'
+                      busyAction === `outgoing:${request.id}`
+                        ? '취소 중…'
+                        : '요청 취소'
                     }}
                   </button>
-                </div>
-              </li>
-            </ul>
-          </section>
+                </li>
+              </ul>
+            </template>
 
-          <section class="friend-panel">
-            <div class="section-heading">
-              <h2>보낸 요청</h2>
-              <span>{{ outgoingRequests.length }}</span>
-            </div>
-            <p v-if="outgoingRequests.length === 0" class="empty-state">
-              대기 중인 친구 요청이 없습니다.
-            </p>
-            <ul v-else class="people-list">
-              <li
-                v-for="request in outgoingRequests"
-                :key="request.id"
-                class="person-row"
-              >
-                <img
-                  v-if="request.profile_image_url"
-                  :src="request.profile_image_url"
-                  alt=""
-                  class="person-avatar"
-                  referrerpolicy="no-referrer"
-                />
-                <div v-else class="person-avatar person-avatar--fallback">
-                  {{ request.name.charAt(0).toUpperCase() }}
-                </div>
-                <div class="person-meta">
-                  <strong>{{ request.name }}</strong>
-                  <span>{{ formatDate(request.requested_at) }}부터 대기 중</span>
-                </div>
-                <button
-                  type="button"
-                  class="text-button text-button--danger"
-                  :disabled="busyAction !== null"
-                  @click="deleteRequest(request, 'outgoing')"
+            <template v-else>
+              <p v-if="friends.length === 0" class="empty-state">
+                아직 수락된 친구가 없습니다.
+              </p>
+              <ul v-else class="people-list friend-list">
+                <li
+                  v-for="friend in friends"
+                  :key="friend.id"
+                  class="person-row"
                 >
-                  {{
-                    busyAction === `outgoing:${request.id}`
-                      ? '취소 중…'
-                      : '요청 취소'
-                  }}
-                </button>
-              </li>
-            </ul>
-          </section>
-        </div>
-
-        <section class="friend-panel">
-          <div class="section-heading">
-            <h2>친구 목록</h2>
-            <span>{{ friends.length }}</span>
+                  <PersonAvatar
+                    :name="friend.name"
+                    :image-url="friend.profile_image_url"
+                  />
+                  <div class="person-meta">
+                    <strong>{{ friend.name }}</strong>
+                    <span
+                      class="friend-presence"
+                      :class="{ 'friend-presence--online': friend.online }"
+                    >
+                      {{ friend.online ? '온라인' : '오프라인' }}
+                    </span>
+                    <span>{{ formatDate(friend.friends_since) }}부터 친구</span>
+                  </div>
+                  <div class="person-actions">
+                    <button
+                      type="button"
+                      class="primary-button primary-button--small"
+                      :disabled="busyAction !== null"
+                      @click="emit('open-dm', friend)"
+                    >
+                      메시지
+                    </button>
+                    <button
+                      type="button"
+                      class="text-button text-button--danger"
+                      :disabled="busyAction !== null"
+                      @click="removeFriend(friend)"
+                    >
+                      {{
+                        busyAction === `remove:${friend.id}`
+                          ? '삭제 중…'
+                          : '친구 삭제'
+                      }}
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            </template>
           </div>
-          <p v-if="friends.length === 0" class="empty-state">
-            아직 수락된 친구가 없습니다.
-          </p>
-          <ul v-else class="people-list friend-list">
-            <li v-for="friend in friends" :key="friend.id" class="person-row">
-              <img
-                v-if="friend.profile_image_url"
-                :src="friend.profile_image_url"
-                alt=""
-                class="person-avatar"
-                referrerpolicy="no-referrer"
-              />
-              <div v-else class="person-avatar person-avatar--fallback">
-                {{ friend.name.charAt(0).toUpperCase() }}
-              </div>
-              <div class="person-meta">
-                <strong>{{ friend.name }}</strong>
-                <span
-                  class="friend-presence"
-                  :class="{ 'friend-presence--online': friend.online }"
-                >
-                  {{ friend.online ? '온라인' : '오프라인' }}
-                </span>
-                <span>{{ formatDate(friend.friends_since) }}부터 친구</span>
-              </div>
-              <div class="person-actions">
-                <button
-                  type="button"
-                  class="primary-button primary-button--small"
-                  :disabled="busyAction !== null"
-                  @click="emit('open-dm', friend)"
-                >
-                  메시지
-                </button>
-                <button
-                  type="button"
-                  class="text-button text-button--danger"
-                  :disabled="busyAction !== null"
-                  @click="removeFriend(friend)"
-                >
-                  {{
-                    busyAction === `remove:${friend.id}`
-                      ? '삭제 중…'
-                      : '친구 삭제'
-                  }}
-                </button>
-              </div>
-            </li>
-          </ul>
         </section>
       </template>
 

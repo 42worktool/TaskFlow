@@ -90,19 +90,23 @@ async function sendMessage(): Promise<void> {
 
   sending.value = true
   error.value = ''
+  let sent = false
   try {
     const message = await FriendAPI.sendMessage(friendId, nextContent)
     if (friendId !== props.friendId) return
     mergeMessages([message])
     content.value = ''
-    await nextTick()
-    composerInput.value?.focus()
+    sent = true
   } catch (caught) {
     if (friendId !== props.friendId) return
     error.value =
       caught instanceof Error ? caught.message : '메시지를 보내지 못했습니다.'
   } finally {
     if (friendId === props.friendId) sending.value = false
+  }
+  if (sent && friendId === props.friendId) {
+    await nextTick()
+    composerInput.value?.focus()
   }
 }
 
@@ -187,15 +191,6 @@ onUnmounted(() => {
           </span>
         </div>
       </div>
-      <button
-        type="button"
-        class="direct-message-refresh"
-        :disabled="loading || sending"
-        aria-label="대화 새로고침"
-        @click="loadMessages(true)"
-      >
-        ↻
-      </button>
     </header>
 
     <div ref="messageList" class="direct-message-list" aria-live="polite">

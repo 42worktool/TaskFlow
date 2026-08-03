@@ -72,7 +72,6 @@ function list(id: string, workspaceId: string): List {
     workspace_id: workspaceId,
     name: 'List',
     sequence: 1,
-    is_done: false,
     created_at: now,
     created_by: USER_ID,
     updated_at: now,

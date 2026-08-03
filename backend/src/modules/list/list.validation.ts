@@ -6,20 +6,14 @@ const listName = z.string().min(1).max(100)
 export const createListSchema = z
   .object({
     name: listName,
-    is_done: z.boolean().optional().default(false),
   })
   .strict()
 
 export const updateListSchema = z
   .object({
-    name: listName.optional(),
-    is_done: z.boolean().optional(),
+    name: listName,
   })
   .strict()
-  .refine(
-    (value) => value.name !== undefined || value.is_done !== undefined,
-    { message: 'either name or is_done is required' },
-  )
 
 export const listReorderSchema = z
   .object({

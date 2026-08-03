@@ -1,6 +1,9 @@
 import type {
   DirectMessage,
+  Friend,
   FriendPresenceEvent,
+  FriendRequest,
+  FriendUserIdEvent,
   NotificationEvent,
   WorkspaceChangedEvent,
   WorkspaceMemberPresenceEvent,
@@ -71,6 +74,10 @@ export interface RealtimeServerEvents {
   'system.error': RealtimeErrorData
   'notification.created': NotificationEvent
   'friend.presence_changed': FriendPresenceEvent
+  'friend.request_created': FriendRequest
+  'friend.request_accepted': Friend
+  'friend.request_deleted': FriendUserIdEvent
+  'friend.removed': FriendUserIdEvent
   'dm.message_created': DirectMessage
   'workspace.changed': WorkspaceChangedEvent
   'workspace.member_presence_changed': WorkspaceMemberPresenceEvent
@@ -171,6 +178,50 @@ export function parseFriendPresenceEvent(
     return null
   }
   return candidate as FriendPresenceEvent
+}
+
+export function parseFriendRequest(value: unknown): FriendRequest | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<FriendRequest>
+  if (
+    !isUuid(candidate.id) ||
+    typeof candidate.name !== 'string' ||
+    candidate.name.length === 0 ||
+    (candidate.profile_image_url !== null &&
+      typeof candidate.profile_image_url !== 'string') ||
+    !isIsoDate(candidate.requested_at)
+  ) {
+    return null
+  }
+  return candidate as FriendRequest
+}
+
+export function parseFriend(value: unknown): Friend | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<Friend>
+  if (
+    !isUuid(candidate.id) ||
+    typeof candidate.name !== 'string' ||
+    candidate.name.length === 0 ||
+    (candidate.profile_image_url !== null &&
+      typeof candidate.profile_image_url !== 'string') ||
+    !isIsoDate(candidate.friends_since) ||
+    typeof candidate.online !== 'boolean'
+  ) {
+    return null
+  }
+  return candidate as Friend
+}
+
+export function parseFriendUserIdEvent(
+  value: unknown,
+): FriendUserIdEvent | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<FriendUserIdEvent>
+  if (typeof candidate.user_id !== 'string' || !UUID_PATTERN.test(candidate.user_id)) {
+    return null
+  }
+  return candidate as FriendUserIdEvent
 }
 
 export function parseDirectMessage(value: unknown): DirectMessage | null {
