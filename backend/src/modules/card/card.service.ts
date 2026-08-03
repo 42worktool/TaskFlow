@@ -180,7 +180,7 @@ export async function listInboxCards(input: { userId: string }) {
     },
     orderBy: { updated_at: 'desc' },
   })
-  return cards.map(toCardDto)
+  return cards.map((card) => toCardDto(card))
 }
 
 export async function createCard(

@@ -1,10 +1,22 @@
-import type { Attachment, Card, Comment } from '@prisma/client'
+import type { Attachment, Card, CardLabel, Comment, Label } from '@prisma/client'
 import {
   toUserSummary,
   type SelectedUserSummary,
 } from '../../lib/user-summary'
 
-export function toCardDto(card: Card) {
+interface BoardCardLabel extends Pick<CardLabel, 'label_id'> {
+  label: Pick<Label, 'id' | 'label_name' | 'label_color'>
+}
+
+export function toBoardCardLabelDto(cardLabel: BoardCardLabel) {
+  return {
+    label_id: cardLabel.label.id,
+    label_name: cardLabel.label.label_name,
+    label_color: cardLabel.label.label_color,
+  }
+}
+
+export function toCardDto(card: Card, labels: BoardCardLabel[] = []) {
   return {
     id: card.id,
     list_id: card.list_id,
@@ -15,6 +27,7 @@ export function toCardDto(card: Card) {
     deadline: card.deadline,
     sequence: card.sequence,
     created_at: card.created_at,
+    labels: labels.map(toBoardCardLabelDto),
   }
 }
 

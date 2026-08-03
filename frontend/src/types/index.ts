@@ -108,6 +108,7 @@ export interface Card {
   is_completed: boolean
   sequence: number
   created_at: ISODateString
+  labels?: CardDetailLabel[]
 }
 
 export interface CardDetailMember {
@@ -143,7 +144,7 @@ export interface CardComment {
   updated_at: ISODateString
 }
 
-export interface CardDetail extends Card {
+export interface CardDetail extends Omit<Card, 'labels'> {
   members: CardDetailMember[]
   labels: CardDetailLabel[]
   attachments: CardAttachment[]

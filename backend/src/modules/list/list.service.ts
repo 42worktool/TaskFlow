@@ -44,6 +44,20 @@ export async function listLists(input: { userId: string; workspaceId: string }) 
       cards: {
         where: { deleted_at: null },
         orderBy: { sequence: 'asc' },
+        include: {
+          card_labels: {
+            where: {
+              deleted_at: null,
+              label: { deleted_at: null },
+            },
+            orderBy: { created_at: 'asc' },
+            include: {
+              label: {
+                select: { id: true, label_name: true, label_color: true },
+              },
+            },
+          },
+        },
       },
     },
   })
@@ -58,6 +72,20 @@ export async function getList(input: { userId: string; listId: string }) {
       cards: {
         where: { deleted_at: null },
         orderBy: { sequence: 'asc' },
+        include: {
+          card_labels: {
+            where: {
+              deleted_at: null,
+              label: { deleted_at: null },
+            },
+            orderBy: { created_at: 'asc' },
+            include: {
+              label: {
+                select: { id: true, label_name: true, label_color: true },
+              },
+            },
+          },
+        },
       },
     },
   })

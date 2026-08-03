@@ -63,6 +63,17 @@ function openCard() {
         ×
       </button>
     </div>
+    <div v-if="card.labels?.length" class="card-labels" aria-label="카드 라벨">
+      <span
+        v-for="label in card.labels"
+        :key="label.label_id"
+        class="card-label"
+        :style="{ backgroundColor: label.label_color }"
+        :title="label.label_name"
+      >
+        {{ label.label_name }}
+      </span>
+    </div>
     <div class="card-meta">
       <button
         v-if="showCompletionAction"

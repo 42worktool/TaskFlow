@@ -3,6 +3,7 @@ import test from 'node:test'
 import type { Attachment, Card, Comment } from '@prisma/client'
 import {
   toAttachmentDto,
+  toBoardCardLabelDto,
   toCardDetailDto,
   toCardDto,
   toCommentDto,
@@ -38,6 +39,7 @@ test('card DTOs preserve public field names and null values', () => {
     deadline: timestamp,
     sequence: 1,
     created_at: timestamp,
+    labels: [],
   })
 
   const attachment = {
@@ -75,6 +77,11 @@ test('card detail and comment DTOs preserve nested user shapes', () => {
     deleted_by: null,
     user: member.user,
   } satisfies Comment & { user: typeof member.user }
+  assert.deepEqual(toBoardCardLabelDto(label), {
+    label_id: 'label-id',
+    label_name: 'Urgent',
+    label_color: '#ef4444',
+  })
   const detail = toCardDetailDto(card, [member], [label], [], [comment])
   assert.deepEqual(detail.members[0], {
     user_id: 'user-id',
