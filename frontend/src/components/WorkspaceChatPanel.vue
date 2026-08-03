@@ -174,6 +174,7 @@ async function sendMessage(): Promise<void> {
 
   sending.value = true
   error.value = ''
+  let sent = false
   try {
     const message = await ChatAPI.send(workspaceId, nextContent, cardId)
     if (workspaceId !== props.workspaceId) return
@@ -181,12 +182,17 @@ async function sendMessage(): Promise<void> {
     content.value = ''
     selectedCardId.value = null
     pickerOpen.value = false
+    sent = true
   } catch (caught) {
     if (workspaceId !== props.workspaceId) return
     error.value =
       caught instanceof Error ? caught.message : '메시지를 보내지 못했습니다.'
   } finally {
     if (workspaceId === props.workspaceId) sending.value = false
+  }
+  if (sent && workspaceId === props.workspaceId) {
+    await nextTick()
+    composerInput.value?.focus()
   }
 }
 

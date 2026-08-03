@@ -5,15 +5,11 @@
   color: #111827;
 }
 
-.friends-heading,
-.section-heading {
+.friends-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-}
-
-.friends-heading {
   align-items: flex-start;
   margin-bottom: 16px;
 }
@@ -131,23 +127,67 @@ button:disabled {
   color: #64748b;
 }
 
-.request-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+.friend-tabs-panel {
   margin: 14px 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-.section-heading span {
+.friend-tabs {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.friend-tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 13px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.friend-tab span {
   display: grid;
-  min-width: 26px;
-  height: 26px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
   place-items: center;
   border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.friend-tab--active {
+  border-bottom-color: #2563eb;
+  color: #2563eb;
+}
+
+.friend-tab--active span {
   background: #eff6ff;
   color: #1d4ed8;
-  font-size: 12px;
-  font-weight: 800;
+}
+
+.friend-tab-panel {
+  padding: 16px;
+}
+
+.friend-tab-panel .people-list {
+  margin-top: 0;
+}
+
+.friend-tab-panel .empty-state {
+  margin-top: 0;
 }
 
 .empty-state {
@@ -171,22 +211,6 @@ button:disabled {
 
 .person-row:last-child {
   border-bottom: 0;
-}
-
-.person-avatar {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.person-avatar--fallback {
-  display: grid;
-  place-items: center;
-  background: #2563eb;
-  color: #fff;
-  font-weight: 800;
 }
 
 .person-meta {
