@@ -2,14 +2,7 @@
   font-size: 12px;
   text-align: center;
   z-index: 1;
-}
-
-.legal-footer--dark {
   color: rgba(255, 255, 255, 0.5);
-}
-
-.legal-footer--light {
-  color: #6b7280;
 }
 
 .legal-footer a {

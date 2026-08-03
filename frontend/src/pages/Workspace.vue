@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import InboxCardsPanel from '../components/InboxCardsPanel.vue'
-import LegalFooter from '../components/LegalFooter.vue'
 import WorkspaceFormModal from '../components/WorkspaceFormModal.vue'
 import WorkspaceToolbox from '../components/WorkspaceToolbox.vue'
 import { WorkspaceAPI } from '../api/workspace'
@@ -204,10 +203,6 @@ onMounted(refreshList)
             </button>
           </div>
         </section>
-
-        <div class="home-footer">
-          <LegalFooter variant="light" />
-        </div>
       </main>
     </div>
 
