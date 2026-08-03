@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import LegalFooter from '../components/LegalFooter.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { authState, deleteAccount, updateAccount } from '../services/auth'
 
 const router = useRouter()
@@ -43,10 +43,7 @@ async function removeAccount() {
 
 <template>
   <div class="account-page">
-    <header class="account-header">
-      <RouterLink to="/workspaces" class="account-logo">TaskFlow</RouterLink>
-      <RouterLink to="/workspaces" class="back-link">← 돌아가기</RouterLink>
-    </header>
+    <PageHeader />
 
     <main class="account-card">
       <h1>계정 설정</h1>
@@ -91,8 +88,6 @@ async function removeAccount() {
         <button type="button" class="danger-button" @click="removeAccount">계정 삭제</button>
       </section>
     </main>
-
-    <LegalFooter variant="light" />
   </div>
 </template>
 

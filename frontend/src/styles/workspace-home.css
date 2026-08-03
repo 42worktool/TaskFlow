@@ -273,11 +273,6 @@
   font-size: 13px;
 }
 
-.home-footer {
-  padding: 14px 20px 18px;
-  background: #f3f4f6;
-}
-
 @media (max-width: 1180px) {
   .project-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -304,8 +299,7 @@
     padding: 24px 16px 32px;
   }
 
-  .home-shell--inbox-open .home-content,
-  .home-shell--inbox-open .home-footer {
+  .home-shell--inbox-open .home-content {
     display: none;
   }
 
@@ -371,9 +365,5 @@
 
   .new-card-inner {
     min-height: 140px;
-  }
-
-  .home-footer {
-    padding: 10px 16px 16px;
   }
 }
