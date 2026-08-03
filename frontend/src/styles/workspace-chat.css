@@ -67,16 +67,6 @@
   font-size: 11px;
 }
 
-.chat-refresh-button {
-  width: 30px;
-  height: 30px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  color: #475569;
-  font-size: 17px;
-}
-
 .workspace-chat-messages-region {
   position: relative;
   min-height: 180px;
@@ -273,8 +263,7 @@
 }
 
 .chat-send-button:disabled,
-.chat-attach-button:disabled,
-.chat-refresh-button:disabled {
+.chat-attach-button:disabled {
   cursor: default;
   opacity: 0.5;
 }

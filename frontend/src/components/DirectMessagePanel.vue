@@ -187,15 +187,6 @@ onUnmounted(() => {
           </span>
         </div>
       </div>
-      <button
-        type="button"
-        class="direct-message-refresh"
-        :disabled="loading || sending"
-        aria-label="대화 새로고침"
-        @click="loadMessages(true)"
-      >
-        ↻
-      </button>
     </header>
 
     <div ref="messageList" class="direct-message-list" aria-live="polite">

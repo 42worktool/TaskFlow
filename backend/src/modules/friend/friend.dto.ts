@@ -1,4 +1,5 @@
 import type { FriendRequest, Friendship } from '@prisma/client'
+import { z } from 'zod'
 import {
   userSummarySelect,
   type SelectedUserSummary,
@@ -14,15 +15,21 @@ export const friendRequestInclude = {
   user_high: { select: userSummarySelect },
 } as const
 
-type FriendshipWithUsers = Friendship & {
+export type FriendshipWithUsers = Friendship & {
   user_low: SelectedUserSummary
   user_high: SelectedUserSummary
 }
 
-type FriendRequestWithUsers = FriendRequest & {
+export type FriendRequestWithUsers = FriendRequest & {
   user_low: SelectedUserSummary
   user_high: SelectedUserSummary
 }
+
+export const friendUserIdEventSchema = z
+  .object({
+    user_id: z.uuid(),
+  })
+  .strict()
 
 export interface FriendDto {
   id: string
