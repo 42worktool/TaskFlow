@@ -449,15 +449,6 @@ onUnmounted(() => {
         <strong># {{ workspaceName || '워크스페이스' }}</strong>
         <span>구성원 공용 대화방</span>
       </div>
-      <button
-        type="button"
-        class="chat-refresh-button"
-        :disabled="loading || sending"
-        aria-label="채팅 새로고침"
-        @click="loadMessages(true)"
-      >
-        ↻
-      </button>
     </div>
 
     <div class="workspace-chat-messages-region">

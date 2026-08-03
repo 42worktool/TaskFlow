@@ -216,27 +216,6 @@
   font-size: 14px;
 }
 
-.messenger-directory-heading button {
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #64748b;
-  font-size: 17px;
-  cursor: pointer;
-}
-
-.messenger-directory-heading button:hover:not(:disabled) {
-  background: #e2e8f0;
-  color: #0f172a;
-}
-
-.messenger-directory-heading button:disabled {
-  cursor: wait;
-  opacity: 0.5;
-}
-
 .messenger-directory-action,
 .messenger-directory-item {
   width: 100%;
