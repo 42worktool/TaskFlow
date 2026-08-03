@@ -137,6 +137,24 @@ Validation:
 - Reject unknown request fields if that matches the module validation convention.
 - Decide whether duplicate names are allowed. Recommended first implementation: allow duplicate names because the existing schema has no unique constraint; the UI should make duplicates understandable.
 
+### Update a label
+
+```http
+PUT /api/labels/{label_id}
+Content-Type: application/json
+```
+
+Request fields are optional individually, but at least one is required:
+
+```json
+{
+  "label_name": "Critical",
+  "label_color": "#DC2626"
+}
+```
+
+Response: `200 OK` with the updated `LabelDto`. MEMBER+ access to the label's workspace is required. The update is reflected on cards the next time their card details are loaded.
+
 ### Delete a label
 
 ```http
@@ -223,6 +241,7 @@ backend/src/modules/label/
 
 - `listLabels({ userId, workspaceId })`
 - `createLabel({ userId, workspaceId, labelName, labelColor })`
+- `updateLabel({ userId, labelId, labelName?, labelColor? })`
 - `deleteLabel({ userId, labelId })`
 - `addCardLabel({ userId, cardId, labelId })`
 - `removeCardLabel({ userId, cardId, labelId })`
@@ -291,9 +310,15 @@ Recommended API methods:
 
 - `LabelAPI.list(workspaceId)`
 - `LabelAPI.create(workspaceId, data)`
+- `LabelAPI.update(labelId, patch)`
 - `LabelAPI.remove(labelId)`
 - `LabelAPI.attach(cardId, labelId)`
 - `LabelAPI.detach(cardId, labelId)`
+
+- `frontend/src/components/WorkspaceLabelsMenu.vue`
+  - Provides the page-level Trello-style manager.
+  - Creates, edits, and deletes workspace labels with color inputs.
+  - Is opened from the workspace header beside the members control.
 
 Update:
 

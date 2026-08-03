@@ -1,7 +1,7 @@
 import type { Card, Label, Prisma } from '@prisma/client'
 import { prisma } from '../../db'
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors'
-import { createdBy, restoredBy, softDeletedBy } from '../../lib/audit'
+import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { requireWorkspaceReadAccess, requireWorkspaceRole } from '../../lib/workspace-permissions'
 import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 import { toLabelDto } from './label.dto'
@@ -76,6 +76,33 @@ export async function createLabel(input: {
     actor_user_id: input.userId,
   })
   return toLabelDto(label)
+}
+
+export async function updateLabel(input: {
+  userId: string
+  labelId: string
+  labelName?: string
+  labelColor?: string
+}) {
+  const label = await getLabelOrThrow(input.labelId)
+  await requireWorkspaceRole(label.workspace_id, input.userId, 'MEMBER')
+  const updated = await prisma.label.update({
+    where: { id: label.id },
+    data: {
+      ...(input.labelName !== undefined ? { label_name: input.labelName } : {}),
+      ...(input.labelColor !== undefined ? { label_color: input.labelColor.toUpperCase() } : {}),
+      ...updatedBy(input.userId),
+    },
+  })
+  publishWorkspaceChange({
+    workspace_id: label.workspace_id,
+    entity: 'workspace',
+    action: 'updated',
+    entity_id: label.workspace_id,
+    list_ids: [],
+    actor_user_id: input.userId,
+  })
+  return toLabelDto(updated)
 }
 
 export async function deleteLabel(input: { userId: string; labelId: string }): Promise<void> {

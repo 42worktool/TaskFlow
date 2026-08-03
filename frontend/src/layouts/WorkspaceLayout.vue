@@ -5,6 +5,7 @@ import AppHeader from '../components/AppHeader.vue'
 import InboxCardsPanel from '../components/InboxCardsPanel.vue'
 import ShareModal from '../components/ShareModal.vue'
 import WorkspaceMembersMenu from '../components/WorkspaceMembersMenu.vue'
+import WorkspaceLabelsMenu from '../components/WorkspaceLabelsMenu.vue'
 import WorkspaceToolbox from '../components/WorkspaceToolbox.vue'
 import { WorkspaceAPI } from '../api/workspace'
 import { authState } from '../services/auth'
@@ -467,6 +468,11 @@ onUnmounted(() => {
           :online-user-ids="onlineUserIds"
           :can-manage="canManageMembers"
           @manage="showShareModal = true"
+        />
+        <WorkspaceLabelsMenu
+          :workspace-id="workspaceId"
+          :can-manage="canEditBoard"
+          @changed="workspaceSyncVersion += 1"
         />
       </template>
     </AppHeader>

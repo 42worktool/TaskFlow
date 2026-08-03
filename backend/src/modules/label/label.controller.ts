@@ -1,7 +1,7 @@
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
 import * as svc from './label.service'
-import { attachLabelSchema, labelSchema } from './label.validation'
+import { attachLabelSchema, labelSchema, updateLabelSchema } from './label.validation'
 
 export const list: RequestHandler = async (req, res) => {
   const labels = await svc.listLabels({
@@ -20,6 +20,17 @@ export const create: RequestHandler = async (req, res) => {
     labelColor: data.label_color,
   })
   res.status(201).json(label)
+}
+
+export const update: RequestHandler = async (req, res) => {
+  const data = updateLabelSchema.parse(req.body)
+  const label = await svc.updateLabel({
+    userId: authenticatedUserId(req),
+    labelId: req.params.label_id as string,
+    ...(data.label_name !== undefined ? { labelName: data.label_name } : {}),
+    ...(data.label_color !== undefined ? { labelColor: data.label_color } : {}),
+  })
+  res.status(200).json(label)
 }
 
 export const remove: RequestHandler = async (req, res) => {

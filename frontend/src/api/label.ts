@@ -11,6 +11,12 @@ export const LabelAPI = {
       json: data,
     }),
 
+  update: (labelId: string, patch: { label_name?: string; label_color?: string }) =>
+    apiRequest<Label>(`/api/labels/${labelId}`, {
+      method: 'PUT',
+      json: patch,
+    }),
+
   remove: (labelId: string) =>
     apiRequest<void>(`/api/labels/${labelId}`, { method: 'DELETE' }),
 

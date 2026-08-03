@@ -17,6 +17,7 @@ test('OpenAPI document contains every active authentication and account route', 
   assert.ok(openApiDocument.paths['/api/auth/account'].delete);
   assert.ok(openApiDocument.paths['/api/workspaces/{workspaceId}/labels'].get);
   assert.ok(openApiDocument.paths['/api/workspaces/{workspaceId}/labels'].post);
+  assert.ok(openApiDocument.paths['/api/labels/{label_id}'].put);
   assert.ok(openApiDocument.paths['/api/labels/{label_id}'].delete);
   assert.ok(openApiDocument.paths['/api/cards/{card_id}/labels'].post);
   assert.ok(openApiDocument.paths['/api/cards/{card_id}/labels/{label_id}'].delete);

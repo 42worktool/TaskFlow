@@ -363,6 +363,27 @@ export const openApiDocument = {
         },
       },
       '/api/labels/{label_id}': {
+        put: {
+          tags: ['Workspace'],
+          summary: '라벨 수정',
+          operationId: 'updateLabel',
+          security: [{ bearerAuth: [] }],
+          parameters: [{ $ref: '#/components/parameters/LabelId' }],
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateLabelRequest' } } },
+          },
+          responses: {
+            '200': {
+              description: '수정된 라벨',
+              content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
+            },
+            '400': errorResponse('라벨 입력값 검증 실패'),
+            '401': errorResponse('인증 필요'),
+            '403': errorResponse('라벨 수정 권한 없음'),
+            '404': errorResponse('라벨 없음'),
+          },
+        },
         delete: {
           tags: ['Workspace'],
           summary: '라벨 삭제',
@@ -479,6 +500,15 @@ export const openApiDocument = {
       CreateLabelRequest: {
         type: 'object',
         required: ['label_name', 'label_color'],
+        additionalProperties: false,
+        properties: {
+          label_name: { type: 'string', minLength: 1, maxLength: 50 },
+          label_color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+        },
+      },
+      UpdateLabelRequest: {
+        type: 'object',
+        minProperties: 1,
         additionalProperties: false,
         properties: {
           label_name: { type: 'string', minLength: 1, maxLength: 50 },

@@ -35,6 +35,26 @@ describe('LabelAPI', () => {
     })
   })
 
+  it('updates a label', async () => {
+    const label = {
+      id: 'label-1',
+      workspace_id: 'workspace-1',
+      label_name: 'Critical',
+      label_color: '#DC2626',
+      created_at: '2026-08-03T12:00:00.000Z',
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(label)
+
+    await expect(LabelAPI.update('label-1', {
+      label_name: 'Critical',
+      label_color: '#DC2626',
+    })).resolves.toEqual(label)
+    expect(apiRequest).toHaveBeenCalledWith('/api/labels/label-1', {
+      method: 'PUT',
+      json: { label_name: 'Critical', label_color: '#DC2626' },
+    })
+  })
+
   it('attaches and detaches card labels', async () => {
     vi.mocked(apiRequest).mockResolvedValue(undefined)
 
