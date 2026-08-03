@@ -68,6 +68,19 @@ async function createLabel(): Promise<void> {
   }
 }
 
+function getLabelTextColor(hex: string): string {
+  const normalized = hex.replace('#', '')
+  if (!/^[\da-f]{6}$/i.test(normalized)) return '#111827'
+
+  const channels = [0, 2, 4].map((index) => Number.parseInt(normalized.slice(index, index + 2), 16) / 255)
+  const luminance = channels.reduce((total, channel, index) => {
+    const linear = channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    return total + linear * [0.2126, 0.7152, 0.0722][index]
+  }, 0)
+
+  return luminance > 0.179 ? '#111827' : '#fff'
+}
+
 function startEditing(label: Label): void {
   editingId.value = label.id
   editingName.value = label.label_name
@@ -196,7 +209,7 @@ onUnmounted(() => {
             <button type="button" :disabled="saving" @click="cancelEditing">취소</button>
           </template>
           <template v-else>
-            <span class="workspace-label-chip" :style="{ backgroundColor: label.label_color }">{{ label.label_name }}</span>
+            <span class="workspace-label-chip" :style="{ backgroundColor: label.label_color, color: getLabelTextColor(label.label_color) }">{{ label.label_name }}</span>
             <button v-if="canManage" type="button" :disabled="saving" @click="startEditing(label)">수정</button>
             <button v-if="canManage" type="button" :disabled="saving" @click="deleteLabel(label)">삭제</button>
           </template>
