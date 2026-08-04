@@ -38,6 +38,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   FRIEND_REQUEST_NOT_FOUND: '친구 요청을 찾을 수 없습니다. 목록을 새로고침해 주세요.',
   UNSUPPORTED_FILE_TYPE: '지원하지 않는 파일 형식입니다.',
   PAYLOAD_TOO_LARGE: '파일 용량이 너무 큽니다.',
+  INVALID_FILE_NAME: '파일 이름이 올바르지 않습니다.',
 }
 
 export const authState = reactive<{

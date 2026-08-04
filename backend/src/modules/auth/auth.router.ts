@@ -2,7 +2,7 @@ import { NextFunction, Request, Response, Router } from 'express';
 import { config } from '../../config';
 import { AppError } from '../../errors';
 import { requireAuth } from '../../middleware/auth';
-import { avatarUpload } from '../../lib/upload';
+import { AVATAR_MIME_ALLOWLIST, avatarUpload, requireMagicBytesMatch } from '../../lib/upload';
 import * as controller from './auth.controller';
 
 function requireSameOrigin(req: Request, _res: Response, next: NextFunction): void {
@@ -36,6 +36,7 @@ authRouter.post(
   requireSameOrigin,
   requireAuth,
   avatarUpload.single('file'),
+  requireMagicBytesMatch('avatars', AVATAR_MIME_ALLOWLIST),
   controller.uploadAvatar,
 );
 authRouter.delete('/account/avatar', requireSameOrigin, requireAuth, controller.removeAvatar);

@@ -966,6 +966,36 @@ test('addAttachment stores the uploaded file metadata for a workspace member', a
   assert.equal(dto.size_bytes, 2048)
 })
 
+test('addAttachment preserves a Korean original filename', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { addAttachment }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.card, 'findFirst', async () =>
+    card({ list_id: SOURCE_LIST_ID }))
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
+  let createArgs: unknown
+  stubMethod(t, prisma.attachment, 'create', async (args: { data: Record<string, unknown> }) => {
+    createArgs = args
+    return attachment({ ...(args.data as object) } as never)
+  })
+  stubMethod(t, realtime, 'publish', () => {})
+
+  const koreanName = '한글 파일명.pdf'
+  await addAttachment({
+    userId: USER_ID,
+    cardId: CARD_ID,
+    file: multerFile({ originalname: koreanName }),
+  })
+
+  assert.equal((createArgs as { data: { file_name: string } }).data.file_name, koreanName)
+})
+
 test('addAttachment rejects a viewer without write access', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { addAttachment }] = await Promise.all([

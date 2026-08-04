@@ -12,6 +12,10 @@ import {
 import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_ALLOWLIST } from '../utils/uploadLimits'
 
+// Derived once from the shared allowlist so the file picker's filter can't
+// drift out of sync with the ATTACHMENT_MIME_ALLOWLIST.has(file.type) check below.
+const attachmentAccept = [...ATTACHMENT_MIME_ALLOWLIST].join(',')
+
 const route = useRoute()
 
 const props = withDefaults(
@@ -624,7 +628,7 @@ onUnmounted(() => {
               ref="attachmentInput"
               type="file"
               class="card-detail-attachment-input"
-              accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,text/csv,.doc,.docx,.xls,.xlsx,.zip"
+              :accept="attachmentAccept"
               @change="onAttachmentSelected"
             />
             <button
