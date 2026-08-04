@@ -1,7 +1,7 @@
 import { getRedisClient } from './redis';
 import { AppError } from '../errors';
 
-const RATE_LIMIT = 5;
+const RATE_LIMIT = 20;
 const WINDOW_SECONDS = 3600;
 
 function key(email: string): string {
