@@ -3,6 +3,7 @@
 // ============================================================
 import { Router } from 'express'
 import * as ctrl from './workspace.controller'
+import * as labelCtrl from '../label/label.controller'
 import * as listCtrl from '../list/list.controller'
 import * as messageCtrl from './workspace-message.controller'
 import { uuidParam } from '../../middleware/validation'
@@ -24,5 +25,7 @@ workspaceRouter.delete('/:workspaceId/members/:userId', ctrl.removeMember)
 workspaceRouter.post('/invite/:token', ctrl.acceptInvite)
 workspaceRouter.get('/:workspaceId/lists', listCtrl.list)
 workspaceRouter.post('/:workspaceId/lists', listCtrl.create)
+workspaceRouter.get('/:workspaceId/labels', labelCtrl.list)
+workspaceRouter.post('/:workspaceId/labels', labelCtrl.create)
 workspaceRouter.get('/:workspaceId/messages', messageCtrl.list)
 workspaceRouter.post('/:workspaceId/messages', messageCtrl.create)

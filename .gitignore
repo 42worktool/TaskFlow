@@ -7,5 +7,6 @@ backend/dist/
 frontend/node_modules/
 frontend/dist/
 
+.commandcode/
 .DS_Store
 *.log

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { CardAPI } from '../api/card'
-import type { Card, CardAttachment, CardDetail } from '../types'
+import { LabelAPI } from '../api/label'
+import type { Card, CardAttachment, CardDetail, Label } from '../types'
 import {
   isDateRangeValid,
   toDateInput,
@@ -9,6 +11,8 @@ import {
 } from '../utils/cardDates'
 import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_ALLOWLIST } from '../utils/uploadLimits'
+
+const route = useRoute()
 
 const props = withDefaults(
   defineProps<{
@@ -33,6 +37,15 @@ const saving = ref(false)
 const commentDraft = ref('')
 const commentSaving = ref(false)
 const commentError = ref('')
+const availableLabels = ref<Label[]>([])
+const labelsLoading = ref(false)
+const labelPending = ref<string | null>(null)
+const labelError = ref('')
+const selectedLabelId = ref('')
+const attachableLabels = computed(() => {
+  const attached = new Set(detail.value?.labels.map((label) => label.label_id) ?? [])
+  return availableLabels.value.filter((label) => !attached.has(label.id))
+})
 const error = ref('')
 const remoteUpdatePending = ref(false)
 const attachmentInput = ref<HTMLInputElement | null>(null)
@@ -176,7 +189,66 @@ function applyDetail(card: CardDetail): void {
   initialDescription = card.description ?? ''
   initialStartDate = startDate.value
   initialDeadline = deadline.value
+  selectedLabelId.value = ''
   remoteUpdatePending.value = false
+}
+
+async function loadLabels(): Promise<void> {
+  const workspaceId = String(route.params.workspaceId ?? '')
+  if (!workspaceId) return
+  labelsLoading.value = true
+  labelError.value = ''
+  try {
+    availableLabels.value = await LabelAPI.list(workspaceId)
+  } catch (caught) {
+    labelError.value = caught instanceof Error ? caught.message : '라벨을 불러오지 못했습니다.'
+  } finally {
+    labelsLoading.value = false
+  }
+}
+
+async function attachLabel(): Promise<void> {
+  if (!detail.value || !selectedLabelId.value || labelPending.value) return
+  const labelId = selectedLabelId.value
+  if (detail.value.labels.some((label) => label.label_id === labelId)) return
+  labelPending.value = labelId
+  labelError.value = ''
+  try {
+    const label = await LabelAPI.attach(props.cardId, labelId)
+    detail.value = {
+      ...detail.value,
+      labels: [
+        ...detail.value.labels,
+        {
+          label_id: label.id,
+          label_name: label.label_name,
+          label_color: label.label_color,
+        },
+      ],
+    }
+    selectedLabelId.value = ''
+  } catch (caught) {
+    labelError.value = caught instanceof Error ? caught.message : '라벨을 추가하지 못했습니다.'
+  } finally {
+    labelPending.value = null
+  }
+}
+
+async function detachLabel(labelId: string): Promise<void> {
+  if (!detail.value || labelPending.value) return
+  labelPending.value = labelId
+  labelError.value = ''
+  try {
+    await LabelAPI.detach(props.cardId, labelId)
+    detail.value = {
+      ...detail.value,
+      labels: detail.value.labels.filter((label) => label.label_id !== labelId),
+    }
+  } catch (caught) {
+    labelError.value = caught instanceof Error ? caught.message : '라벨을 제거하지 못했습니다.'
+  } finally {
+    labelPending.value = null
+  }
 }
 
 function hasUnsavedChanges(): boolean {
@@ -209,6 +281,7 @@ async function loadCard(
   error.value = ''
   try {
     const card = await CardAPI.get(props.cardId)
+    void loadLabels()
     if (generation === loadGeneration) {
       if (
         background &&
@@ -488,14 +561,14 @@ onUnmounted(() => {
           </div>
 
           <div
-            v-if="detail.members.length || detail.labels.length"
+            v-if="detail.members.length || detail.labels.length || detail.attachments.length || editable"
             class="card-detail-metadata"
           >
             <div v-if="detail.members.length">
               <span class="card-detail-meta-label">담당자</span>
               <span>{{ detail.members.map((member) => member.name).join(', ') }}</span>
             </div>
-            <div v-if="detail.labels.length">
+            <div v-if="detail.labels.length || editable" class="card-detail-label-section">
               <span class="card-detail-meta-label">라벨</span>
               <span class="card-detail-labels">
                 <span
@@ -505,8 +578,38 @@ onUnmounted(() => {
                   :style="{ borderColor: label.label_color, color: label.label_color }"
                 >
                   {{ label.label_name }}
+                  <button
+                    v-if="editable"
+                    type="button"
+                    :disabled="labelPending !== null"
+                    :aria-label="`${label.label_name} 라벨 제거`"
+                    @click="detachLabel(label.label_id)"
+                  >
+                    ×
+                  </button>
                 </span>
               </span>
+              <div v-if="editable" class="card-detail-label-controls">
+                <select v-model="selectedLabelId" :disabled="labelsLoading || labelPending !== null">
+                  <option value="">{{ attachableLabels.length ? '라벨 추가' : '라벨 없음' }}</option>
+                  <option
+                    v-for="label in attachableLabels"
+                    :key="label.id"
+                    :value="label.id"
+                  >
+                    {{ label.label_name }}
+                  </option>
+                </select>
+                <button
+                  type="button"
+                  :disabled="!selectedLabelId || labelPending !== null"
+                  @click="attachLabel"
+                >
+                  {{ labelPending === selectedLabelId ? '추가 중…' : '추가' }}
+                </button>
+              </div>
+              <p v-if="labelsLoading" class="card-detail-label-state">라벨을 불러오는 중…</p>
+              <p v-if="labelError" class="card-detail-label-error" role="alert">{{ labelError }}</p>
             </div>
           </div>
 
