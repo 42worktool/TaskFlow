@@ -71,6 +71,14 @@ export const acceptInvite: RequestHandler = async (req, res) => {
   res.status(200).json(workspace)
 }
 
+export const previewInvite: RequestHandler = async (req, res) => {
+  const invitation = await svc.previewInvite({
+    userId: authenticatedUserId(req),
+    token: req.params.token as string,
+  })
+  res.status(200).json(invitation)
+}
+
 export const changeMemberRole: RequestHandler = async (req, res) => {
   const body = changeWorkspaceRoleSchema.parse(req.body)
   const workspace = await svc.changeMemberRole({

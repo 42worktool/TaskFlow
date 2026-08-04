@@ -3,6 +3,13 @@ import { apiRequest } from '../services/auth'
 
 type ManageableWorkspaceRole = Exclude<WorkspaceRole, 'OWNER'>
 
+export interface WorkspaceInvitationPreview {
+  workspace_name: string
+  role: ManageableWorkspaceRole
+  already_member: boolean
+  current_role?: WorkspaceRole
+}
+
 export const WorkspaceAPI = {
   list: () =>
     apiRequest<{ my: Workspace[]; public: Workspace[] }>('/api/workspaces'),
@@ -45,6 +52,9 @@ export const WorkspaceAPI = {
     apiRequest<Workspace>(`/api/workspaces/invite/${token}`, {
       method: 'POST',
     }),
+
+  previewInvite: async (token: string) =>
+    apiRequest<WorkspaceInvitationPreview>(`/api/workspaces/invite/${token}`),
 
   removeMember: async (workspaceId: string, userId: string) =>
     apiRequest<{ ok: true }>(`/api/workspaces/${workspaceId}/members/${userId}`, {
