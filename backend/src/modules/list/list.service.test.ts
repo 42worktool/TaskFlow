@@ -226,6 +226,20 @@ test('getList returns one list with cards under the board read policy', async (t
   assert.deepEqual(listQuery.include.cards, {
     where: { deleted_at: null },
     orderBy: { sequence: 'asc' },
+    include: {
+      card_labels: {
+        where: {
+          deleted_at: null,
+          label: { deleted_at: null },
+        },
+        orderBy: { created_at: 'asc' },
+        include: {
+          label: {
+            select: { id: true, label_name: true, label_color: true },
+          },
+        },
+      },
+    },
   })
 })
 
