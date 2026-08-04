@@ -196,13 +196,17 @@ export async function updateWorkspace(
  * hidden by active-workspace filters. Requires OWNER.
  */
 export async function deleteWorkspace(input: { userId: string; workspaceId: string }) {
-  await prisma.$transaction(async (tx) => {
-    await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'OWNER')
+  await workspaceInviteLock.run(input.workspaceId, async () => {
+    await prisma.$transaction(async (tx) => {
+      await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'OWNER')
 
-    await tx.workspace.update({
-      where: { id: input.workspaceId },
-      data: softDeletedBy(input.userId),
+      await tx.workspace.update({
+        where: { id: input.workspaceId },
+        data: softDeletedBy(input.userId),
+      })
     })
+
+    await workspaceInvitationStore.discardWorkspace(input.workspaceId)
   })
 
   revokeWorkspaceAccess(input.workspaceId)

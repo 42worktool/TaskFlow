@@ -536,9 +536,15 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
 
 test('workspace removal events are published before channel access is revoked', async (t) => {
   setRequiredEnvironment()
-  const [{ prisma }, { realtime }, service] = await Promise.all([
+  const [
+    { prisma },
+    { realtime },
+    { workspaceInvitationStore },
+    service,
+  ] = await Promise.all([
     import('../../db'),
     import('../../realtime'),
+    import('./workspace-invitation.store'),
     import('./workspace.service'),
   ])
 
@@ -586,6 +592,10 @@ test('workspace removal events are published before channel access is revoked', 
       operationOrder.push('update')
       return {}
     })
+    stubMethod(t, workspaceInvitationStore, 'discardWorkspace', async (workspaceId) => {
+      operationOrder.push('discard-invitations')
+      assert.equal(workspaceId, WORKSPACE_ID)
+    })
     stubMethod(t, realtime, 'publish', () => {
       operationOrder.push('publish')
     })
@@ -600,7 +610,12 @@ test('workspace removal events are published before channel access is revoked', 
       workspaceId: WORKSPACE_ID,
     })
 
-    assert.deepEqual(operationOrder, ['update', 'publish', 'clear'])
+    assert.deepEqual(operationOrder, [
+      'update',
+      'discard-invitations',
+      'publish',
+      'clear',
+    ])
     assert.deepEqual(clearArgs!, [`workspace:${WORKSPACE_ID}`])
   })
 })
