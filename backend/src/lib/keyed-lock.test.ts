@@ -10,12 +10,12 @@ test('KeyedLock serializes operations sharing a key', async () => {
     releaseFirst = resolve
   })
 
-  const first = lock.run('workspace:email', async () => {
+  const first = lock.run('workspace', async () => {
     order.push('first:start')
     await firstMayFinish
     order.push('first:end')
   })
-  const second = lock.run('workspace:email', async () => {
+  const second = lock.run('workspace', async () => {
     order.push('second:start')
   })
 
@@ -32,13 +32,13 @@ test('KeyedLock releases a key after a failed operation', async () => {
   const expected = new Error('failed')
 
   await assert.rejects(
-    lock.run('workspace:email', async () => {
+    lock.run('workspace', async () => {
       throw expected
     }),
     expected,
   )
 
-  assert.equal(await lock.run('workspace:email', async () => 'next'), 'next')
+  assert.equal(await lock.run('workspace', async () => 'next'), 'next')
 })
 
 test('KeyedLock allows different keys to run concurrently', async () => {

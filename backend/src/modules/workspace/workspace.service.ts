@@ -342,9 +342,8 @@ export async function inviteWorkspaceMember(input: {
   role: Exclude<Role, 'OWNER'>
 }): Promise<void> {
   const email = normalizeEmail(input.email)
-  const lockKey = `${input.workspaceId}:${email}`
 
-  await workspaceInviteLock.run(lockKey, async () => {
+  await workspaceInviteLock.run(input.workspaceId, async () => {
     const workspace = await getWorkspace({
       userId: input.userId,
       workspaceId: input.workspaceId,
