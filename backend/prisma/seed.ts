@@ -228,20 +228,6 @@ async function main() {
       })
     }
 
-    await tx.card.deleteMany({
-      where: {
-        created_by: ids.users.owner,
-        OR: [
-          { list_id: ids.lists.todo, title: '할 일 1', description: '첫 번 째 할 일' },
-          { list_id: ids.lists.todo, title: '할 일 2', description: '두 번 째 할 일' },
-          { list_id: ids.lists.doing, title: '하는 중', description: '하고 있음' },
-          { list_id: ids.lists.doing, title: '하고 있는데', description: '하고 있음' },
-          { list_id: ids.lists.done, title: '다 함', description: '끝' },
-          { list_id: ids.lists.done, title: '완', description: '끝' },
-        ],
-      },
-    })
-
     const cards = [
       { id: ids.cards.research, list_id: ids.lists.backlog, user_id: null, title: '사용자 인터뷰 결과 정리', description: '인터뷰 메모를 정리하고 launch scope에 반영합니다.', is_completed: false, start_at: null, deadline: null, sequence: 1024, actor: ids.users.member, created_at: dateFromNow(-24) },
       { id: ids.cards.analytics, list_id: ids.lists.backlog, user_id: null, title: 'Analytics event taxonomy', description: '핵심 행동 이벤트와 naming convention 초안 작성.', is_completed: false, start_at: dateFromNow(7), deadline: dateFromNow(12), sequence: 2048, actor: ids.users.admin, created_at: dateFromNow(-20) },
