@@ -4,7 +4,22 @@
 //   upsert 를 쓰므로 여러 번 실행해도 중복 생성되지 않는다.
 // ============================================================
 import { PrismaClient } from '@prisma/client'
-import { DEV_USER_ID } from '../src/config'
+import { hashPassword } from '../src/modules/auth/auth.utils'
+
+if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DB_SEED !== 'true') {
+  throw new Error('Database seed is allowed only in development')
+}
+
+const DEV_USER_ID = '00000000-0000-4000-8000-000000000001'
+
+function required(name: string): string {
+  const value = process.env[name]?.trim()
+  if (!value) throw new Error(`${name} is required`)
+  return value
+}
+
+const DEV_SEED_EMAIL = required('DEV_SEED_EMAIL')
+const DEV_SEED_PASSWORD = required('DEV_SEED_PASSWORD')
 
 const prisma = new PrismaClient()
 
@@ -13,15 +28,21 @@ const prisma = new PrismaClient()
 export const DEV_WORKSPACE_ID = '00000000-0000-4000-8000-0000000000aa'
 
 async function main() {
-  // 1) 인증 스텁이 사용하는 개발 유저
+  const passwordHash = await hashPassword(DEV_SEED_PASSWORD)
+
+  // 1) 로그인 가능한 개발 유저
   const user = await prisma.user.upsert({
     where: { id: DEV_USER_ID },
-    update: {},
+    update: {
+      email: DEV_SEED_EMAIL,
+      password_hash: passwordHash,
+      updated_by: DEV_USER_ID,
+    },
     create: {
       id: DEV_USER_ID,
-      email: 'dev@local.test',
+      email: DEV_SEED_EMAIL,
       name: '개발유저',
-      password_hash: null,
+      password_hash: passwordHash,
       created_by: DEV_USER_ID,
       updated_by: DEV_USER_ID,
     },

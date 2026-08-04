@@ -6,8 +6,6 @@ const DEFAULT_WS_HEARTBEAT_INTERVAL_MS = 30_000;
 const DEFAULT_WS_MAX_PAYLOAD_BYTES = 64 * 1024;
 const DEFAULT_WS_MAX_MESSAGES_PER_MINUTE = 120;
 
-export const DEV_USER_ID = '00000000-0000-4000-8000-000000000001';
-
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
