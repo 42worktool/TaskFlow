@@ -100,4 +100,6 @@ clean:
 fclean: clean
 
 # Rebuild the development environment from a clean Docker state
-re: fclean all
+re:
+	$(MAKE) fclean
+	$(MAKE)
