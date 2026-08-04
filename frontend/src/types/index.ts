@@ -145,7 +145,6 @@ export interface CardComment {
 }
 
 export interface CardDetail extends Omit<Card, 'labels'> {
-  members: CardDetailMember[]
   labels: CardDetailLabel[]
   attachments: CardAttachment[]
   comments: CardComment[]

@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import draggable from 'vuedraggable'
 import CardDetailModal from './CardDetailModal.vue'
 import TaskCard from './TaskCard.vue'
+import { CardAPI } from '../api/card'
 import { InboxAPI } from '../api/inbox'
 import { isExternalCardDropClaimed } from '../services/messenger'
 import type { Card, DraggableChange, List } from '../types'
@@ -76,6 +77,25 @@ async function deleteCard(cardId: string) {
   } catch (caught) {
     error.value =
       caught instanceof Error ? caught.message : '인박스 카드를 삭제하지 못했습니다.'
+  } finally {
+    busyCardId.value = null
+  }
+}
+
+async function toggleCardCompletion(card: Card) {
+  if (busyCardId.value) return
+  busyCardId.value = card.id
+  error.value = ''
+  try {
+    const saved = await CardAPI.updateCompletion(card.id, !card.is_completed)
+    updateSavedCard(saved)
+  } catch (caught) {
+    error.value =
+      caught instanceof Error
+        ? caught.message
+        : card.is_completed
+          ? '카드를 다시 열지 못했습니다.'
+          : '카드를 완료하지 못했습니다.'
   } finally {
     busyCardId.value = null
   }
@@ -181,9 +201,14 @@ onUnmounted(() => {
         <li>
           <TaskCard
             :card="card"
+            :openable="true"
+            :show-delete-action="true"
+            :show-completion-action="true"
             :completed="card.is_completed"
+            :completion-pending="busyCardId === card.id"
             @open="selectedCardId = card.id"
             @delete="deleteCard"
+            @toggle-completion="toggleCardCompletion"
           />
         </li>
       </template>
