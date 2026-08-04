@@ -35,3 +35,19 @@ export function canChangeWorkspaceMemberRole(
     ROLE_RANK[targetRole] <= ROLE_RANK[callerRole]
   )
 }
+
+export function partitionWorkspacesByOwnership(
+  workspaces: readonly Workspace[],
+  userId: string | undefined,
+): { owned: Workspace[]; participating: Workspace[] } {
+  const owned: Workspace[] = []
+  const participating: Workspace[] = []
+
+  for (const workspace of workspaces) {
+    const role = workspaceRoleFor(workspace, userId)
+    if (role === 'OWNER') owned.push(workspace)
+    else if (role !== null) participating.push(workspace)
+  }
+
+  return { owned, participating }
+}

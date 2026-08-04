@@ -11,48 +11,66 @@ import { workspaceColor } from '../types'
 import type { Workspace } from '../types'
 import {
   hasWorkspaceRole,
+  partitionWorkspacesByOwnership,
   workspaceRoleFor,
 } from '../utils/workspacePermissions'
 
 const showCreate = ref(false)
 const inboxOpen = ref(false)
-const myWorkspaces = ref<Workspace[]>([])
-const openWorkspaces = ref<Workspace[]>([])
+const memberWorkspaces = ref<Workspace[]>([])
+const loading = ref(true)
+const loadError = ref('')
 
 const editing = ref<Workspace | null>(null)
 const menuOpen = ref<string | null>(null)
+const partitionedWorkspaces = computed(() =>
+  partitionWorkspacesByOwnership(
+    memberWorkspaces.value,
+    authState.user?.id,
+  ),
+)
 const workspaceSections = computed(() => [
   {
     key: 'mine',
     title: '내 프로젝트',
-    description: '내가 참여 중인 프로젝트',
-    workspaces: myWorkspaces.value,
+    description: '내가 만들고 소유하고 있는 프로젝트',
+    emptyMessage: '아직 만든 프로젝트가 없습니다.',
+    workspaces: partitionedWorkspaces.value.owned,
     editable: true,
   },
   {
-    key: 'public',
-    title: '공개 프로젝트',
-    description: '로그인 사용자가 열람할 수 있는 프로젝트',
-    workspaces: openWorkspaces.value,
+    key: 'participating',
+    title: '참여하고 있는 프로젝트',
+    description: '초대받아 구성원으로 참여하고 있는 프로젝트',
+    emptyMessage: '현재 참여하고 있는 다른 프로젝트가 없습니다.',
+    workspaces: partitionedWorkspaces.value.participating,
     editable: false,
   },
 ])
 
 async function refreshList() {
-  const data = await WorkspaceAPI.list()
-  myWorkspaces.value = data.my
-  openWorkspaces.value = data.public
+  loading.value = true
+  loadError.value = ''
+  try {
+    const data = await WorkspaceAPI.list()
+    memberWorkspaces.value = data.my
+  } catch (caught) {
+    loadError.value =
+      caught instanceof Error
+        ? caught.message
+        : '프로젝트 목록을 불러오지 못했습니다.'
+  } finally {
+    loading.value = false
+  }
 }
 
 function onSaved(ws: Workspace) {
   if (!editing.value) {
-    myWorkspaces.value.unshift(ws)
+    memberWorkspaces.value.unshift(ws)
     return
   }
-  const idx = myWorkspaces.value.findIndex((w) => w.id === ws.id)
-  if (idx !== -1) myWorkspaces.value[idx] = ws
-  const idx2 = openWorkspaces.value.findIndex((w) => w.id === ws.id)
-  if (idx2 !== -1) openWorkspaces.value[idx2] = ws
+  const index = memberWorkspaces.value.findIndex((w) => w.id === ws.id)
+  if (index !== -1) memberWorkspaces.value[index] = ws
 }
 
 function toggleMenu(wsId: string) {
@@ -82,6 +100,16 @@ function hasWorkspaceMenu(ws: Workspace): boolean {
   return canEditWorkspace(ws) || canDeleteWorkspace(ws)
 }
 
+function workspaceRoleLabel(ws: Workspace): string {
+  const role = workspaceRoleFor(ws, authState.user?.id)
+  return {
+    OWNER: '소유자',
+    ADMIN: '관리자',
+    MEMBER: '멤버',
+    VIEWER: '뷰어',
+  }[role ?? 'VIEWER']
+}
+
 function startEdit(ws: Workspace) {
   if (!canEditWorkspace(ws)) return
   menuOpen.value = null
@@ -94,8 +122,9 @@ async function removeWorkspace(ws: Workspace) {
   if (!confirm(`"${ws.name}" 프로젝트를 삭제하시겠습니까?`)) return
   try {
     await WorkspaceAPI.remove(ws.id)
-    myWorkspaces.value = myWorkspaces.value.filter((w) => w.id !== ws.id)
-    openWorkspaces.value = openWorkspaces.value.filter((w) => w.id !== ws.id)
+    memberWorkspaces.value = memberWorkspaces.value.filter(
+      (workspace) => workspace.id !== ws.id,
+    )
   } catch {
     alert('삭제에 실패했습니다.')
   }
@@ -125,14 +154,26 @@ onMounted(refreshList)
 
       <!-- Content -->
       <main class="home-content">
+        <div v-if="loadError" class="project-load-state project-load-state--error" role="alert">
+          <span>{{ loadError }}</span>
+          <button type="button" @click="refreshList">다시 시도</button>
+        </div>
+        <div v-else-if="loading" class="project-load-state" role="status">
+          프로젝트를 불러오는 중…
+        </div>
+        <template v-else>
         <section
           v-for="section in workspaceSections"
-          v-show="section.editable || section.workspaces.length"
           :key="section.key"
           class="project-section"
         >
-          <h2 class="section-title">{{ section.title }}</h2>
-          <p class="section-desc">{{ section.description }}</p>
+          <div class="project-section-heading">
+            <div>
+              <h2 class="section-title">{{ section.title }}</h2>
+              <p class="section-desc">{{ section.description }}</p>
+            </div>
+            <span class="project-section-count">{{ section.workspaces.length }}</span>
+          </div>
           <div class="project-grid">
             <div
               v-for="ws in section.workspaces"
@@ -146,10 +187,15 @@ onMounted(refreshList)
                 <div class="card-color-bar" :style="{ background: workspaceColor(ws.id) }" />
                 <div class="card-body">
                   <h3 class="card-name">{{ ws.name }}</h3>
-                  <span
-                    class="card-badge"
-                    :class="ws.is_public ? 'card-badge--public' : 'card-badge--private'"
-                  >{{ ws.is_public ? '공개' : '비공개' }}</span>
+                  <div class="card-badges">
+                    <span
+                      class="card-badge"
+                      :class="ws.is_public ? 'card-badge--public' : 'card-badge--private'"
+                    >{{ ws.is_public ? '공개' : '비공개' }}</span>
+                    <span class="card-badge card-badge--role">
+                      {{ workspaceRoleLabel(ws) }}
+                    </span>
+                  </div>
                   <div class="card-footer">
                     <span class="card-members">멤버 {{ ws.members.length }}명</span>
                     <div class="card-footer-actions">
@@ -202,7 +248,14 @@ onMounted(refreshList)
               </div>
             </button>
           </div>
+          <p
+            v-if="!section.editable && section.workspaces.length === 0"
+            class="project-section-empty"
+          >
+            {{ section.emptyMessage }}
+          </p>
         </section>
+        </template>
       </main>
     </div>
 
