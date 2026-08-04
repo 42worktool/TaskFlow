@@ -143,9 +143,26 @@ The backend entrypoint generates the Prisma client and applies pending
 migrations automatically. Nginx generates a self-signed development
 certificate when no certificate is mounted.
 
-The seed command can be run repeatedly without duplicating its workspace,
-lists, or cards. The default development account is configured by
-`DEV_SEED_EMAIL` and `DEV_SEED_PASSWORD` in `.env.dev`.
+The seed command creates two workspaces with role-based members, 24 board and
+Inbox cards, relative Calendar dates, Dashboard activity, labels, assignees,
+comments, attachments, friendships, requests, workspace messages, and DMs.
+The dates are recalculated around the day the seed runs so recent activity and
+upcoming work remain visible.
+
+All fixture accounts use `DEV_SEED_PASSWORD` from `.env.dev`:
+
+| Role/scenario | Email |
+| --- | --- |
+| Product workspace `OWNER` | Value of `DEV_SEED_EMAIL` (`dev@local.test` by default) |
+| Product workspace `ADMIN` | `alex.admin@local.test` |
+| Product workspace `MEMBER` | `mina.member@local.test` |
+| Product workspace `VIEWER` | `joon.viewer@local.test` |
+| Public non-member and pending request | `guest.pending@local.test` |
+
+Repeated seed runs restore fixed fixture records without deleting unrelated
+user-created workspaces or cards. They do reset activity history for the two
+fixture workspaces so the Dashboard remains deterministic. Never run the seed
+against production.
 
 Open:
 
