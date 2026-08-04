@@ -1,5 +1,6 @@
-import type { Card, CardComment, CardDetail } from '../types'
+import type { Card, CardAttachment, CardComment, CardDetail } from '../types'
 import { apiRequest } from '../services/auth'
+import { downloadFile, fetchBlob, uploadFile } from '../services/fileTransfer'
 
 export const CardAPI = {
   get: (cardId: string) =>
@@ -60,4 +61,16 @@ export const CardAPI = {
       method: 'POST',
       json: { comment_str: comment },
     }),
+
+  uploadAttachment: (cardId: string, file: File, onProgress?: (percent: number) => void) =>
+    uploadFile<CardAttachment>(`/api/cards/${cardId}/attachments`, file, onProgress),
+
+  removeAttachment: (attachmentId: string) =>
+    apiRequest<void>(`/api/cards/attachments/${attachmentId}`, { method: 'DELETE' }),
+
+  downloadAttachment: (attachmentId: string, fileName: string) =>
+    downloadFile(`/api/cards/attachments/${attachmentId}/download`, fileName),
+
+  fetchAttachmentBlob: (attachmentId: string) =>
+    fetchBlob(`/api/cards/attachments/${attachmentId}/download`),
 }

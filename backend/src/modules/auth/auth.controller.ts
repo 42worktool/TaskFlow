@@ -1,7 +1,8 @@
 import type { CookieOptions, RequestHandler, Response } from 'express';
 import { config } from '../../config';
-import { AppError } from '../../errors';
+import { AppError, BadRequestError } from '../../errors';
 import { authenticatedUserId } from '../../middleware/auth';
+import { withUploadCleanup } from '../../lib/upload';
 import * as authService from './auth.service';
 
 const OAUTH_STATE_COOKIE = 'ft_oauth_state';
@@ -173,4 +174,16 @@ export const deleteAccount: RequestHandler = async (req, res) => {
   await authService.deleteCurrentUser(authenticatedUserId(req));
   res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions);
   res.status(204).send();
+};
+
+export const uploadAvatar: RequestHandler = async (req, res) => {
+  if (!req.file) throw new BadRequestError('avatar file is required');
+  const user = await withUploadCleanup('avatars', req.file, () =>
+    authService.updateAvatar(authenticatedUserId(req), req.file!),
+  );
+  res.json(user);
+};
+
+export const removeAvatar: RequestHandler = async (req, res) => {
+  res.json(await authService.removeAvatar(authenticatedUserId(req)));
 };

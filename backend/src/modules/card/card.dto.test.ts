@@ -46,7 +46,10 @@ test('card DTOs preserve public field names and null values', () => {
     id: 'attachment-id',
     card_id: 'card-id',
     file_url: null,
-    file_name: null,
+    file_name: 'notes.pdf',
+    storage_key: 'stored-file.pdf',
+    mime_type: 'application/pdf',
+    size_bytes: 1024,
     created_at: timestamp,
     created_by: null,
     updated_at: timestamp,
@@ -54,7 +57,19 @@ test('card DTOs preserve public field names and null values', () => {
     deleted_at: null,
     deleted_by: null,
   } satisfies Attachment
-  assert.equal(toAttachmentDto(attachment).file_url, null)
+  assert.equal(toAttachmentDto(attachment).file_url, '/api/cards/attachments/attachment-id/download')
+  assert.equal(toAttachmentDto(attachment).mime_type, 'application/pdf')
+  assert.equal(toAttachmentDto(attachment).size_bytes, 1024)
+
+  const legacyAttachment = {
+    ...attachment,
+    file_url: 'https://legacy.example.com/notes.pdf',
+    storage_key: null,
+  } satisfies Attachment
+  assert.equal(
+    toAttachmentDto(legacyAttachment).file_url,
+    'https://legacy.example.com/notes.pdf',
+  )
 })
 
 test('card detail and comment DTOs preserve nested user shapes', () => {

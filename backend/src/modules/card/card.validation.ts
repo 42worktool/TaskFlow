@@ -46,11 +46,6 @@ export const cardCompletionSchema = z.object({
 
 export const addCardMemberSchema = z.object({ user_id: uuidSchema })
 
-export const addAttachmentSchema = z.object({
-  file_url: z.string().url(),
-  file_name: z.string().min(1).max(255),
-})
-
 export const commentSchema = z.object({
   comment_str: z.string().min(1).max(2000),
 })

@@ -111,6 +111,159 @@ export async function listWorkspaces(input: { userId: string }) {
   }
 }
 
+type WorkspaceWithMembers = Prisma.WorkspaceGetPayload<{ include: typeof workspaceInclude }>
+
+/**
+ * Runs `operation` inside a transaction holding a Postgres advisory lock
+ * scoped to the (workspace_id, user_id) pair, serializing every concurrent
+ * membership-transition attempt for that pair — whether they're racing to
+ * create, restore, or (for the public-join path) re-check the workspace's
+ * live state — before any of them reads or writes anything.
+ *
+ * A row lock (`SELECT ... FOR UPDATE`) can't do this on its own: there's no
+ * row to lock until one side commits a brand-new membership, so two
+ * concurrent callers could both see no row and both attempt `create`,
+ * failing the second on the unique (workspace_id, user_id) constraint.
+ */
+async function lockMembershipPair<T>(
+  workspaceId: string,
+  userId: string,
+  operation: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId}), hashtext(${userId}))`
+    return operation(tx)
+  })
+}
+
+/**
+ * Restore a soft-deleted membership or create a fresh one. WorkspaceMember's
+ * PK is (workspace_id, user_id), so a prior removal must be restored rather
+ * than re-created. Assumes the caller already holds the pair's advisory
+ * lock (see lockMembershipPair) — this only does the read-then-write, not
+ * the locking.
+ *
+ * Returns whether the membership actually transitioned from inactive
+ * (absent or soft-deleted) to active, so callers emit a join notification
+ * exactly once instead of once per racing request.
+ */
+async function writeActiveMembership(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  userId: string,
+  role: Role,
+): Promise<boolean> {
+  const existing = await tx.workspaceMember.findUnique({
+    where: { workspace_id_user_id: { workspace_id: workspaceId, user_id: userId } },
+  })
+  const wasInactive = !existing || existing.deleted_at !== null
+
+  if (existing) {
+    await tx.workspaceMember.update({
+      where: { workspace_id_user_id: { workspace_id: workspaceId, user_id: userId } },
+      data: { role, ...restoredBy(userId) },
+    })
+  } else {
+    await tx.workspaceMember.create({
+      data: { workspace_id: workspaceId, user_id: userId, role, ...createdBy(userId) },
+    })
+  }
+
+  return wasInactive
+}
+
+/** Notification + realtime fan-out after a membership is created/restored. */
+function announceMemberJoined(
+  workspace: { id: string; name: string; members: { user_id: string }[] },
+  actor: { userId: string; name: string; profileImageUrl: string | null },
+): void {
+  notifyWorkspaceMemberJoined({
+    recipientUserIds: workspace.members.map((member) => member.user_id),
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
+    actor,
+  })
+
+  publishWorkspaceChange({
+    workspace_id: workspace.id,
+    entity: 'member',
+    action: 'created',
+    entity_id: actor.userId,
+    list_ids: [],
+    actor_user_id: actor.userId,
+  })
+  if (isUserOnline(actor.userId)) {
+    publishWorkspacePresenceChanged({
+      workspace_id: workspace.id,
+      user_id: actor.userId,
+      online: true,
+    })
+  }
+}
+
+/**
+ * Row-locks the workspace so a concurrent `updateWorkspace` (is_public
+ * toggle) or `deleteWorkspace` can't land between this check and the
+ * membership write below. Both of those do a plain `tx.workspace.update`,
+ * which Postgres already gives an exclusive row lock for the duration of
+ * their transaction — `FOR UPDATE` here requests that same lock, so
+ * whichever transaction gets there first makes the other wait, instead of
+ * both reading a snapshot that's stale by the time either one writes.
+ *
+ * Unlike the (workspace_id, user_id) membership pair (see
+ * lockMembershipPair), the workspace row is known to already exist by the
+ * time this runs, so a plain row lock — not an advisory one — is enough.
+ */
+async function lockWorkspaceRow(tx: Prisma.TransactionClient, workspaceId: string): Promise<boolean> {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id" FROM "Workspaces"
+    WHERE "id" = ${workspaceId}::uuid AND "deleted_at" IS NULL
+    FOR UPDATE
+  `
+  return rows.length > 0
+}
+
+/**
+ * First visit to a public workspace by a non-member auto-provisions a VIEWER
+ * membership. The initial `is_public`/membership check the caller made to
+ * decide whether to call this is a separate read from the write below, so
+ * by the time the lock is held, the workspace may have been made private or
+ * deleted out from under it — re-checks its live state inside the same
+ * locked transaction as the write, instead of trusting that stale snapshot,
+ * and returns the current row (or null, if it's gone) so the caller never
+ * has to re-fetch-and-assume-non-null afterward.
+ */
+async function joinPublicWorkspaceAsViewer(
+  workspaceId: string,
+  userId: string,
+): Promise<{ workspace: WorkspaceWithMembers | null; joined: boolean }> {
+  return lockMembershipPair(workspaceId, userId, async (tx) => {
+    if (!(await lockWorkspaceRow(tx, workspaceId))) return { workspace: null, joined: false }
+
+    const workspace = await tx.workspace.findFirst({
+      where: { id: workspaceId, deleted_at: null },
+      include: workspaceInclude,
+    })
+    if (!workspace) return { workspace: null, joined: false }
+
+    const isMember = workspace.members.some((member) => member.user_id === userId)
+    if (!workspace.is_public || isMember) {
+      // Went private, or was joined some other way, while we waited for the
+      // lock — nothing to do; let the caller re-evaluate access itself.
+      return { workspace, joined: false }
+    }
+
+    const wasInactive = await writeActiveMembership(tx, workspaceId, userId, 'VIEWER')
+    if (!wasInactive) return { workspace, joined: false }
+
+    const refreshed = await tx.workspace.findFirst({
+      where: { id: workspaceId, deleted_at: null },
+      include: workspaceInclude,
+    })
+    return { workspace: refreshed, joined: true }
+  })
+}
+
 /**
  * Get a single workspace by ID.
  * Accessible if the user is a member OR the workspace is public.
@@ -123,7 +276,32 @@ export async function getWorkspace(input: { userId: string; workspaceId: string 
 
   const { workspace, isMember } = requireWorkspaceReadAccess(ws, input.userId)
 
-  return toWorkspaceDto(workspace, { includeMemberEmail: isMember })
+  if (!workspace.is_public || isMember) {
+    return toWorkspaceDto(workspace, { includeMemberEmail: isMember })
+  }
+
+  const result = await joinPublicWorkspaceAsViewer(workspace.id, input.userId)
+  // Re-validate against the fresh, lock-consistent state rather than the
+  // snapshot above: requireWorkspaceReadAccess throws NotFoundError if the
+  // workspace was deleted, or ForbiddenError if it turned private and this
+  // user still isn't a member.
+  const fresh = requireWorkspaceReadAccess(result.workspace, input.userId)
+
+  if (result.joined) {
+    const joiner = await prisma.user.findFirst({
+      where: { id: input.userId, deleted_at: null },
+      select: { name: true, profile_image_url: true },
+    })
+    if (joiner) {
+      announceMemberJoined(fresh.workspace, {
+        userId: input.userId,
+        name: joiner.name,
+        profileImageUrl: joiner.profile_image_url,
+      })
+    }
+  }
+
+  return toWorkspaceDto(fresh.workspace, { includeMemberEmail: fresh.isMember })
 }
 
 /**
@@ -447,56 +625,20 @@ export async function acceptInvite(input: { userId: string; token: string }) {
     return toWorkspaceDto(ws, { includeMemberEmail: true })
   }
 
-  if (existing) {
-    await prisma.workspaceMember.update({
-      where: {
-        workspace_id_user_id: {
-          workspace_id: invitation.workspaceId,
-          user_id: input.userId,
-        },
-      },
-      data: { role: invitation.role, ...restoredBy(input.userId) },
-    })
-  } else {
-    await prisma.workspaceMember.create({
-      data: {
-        workspace_id: invitation.workspaceId,
-        user_id: input.userId,
-        role: invitation.role,
-        ...createdBy(input.userId),
-      },
-    })
-  }
+  const joined = await lockMembershipPair(invitation.workspaceId, input.userId, (tx) =>
+    writeActiveMembership(tx, invitation.workspaceId, input.userId, invitation.role),
+  )
 
   const updated = await prisma.workspace.findFirst({
     where: { id: invitation.workspaceId, deleted_at: null },
     include: workspaceInclude,
   })
 
-  notifyWorkspaceMemberJoined({
-    recipientUserIds: ws.members.map((member) => member.user_id),
-    workspaceId: ws.id,
-    workspaceName: ws.name,
-    actor: {
+  if (joined) {
+    announceMemberJoined(ws, {
       userId: input.userId,
       name: invitee.name,
       profileImageUrl: invitee.profile_image_url,
-    },
-  })
-
-  publishWorkspaceChange({
-    workspace_id: invitation.workspaceId,
-    entity: 'member',
-    action: 'created',
-    entity_id: input.userId,
-    list_ids: [],
-    actor_user_id: input.userId,
-  })
-  if (isUserOnline(input.userId)) {
-    publishWorkspacePresenceChanged({
-      workspace_id: invitation.workspaceId,
-      user_id: input.userId,
-      online: true,
     })
   }
 

@@ -5,6 +5,7 @@ const USER_ID = '00000000-0000-4000-8000-000000000001'
 const LIST_ID = '00000000-0000-4000-8000-000000000002'
 const WORKSPACE_ID = '00000000-0000-4000-8000-000000000003'
 const CARD_ID = '00000000-0000-4000-8000-000000000004'
+const LABEL_ID = '00000000-0000-4000-8000-000000000005'
 
 function setRequiredEnvironment(): void {
   Object.assign(process.env, {
@@ -210,6 +211,12 @@ test('getList returns one list with cards under the board read policy', async (t
           updated_by: USER_ID,
           deleted_at: null,
           deleted_by: null,
+          card_labels: [
+            {
+              label_id: LABEL_ID,
+              label: { id: LABEL_ID, label_name: 'Bug', label_color: '#ff0000' },
+            },
+          ],
         },
       ],
     }
@@ -223,9 +230,26 @@ test('getList returns one list with cards under the board read policy', async (t
 
   assert.equal(result.id, LIST_ID)
   assert.deepEqual(result.cards.map((card) => card.id), [CARD_ID])
+  assert.deepEqual(result.cards[0]?.labels, [
+    { label_id: LABEL_ID, label_name: 'Bug', label_color: '#ff0000' },
+  ])
   assert.deepEqual(listQuery.include.cards, {
     where: { deleted_at: null },
     orderBy: { sequence: 'asc' },
+    include: {
+      card_labels: {
+        where: {
+          deleted_at: null,
+          label: { deleted_at: null },
+        },
+        orderBy: { created_at: 'asc' },
+        include: {
+          label: {
+            select: { id: true, label_name: true, label_color: true },
+          },
+        },
+      },
+    },
   })
 })
 

@@ -128,6 +128,8 @@ export interface CardAttachment {
   card_id: UUID
   file_url: string | null
   file_name: string | null
+  mime_type: string | null
+  size_bytes: number | null
   created_at: ISODateString
 }
 

@@ -4,12 +4,22 @@ vi.mock('../services/auth', () => ({
   apiRequest: vi.fn(),
 }))
 
+vi.mock('../services/fileTransfer', () => ({
+  uploadFile: vi.fn(),
+  fetchBlob: vi.fn(),
+  downloadFile: vi.fn(),
+}))
+
 import { CardAPI } from './card'
 import { apiRequest } from '../services/auth'
+import { downloadFile, fetchBlob, uploadFile } from '../services/fileTransfer'
 
 describe('CardAPI', () => {
   beforeEach(() => {
     vi.mocked(apiRequest).mockReset()
+    vi.mocked(uploadFile).mockReset()
+    vi.mocked(fetchBlob).mockReset()
+    vi.mocked(downloadFile).mockReset()
   })
 
   it('moves a card to the signed-in user inbox', async () => {
@@ -116,6 +126,62 @@ describe('CardAPI', () => {
         method: 'PATCH',
         json: { is_completed: true },
       },
+    )
+  })
+
+  it('uploads an attachment through the generic file-transfer helper', async () => {
+    const attachment = {
+      id: 'attachment-1',
+      card_id: 'card-1',
+      file_url: '/api/cards/attachments/attachment-1/download',
+      file_name: 'notes.pdf',
+      mime_type: 'application/pdf',
+      size_bytes: 2048,
+      created_at: '2026-07-30T00:00:00.000Z',
+    }
+    vi.mocked(uploadFile).mockResolvedValueOnce(attachment)
+    const file = new File(['content'], 'notes.pdf', { type: 'application/pdf' })
+    const onProgress = vi.fn()
+
+    await expect(
+      CardAPI.uploadAttachment('card-1', file, onProgress),
+    ).resolves.toEqual(attachment)
+    expect(uploadFile).toHaveBeenCalledWith(
+      '/api/cards/card-1/attachments',
+      file,
+      onProgress,
+    )
+  })
+
+  it('removes an attachment', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce(undefined)
+
+    await CardAPI.removeAttachment('attachment-1')
+
+    expect(apiRequest).toHaveBeenCalledWith(
+      '/api/cards/attachments/attachment-1',
+      { method: 'DELETE' },
+    )
+  })
+
+  it('downloads an attachment through the generic file-transfer helper', async () => {
+    vi.mocked(downloadFile).mockResolvedValueOnce(undefined)
+
+    await CardAPI.downloadAttachment('attachment-1', 'notes.pdf')
+
+    expect(downloadFile).toHaveBeenCalledWith(
+      '/api/cards/attachments/attachment-1/download',
+      'notes.pdf',
+    )
+  })
+
+  it('fetches an attachment blob through the generic file-transfer helper', async () => {
+    const blob = new Blob(['content'])
+    vi.mocked(fetchBlob).mockResolvedValueOnce(blob)
+
+    await expect(CardAPI.fetchAttachmentBlob('attachment-1')).resolves.toBe(blob)
+    expect(fetchBlob).toHaveBeenCalledWith(
+      '/api/cards/attachments/attachment-1/download',
     )
   })
 })

@@ -8,6 +8,7 @@
 // ============================================================
 import type { ErrorRequestHandler, Response } from 'express';
 import { ZodError } from 'zod';
+import { MulterError } from 'multer';
 
 export class AppError extends Error {
   constructor(
@@ -50,6 +51,16 @@ function sendError(res: Response, error: unknown): void {
       status_code: error.statusCode,
       error: error.code,
       message: error.message,
+    });
+    return;
+  }
+
+  if (error instanceof MulterError) {
+    const statusCode = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    res.status(statusCode).json({
+      status_code: statusCode,
+      error: statusCode === 413 ? 'PAYLOAD_TOO_LARGE' : 'BAD_REQUEST',
+      message: statusCode === 413 ? 'Request body is too large' : error.message,
     });
     return;
   }
