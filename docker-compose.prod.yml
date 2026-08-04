@@ -12,6 +12,8 @@ services:
   backend:
     build:
       target: production
+    volumes:
+      - prod_uploads_data:/app/uploads
     restart: always
 
   postgres:
@@ -19,3 +21,6 @@ services:
 
   redis:
     restart: always
+
+volumes:
+  prod_uploads_data:

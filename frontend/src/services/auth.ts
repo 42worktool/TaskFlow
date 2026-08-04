@@ -36,6 +36,9 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   ALREADY_FRIENDS: '이미 친구인 사용자입니다.',
   FRIEND_REQUEST_ALREADY_RECEIVED: '상대방이 먼저 보낸 요청이 있습니다. 받은 요청에서 수락해 주세요.',
   FRIEND_REQUEST_NOT_FOUND: '친구 요청을 찾을 수 없습니다. 목록을 새로고침해 주세요.',
+  UNSUPPORTED_FILE_TYPE: '지원하지 않는 파일 형식입니다.',
+  PAYLOAD_TOO_LARGE: '파일 용량이 너무 큽니다.',
+  INVALID_FILE_NAME: '파일 이름이 올바르지 않습니다.',
 }
 
 export const authState = reactive<{
@@ -89,7 +92,10 @@ function abortRefresh(): void {
   currentRefresh?.controller.abort()
 }
 
-function invalidateAuthenticatedSession(): void {
+// Exported for account.ts's delete-account flow: clearing the session after
+// the account itself is gone is a session-management concern, not something
+// that belongs duplicated outside auth.ts.
+export function invalidateAuthenticatedSession(): void {
   authGeneration += 1
   authAttempt += 1
   abortRefresh()
@@ -105,13 +111,21 @@ function rejectCurrentSession(expectedGeneration: number): void {
   authState.initialized = true
 }
 
-async function authRequestError(response: Response, fallback: string): Promise<Error> {
+// Also used by fileTransfer.ts, whose XHR-based uploadFile has no Response
+// object to pass through authRequestError and must map a manually parsed
+// error body instead.
+export function resolveErrorMessage(
+  body: { error?: string; message?: string } | null,
+  fallback: string,
+): string {
+  return (body?.error && AUTH_ERROR_MESSAGES[body.error]) || body?.message || fallback
+}
+
+export async function authRequestError(response: Response, fallback: string): Promise<Error> {
   const body = (await response.json().catch(() => null)) as
     | { error?: string; message?: string }
     | null
-  return new Error(
-    (body?.error && AUTH_ERROR_MESSAGES[body.error]) || body?.message || fallback,
-  )
+  return new Error(resolveErrorMessage(body, fallback))
 }
 
 function applyAuthenticatedSession(
@@ -324,18 +338,3 @@ export async function logout(): Promise<void> {
   })
 }
 
-export async function updateAccount(name: string): Promise<AuthUser> {
-  const user = await apiRequest<AuthUser>('/api/auth/account', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ name }),
-  })
-
-  authState.user = user
-  return user
-}
-
-export async function deleteAccount(): Promise<void> {
-  await apiRequest<void>('/api/auth/account', { method: 'DELETE' })
-  invalidateAuthenticatedSession()
-}

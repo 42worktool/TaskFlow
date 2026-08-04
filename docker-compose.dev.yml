@@ -18,6 +18,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - dev_uploads_data:/app/uploads
     environment:
       ALLOW_DB_SEED: ${ALLOW_DB_SEED:-true}
       DEV_SEED_EMAIL: ${DEV_SEED_EMAIL:-dev@local.test}
@@ -25,3 +26,4 @@ services:
 
 volumes:
   dev_tls_data:
+  dev_uploads_data:

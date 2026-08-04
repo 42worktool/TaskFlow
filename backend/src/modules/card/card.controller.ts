@@ -1,8 +1,9 @@
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
+import { BadRequestError } from '../../errors'
+import { withUploadCleanup } from '../../lib/upload'
 import * as svc from './card.service'
 import {
-  addAttachmentSchema,
   addCardMemberSchema,
   cardCompletionSchema,
   cardDatesSchema,
@@ -130,14 +131,23 @@ export const removeMember: RequestHandler = async (req, res) => {
 }
 
 export const addAttachment: RequestHandler = async (req, res) => {
-  const data = addAttachmentSchema.parse(req.body)
-  const attachment = await svc.addAttachment({
-    userId: authenticatedUserId(req),
-    cardId: req.params.card_id as string,
-    fileUrl: data.file_url,
-    fileName: data.file_name,
-  })
+  if (!req.file) throw new BadRequestError('file is required')
+  const attachment = await withUploadCleanup('attachments', req.file, () =>
+    svc.addAttachment({
+      userId: authenticatedUserId(req),
+      cardId: req.params.card_id as string,
+      file: req.file!,
+    }),
+  )
   res.status(201).json(attachment)
+}
+
+export const downloadAttachment: RequestHandler = async (req, res) => {
+  const file = await svc.getAttachmentFile({
+    userId: authenticatedUserId(req),
+    attachmentId: req.params.attachment_id as string,
+  })
+  res.download(file.absolutePath, file.fileName)
 }
 
 export const removeAttachment: RequestHandler = async (req, res) => {

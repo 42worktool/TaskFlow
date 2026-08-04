@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { CardAPI } from '../api/card'
 import { LabelAPI } from '../api/label'
-import type { Card, CardDetail, Label } from '../types'
+import type { Card, CardAttachment, CardDetail, Label } from '../types'
 import {
   isDateRangeValid,
   toDateInput,
   toIsoDate,
 } from '../utils/cardDates'
 import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
+import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_ALLOWLIST } from '../utils/uploadLimits'
+
+// Derived once from the shared allowlist so the file picker's filter can't
+// drift out of sync with the ATTACHMENT_MIME_ALLOWLIST.has(file.type) check below.
+const attachmentAccept = [...ATTACHMENT_MIME_ALLOWLIST].join(',')
 
 const route = useRoute()
 
@@ -45,10 +50,18 @@ const attachableLabels = computed(() => {
   const attached = new Set(detail.value?.labels.map((label) => label.label_id) ?? [])
   return availableLabels.value.filter((label) => !attached.has(label.id))
 })
+const isInboxCard = computed(() => detail.value?.list_id === null)
 const error = ref('')
 const remoteUpdatePending = ref(false)
+const attachmentInput = ref<HTMLInputElement | null>(null)
+const attachmentUploading = ref(false)
+const attachmentProgress = ref(0)
+const attachmentError = ref('')
+const attachmentPreviews = reactive<Record<string, string>>({})
+const attachmentPreviewLoading = ref('')
 let loadGeneration = 0
 let commentGeneration = 0
+let attachmentGeneration = 0
 let active = true
 let initialTitle = ''
 let initialDescription = ''
@@ -56,7 +69,119 @@ let initialStartDate = ''
 let initialDeadline = ''
 
 function close(): void {
-  if (!saving.value && !commentSaving.value) emit('close')
+  if (!saving.value && !commentSaving.value && !attachmentUploading.value) emit('close')
+}
+
+function formatBytes(bytes: number | null): string {
+  if (bytes === null) return ''
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function isPreviewable(attachment: CardAttachment): boolean {
+  return Boolean(attachment.mime_type?.startsWith('image/'))
+}
+
+function revokeAttachmentPreviews(): void {
+  for (const url of Object.values(attachmentPreviews)) URL.revokeObjectURL(url)
+  for (const key of Object.keys(attachmentPreviews)) delete attachmentPreviews[key]
+}
+
+function triggerAttachmentPicker(): void {
+  attachmentInput.value?.click()
+}
+
+async function togglePreview(attachment: CardAttachment): Promise<void> {
+  if (attachmentPreviews[attachment.id]) {
+    URL.revokeObjectURL(attachmentPreviews[attachment.id])
+    delete attachmentPreviews[attachment.id]
+    return
+  }
+  if (!attachment.file_url || attachmentPreviewLoading.value) return
+  attachmentPreviewLoading.value = attachment.id
+  try {
+    const blob = await CardAPI.fetchAttachmentBlob(attachment.id)
+    attachmentPreviews[attachment.id] = URL.createObjectURL(blob)
+  } catch {
+    attachmentError.value = '미리보기를 불러오지 못했습니다.'
+  } finally {
+    attachmentPreviewLoading.value = ''
+  }
+}
+
+async function onAttachmentSelected(event: Event): Promise<void> {
+  const cardId = props.cardId
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  input.value = ''
+  if (!file || !detail.value || !props.editable) return
+
+  attachmentError.value = ''
+  if (file.size > ATTACHMENT_MAX_BYTES) {
+    attachmentError.value = '파일 용량은 10MB를 넘을 수 없습니다.'
+    return
+  }
+  if (!ATTACHMENT_MIME_ALLOWLIST.has(file.type)) {
+    attachmentError.value = '지원하지 않는 파일 형식입니다.'
+    return
+  }
+
+  const generation = ++attachmentGeneration
+  attachmentUploading.value = true
+  attachmentProgress.value = 0
+  try {
+    const created = await CardAPI.uploadAttachment(cardId, file, (percent) => {
+      if (generation === attachmentGeneration) attachmentProgress.value = percent
+    })
+    if (!active || generation !== attachmentGeneration || cardId !== props.cardId || !detail.value) {
+      return
+    }
+    detail.value = {
+      ...detail.value,
+      attachments: [...detail.value.attachments, created],
+    }
+  } catch (caught) {
+    if (active && generation === attachmentGeneration && cardId === props.cardId) {
+      attachmentError.value =
+        caught instanceof Error ? caught.message : '파일을 업로드하지 못했습니다.'
+    }
+  } finally {
+    if (active && generation === attachmentGeneration && cardId === props.cardId) {
+      attachmentUploading.value = false
+    }
+  }
+}
+
+async function removeAttachmentItem(attachment: CardAttachment): Promise<void> {
+  if (!detail.value || attachmentUploading.value || !props.editable) return
+  const cardId = props.cardId
+  const previousAttachments = detail.value.attachments
+  detail.value = {
+    ...detail.value,
+    attachments: previousAttachments.filter((item) => item.id !== attachment.id),
+  }
+  if (attachmentPreviews[attachment.id]) {
+    URL.revokeObjectURL(attachmentPreviews[attachment.id])
+    delete attachmentPreviews[attachment.id]
+  }
+  try {
+    await CardAPI.removeAttachment(attachment.id)
+  } catch (caught) {
+    if (!active || cardId !== props.cardId || !detail.value) return
+    detail.value = { ...detail.value, attachments: previousAttachments }
+    attachmentError.value =
+      caught instanceof Error ? caught.message : '첨부파일을 삭제하지 못했습니다.'
+  }
+}
+
+async function downloadAttachmentItem(attachment: CardAttachment): Promise<void> {
+  try {
+    await CardAPI.downloadAttachment(attachment.id, attachment.file_name ?? '파일')
+  } catch (caught) {
+    attachmentError.value =
+      caught instanceof Error ? caught.message : '파일을 다운로드하지 못했습니다.'
+  }
 }
 
 function applyDetail(card: CardDetail): void {
@@ -333,6 +458,11 @@ watch(
     commentDraft.value = ''
     commentSaving.value = false
     commentError.value = ''
+    attachmentGeneration += 1
+    attachmentUploading.value = false
+    attachmentProgress.value = 0
+    attachmentError.value = ''
+    revokeAttachmentPreviews()
     void loadCard()
   },
   { immediate: true },
@@ -359,6 +489,8 @@ onUnmounted(() => {
   active = false
   loadGeneration += 1
   commentGeneration += 1
+  attachmentGeneration += 1
+  revokeAttachmentPreviews()
 })
 </script>
 
@@ -378,7 +510,7 @@ onUnmounted(() => {
             class="close-btn"
             type="button"
             aria-label="닫기"
-            :disabled="saving || commentSaving"
+            :disabled="saving || commentSaving || attachmentUploading"
             @click="close"
           >
             ✕
@@ -434,13 +566,9 @@ onUnmounted(() => {
           </div>
 
           <div
-            v-if="detail.members.length || detail.labels.length || detail.attachments.length || editable"
+            v-if="detail.labels.length || detail.attachments.length || editable"
             class="card-detail-metadata"
           >
-            <div v-if="detail.members.length">
-              <span class="card-detail-meta-label">담당자</span>
-              <span>{{ detail.members.map((member) => member.name).join(', ') }}</span>
-            </div>
             <div v-if="detail.labels.length || editable" class="card-detail-label-section">
               <span class="card-detail-meta-label">라벨</span>
               <span class="card-detail-labels">
@@ -454,7 +582,7 @@ onUnmounted(() => {
                   <button
                     v-if="editable"
                     type="button"
-                    :disabled="labelPending !== null"
+                    :disabled="labelPending !== null || isInboxCard"
                     :aria-label="`${label.label_name} 라벨 제거`"
                     @click="detachLabel(label.label_id)"
                   >
@@ -463,7 +591,10 @@ onUnmounted(() => {
                 </span>
               </span>
               <div v-if="editable" class="card-detail-label-controls">
-                <select v-model="selectedLabelId" :disabled="labelsLoading || labelPending !== null">
+                <select
+                  v-model="selectedLabelId"
+                  :disabled="labelsLoading || labelPending !== null || isInboxCard"
+                >
                   <option value="">{{ attachableLabels.length ? '라벨 추가' : '라벨 없음' }}</option>
                   <option
                     v-for="label in attachableLabels"
@@ -475,22 +606,101 @@ onUnmounted(() => {
                 </select>
                 <button
                   type="button"
-                  :disabled="!selectedLabelId || labelPending !== null"
+                  :disabled="!selectedLabelId || labelPending !== null || isInboxCard"
                   @click="attachLabel"
                 >
                   {{ labelPending === selectedLabelId ? '추가 중…' : '추가' }}
                 </button>
               </div>
+              <p v-if="editable && isInboxCard" class="card-detail-label-state">
+                인박스 카드에는 라벨을 추가할 수 없습니다.
+              </p>
               <p v-if="labelsLoading" class="card-detail-label-state">라벨을 불러오는 중…</p>
               <p v-if="labelError" class="card-detail-label-error" role="alert">{{ labelError }}</p>
             </div>
-            <div v-if="detail.attachments.length">
-              <span class="card-detail-meta-label">첨부</span>
-              <span>
-                {{ detail.attachments.map((attachment) => attachment.file_name ?? '파일').join(', ') }}
-              </span>
-            </div>
           </div>
+
+          <section class="card-detail-attachments">
+            <div class="card-detail-comments-heading">
+              <h3>첨부파일</h3>
+              <span>{{ detail.attachments.length }}</span>
+            </div>
+
+            <input
+              v-if="editable"
+              ref="attachmentInput"
+              type="file"
+              class="card-detail-attachment-input"
+              :accept="attachmentAccept"
+              @change="onAttachmentSelected"
+            />
+            <button
+              v-if="editable"
+              type="button"
+              class="card-detail-btn card-detail-btn--secondary card-detail-attachment-add"
+              :disabled="attachmentUploading"
+              @click="triggerAttachmentPicker"
+            >
+              {{ attachmentUploading ? `업로드 중… ${attachmentProgress}%` : '파일 첨부' }}
+            </button>
+            <progress
+              v-if="editable && attachmentUploading"
+              class="card-detail-attachment-progress"
+              :value="attachmentProgress"
+              max="100"
+            />
+            <p v-if="attachmentError" class="card-detail-comment-error" role="alert">
+              {{ attachmentError }}
+            </p>
+
+            <p v-if="detail.attachments.length === 0" class="card-detail-comments-empty">
+              첨부된 파일이 없습니다.
+            </p>
+            <div
+              v-for="attachment in detail.attachments"
+              :key="attachment.id"
+              class="card-detail-attachment"
+            >
+              <div class="card-detail-attachment-row">
+                <div class="card-detail-attachment-info">
+                  <strong>{{ attachment.file_name ?? '파일' }}</strong>
+                  <span>{{ formatBytes(attachment.size_bytes) }}</span>
+                </div>
+                <div class="card-detail-attachment-actions">
+                  <button
+                    v-if="isPreviewable(attachment)"
+                    type="button"
+                    class="card-detail-attachment-link"
+                    :disabled="attachmentPreviewLoading === attachment.id"
+                    @click="togglePreview(attachment)"
+                  >
+                    {{ attachmentPreviews[attachment.id] ? '미리보기 닫기' : '미리보기' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="card-detail-attachment-link"
+                    @click="downloadAttachmentItem(attachment)"
+                  >
+                    다운로드
+                  </button>
+                  <button
+                    v-if="editable"
+                    type="button"
+                    class="card-detail-attachment-link card-detail-attachment-link--danger"
+                    @click="removeAttachmentItem(attachment)"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+              <img
+                v-if="attachmentPreviews[attachment.id]"
+                :src="attachmentPreviews[attachment.id]"
+                alt=""
+                class="card-detail-attachment-preview"
+              />
+            </div>
+          </section>
 
           <section class="card-detail-comments">
             <div class="card-detail-comments-heading">
@@ -505,7 +715,7 @@ onUnmounted(() => {
                 rows="3"
                 maxlength="2000"
                 placeholder="카드에 댓글을 남기세요."
-                :disabled="saving || commentSaving"
+                :disabled="saving || commentSaving || attachmentUploading"
                 aria-describedby="card-detail-comment-hint"
                 @keydown.enter.exact="commentSubmitter.handleEnter"
                 @compositionend="commentSubmitter.handleCompositionEnd"
@@ -573,7 +783,7 @@ onUnmounted(() => {
             <button
               type="button"
               class="card-detail-btn card-detail-btn--secondary"
-              :disabled="saving || commentSaving"
+              :disabled="saving || commentSaving || attachmentUploading"
               @click="close"
             >
               {{ editable ? '취소' : '닫기' }}

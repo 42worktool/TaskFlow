@@ -128,6 +128,8 @@ export interface CardAttachment {
   card_id: UUID
   file_url: string | null
   file_name: string | null
+  mime_type: string | null
+  size_bytes: number | null
   created_at: ISODateString
 }
 
@@ -145,7 +147,6 @@ export interface CardComment {
 }
 
 export interface CardDetail extends Omit<Card, 'labels'> {
-  members: CardDetailMember[]
   labels: CardDetailLabel[]
   attachments: CardAttachment[]
   comments: CardComment[]
