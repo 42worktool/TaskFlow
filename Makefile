@@ -1,10 +1,11 @@
 # 프로젝트 이름 설정
-NAME = korello
+NAME = TaskFlow
 
-# 사용할 도커 컴포즈 파일 지정
-COMPOSE = docker compose
+# 환경별 도커 컴포즈 명령
+COMPOSE_DEV = docker compose -p taskflow-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml
+COMPOSE_PROD = docker compose -p taskflow-prod --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml
 
-.PHONY: all up down start stop logs clean fclean re init check_init
+.PHONY: all up down logs dev-up dev-down dev-logs dev-seed dev-reset prod-up prod-down prod-logs clean fclean re init check_init
 
 # 기본 실행
 all: up
@@ -52,23 +53,46 @@ check_init:
 # ----------------------------------------------------
 # 3. 메인 구동 명령어
 # ----------------------------------------------------
-up: check_init
+up: dev-up
+
+dev-up: check_init
 	@echo "시스템을 빌드하고 구동합니다..."
-	$(COMPOSE) up -d --build
+	$(COMPOSE_DEV) up -d --build
 
 # 컨테이너 종료 및 네트워크 삭제
-down:
+down: dev-down
+
+dev-down:
 	@echo "시스템을 종료합니다..."
-	$(COMPOSE) down
+	$(COMPOSE_DEV) down
 
 # 전체 컨테이너 실시간 로그 확인
-logs:
-	$(COMPOSE) logs -f
+logs: dev-logs
+
+dev-logs:
+	$(COMPOSE_DEV) logs -f
+
+dev-seed:
+	$(COMPOSE_DEV) exec backend npm run db:seed
+
+dev-reset:
+	$(COMPOSE_DEV) down -v
+
+prod-up: check_init
+	@mkdir -p .taskflow/tls
+	@echo "Production 시스템을 빌드하고 구동합니다..."
+	$(COMPOSE_PROD) up -d --build
+
+prod-down:
+	$(COMPOSE_PROD) down
+
+prod-logs:
+	$(COMPOSE_PROD) logs -f
 
 # 컨테이너, 네트워크 및 볼륨(데이터) 삭제
 clean:
 	@echo "데이터 볼륨과 컨테이너를 삭제합니다..."
-	$(COMPOSE) down -v
+	$(COMPOSE_DEV) down -v
 
 # 프로젝트와 관련된 모든 도커 리소스 완전 삭제
 fclean: clean

@@ -1,0 +1,27 @@
+services:
+  nginx:
+    volumes:
+      - dev_tls_data:/etc/nginx/ssl
+
+  frontend:
+    build:
+      target: development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+
+  backend:
+    build:
+      target: development
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      ALLOW_DB_SEED: ${ALLOW_DB_SEED:-true}
+      DEV_SEED_EMAIL: ${DEV_SEED_EMAIL:-dev@local.test}
+      DEV_SEED_PASSWORD: ${DEV_SEED_PASSWORD:-DevPassword123!}
+
+volumes:
+  dev_tls_data:

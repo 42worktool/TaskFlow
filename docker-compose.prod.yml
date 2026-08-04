@@ -1,0 +1,21 @@
+services:
+  nginx:
+    volumes:
+      - ${TLS_CERT_DIR:-./.taskflow/tls}:/etc/nginx/ssl
+    restart: always
+
+  frontend:
+    build:
+      target: production
+    restart: always
+
+  backend:
+    build:
+      target: production
+    restart: always
+
+  postgres:
+    restart: always
+
+  redis:
+    restart: always
