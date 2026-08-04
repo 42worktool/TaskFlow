@@ -71,8 +71,6 @@
   gap: 10px;
   margin-bottom: 16px;
   border-radius: 8px;
-  padding: 12px;
-  background: #f9fafb;
   color: #4b5563;
   font-size: 13px;
 }
@@ -132,6 +130,11 @@
   color: #374151;
   font: inherit;
   font-size: 12px;
+}
+
+.card-detail-label-controls select:disabled {
+  color: #a7aab0;
+  cursor: default;
 }
 
 .card-detail-label-controls button {
@@ -293,7 +296,7 @@
   margin-bottom: 12px;
 }
 
-.card-detail-comment-composer > label {
+.card-detail-comment-composer>label {
   color: #475569;
   font-size: 12px;
   font-weight: 600;
@@ -382,7 +385,7 @@
   border-bottom: 0;
 }
 
-.card-detail-comment > img,
+.card-detail-comment>img,
 .card-detail-comment-avatar {
   width: 28px;
   height: 28px;
@@ -390,7 +393,7 @@
   border-radius: 50%;
 }
 
-.card-detail-comment > img {
+.card-detail-comment>img {
   object-fit: cover;
 }
 
@@ -403,7 +406,7 @@
   font-weight: 700;
 }
 
-.card-detail-comment > div {
+.card-detail-comment>div {
   min-width: 0;
   flex: 1;
 }
