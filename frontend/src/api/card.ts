@@ -1,5 +1,6 @@
 import type { Card, CardAttachment, CardComment, CardDetail } from '../types'
-import { apiRequest, downloadFile, fetchBlob, uploadFile } from '../services/auth'
+import { apiRequest } from '../services/auth'
+import { downloadFile, fetchBlob, uploadFile } from '../services/fileTransfer'
 
 export const CardAPI = {
   get: (cardId: string) =>

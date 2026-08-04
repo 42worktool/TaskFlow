@@ -2,7 +2,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageHeader from '../components/PageHeader.vue'
-import { authState, deleteAccount, updateAccount, removeAvatar, uploadAvatar } from '../services/auth'
+import { authState } from '../services/auth'
+import { AccountAPI } from '../api/account'
 import { AVATAR_MAX_BYTES, AVATAR_MIME_ALLOWLIST } from '../utils/uploadLimits'
 
 const router = useRouter()
@@ -21,7 +22,7 @@ async function saveProfile() {
   message.value = ''
   error.value = ''
   try {
-    await updateAccount(name.value)
+    await AccountAPI.update(name.value)
     message.value = '계정 정보가 저장되었습니다.'
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : '계정 정보를 저장하지 못했습니다.'
@@ -53,7 +54,7 @@ async function onAvatarSelected(event: Event) {
   avatarUploading.value = true
   avatarProgress.value = 0
   try {
-    await uploadAvatar(file, (percent) => {
+    await AccountAPI.uploadAvatar(file, (percent) => {
       avatarProgress.value = percent
     })
   } catch (caught) {
@@ -67,7 +68,7 @@ async function removeAvatarPhoto() {
   avatarError.value = ''
   avatarUploading.value = true
   try {
-    await removeAvatar()
+    await AccountAPI.removeAvatar()
   } catch (caught) {
     avatarError.value = caught instanceof Error ? caught.message : '사진을 삭제하지 못했습니다.'
   } finally {
@@ -83,7 +84,7 @@ async function removeAccount() {
 
   error.value = ''
   try {
-    await deleteAccount()
+    await AccountAPI.delete()
     await router.replace('/signin')
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : '계정을 삭제하지 못했습니다.'
