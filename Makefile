@@ -1,27 +1,27 @@
-# 프로젝트 이름 설정
+# Project name
 NAME = TaskFlow
 
-# 환경별 도커 컴포즈 명령
+# Environment-specific Docker Compose commands
 COMPOSE_DEV = docker compose -p taskflow-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml
 COMPOSE_PROD = docker compose -p taskflow-prod --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml
 
 .PHONY: all up down logs dev-up dev-down dev-logs dev-seed dev-reset prod-up prod-down prod-logs clean fclean re init check_init
 
-# 기본 실행
+# Default target
 all: up
 
 # ----------------------------------------------------
-# 1. 초기 환경 구축 스크립트 (기존 폴더 보존)
+# 1. Initialize missing project directories
 # ----------------------------------------------------
 init:
-	@echo "프로젝트 기초 환경 설정을 시작합니다..."
+	@echo "Initializing the project environment..."
 	@docker run --rm \
 	  -e npm_config_cache=/tmp/.npm \
 	  -v $(CURDIR):/workspace \
 	  -w /workspace \
 	  node:20-slim /bin/bash -c "\
 	    if [ ! -d 'backend' ]; then \
-	      echo '1. 백엔드 환경 생성 중...' && \
+	      echo '1. Creating the backend environment...' && \
 	      mkdir -p backend && cd backend && \
 	      npm init -y && npm install express && \
 	      npm install -D typescript ts-node-dev @types/node @types/express && \
@@ -31,42 +31,42 @@ init:
 	      cd ..; \
 	    fi && \
 	    if [ ! -d 'frontend' ]; then \
-	      echo '2. 프론트엔드 환경 생성 중...' && \
+	      echo '2. Creating the frontend environment...' && \
 	      npm create vite@latest frontend -- --template vue-ts && \
 	      cd frontend && npm install && \
 	      printf 'FROM node:20-slim\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nEXPOSE 5173\nCMD [\"npm\", \"run\", \"dev\", \"--\", \"--host\", \"0.0.0.0\"]\n' > Dockerfile && \
 	      printf 'node_modules\nDockerfile\n.dockerignore\n' > .dockerignore && \
 	      cd ..; \
 	    fi && \
-	    echo '3. 환경 설정 점검이 완료되었습니다.' \
+	    echo '3. Environment setup is complete.' \
 	  "
 
 # ----------------------------------------------------
-# 2. 폴더 존재 여부 확인
+# 2. Check required directories
 # ----------------------------------------------------
 check_init:
 	@if [ ! -d "backend" ] || [ ! -d "frontend" ]; then \
-		echo "필요한 소스 폴더가 없습니다. 자동 생성을 진행합니다."; \
+		echo "Required source directories are missing. Creating them now."; \
 		$(MAKE) init; \
 	fi
 
 # ----------------------------------------------------
-# 3. 메인 구동 명령어
+# 3. Application lifecycle commands
 # ----------------------------------------------------
 up: dev-up
 
 dev-up: check_init
-	@echo "시스템을 빌드하고 구동합니다..."
+	@echo "Building and starting the development environment..."
 	$(COMPOSE_DEV) up -d --build
 
-# 컨테이너 종료 및 네트워크 삭제
+# Stop containers and remove the development network
 down: dev-down
 
 dev-down:
-	@echo "시스템을 종료합니다..."
+	@echo "Stopping the development environment..."
 	$(COMPOSE_DEV) down
 
-# 전체 컨테이너 실시간 로그 확인
+# Follow all development container logs
 logs: dev-logs
 
 dev-logs:
@@ -80,7 +80,7 @@ dev-reset:
 
 prod-up: check_init
 	@mkdir -p .taskflow/tls
-	@echo "Production 시스템을 빌드하고 구동합니다..."
+	@echo "Building and starting the production environment..."
 	$(COMPOSE_PROD) up -d --build
 
 prod-down:
@@ -89,15 +89,15 @@ prod-down:
 prod-logs:
 	$(COMPOSE_PROD) logs -f
 
-# 컨테이너, 네트워크 및 볼륨(데이터) 삭제
+# Remove development containers, networks, volumes, and unused Docker resources
 clean:
-	@echo "데이터 볼륨과 컨테이너를 삭제합니다..."
+	@echo "Removing development containers, networks, and data volumes..."
 	$(COMPOSE_DEV) down -v
-
-# 프로젝트와 관련된 모든 도커 리소스 완전 삭제
-fclean: clean
-	@echo "시스템 리소스를 완전히 초기화합니다..."
+	@echo "Pruning unused Docker resources..."
 	docker system prune -a --force
 
-# 완전 초기화 후 시스템 재구동
+# Backward-compatible full clean target
+fclean: clean
+
+# Rebuild the development environment from a clean Docker state
 re: fclean all
