@@ -54,7 +54,7 @@ HTTP controllers or the Vue component tree.
 ```mermaid
 flowchart LR
     Browser["Vue client"] -->|"HTTPS / WSS"| Nginx["Nginx reverse proxy"]
-    Nginx -->|"HTTP"| Frontend["Vite development server"]
+    Nginx -->|"HTTP"| Frontend["Vue frontend"]
     Nginx -->|"/api"| Backend["Express application"]
     Nginx -->|"/ws"| Realtime["Versioned WebSocket gateway"]
     Realtime --> Backend
@@ -88,13 +88,15 @@ installation is only needed when running tests outside Docker.
 ### 1. Configure the environment
 
 ```bash
-cp .env.example .env
+cp .env.dev.example .env.dev
 ```
 
-Set every non-default value in `.env`:
+Set every non-default value in `.env.dev`:
 
 | Variable | Purpose |
 | --- | --- |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Credentials for the environment-specific PostgreSQL container |
+| `DATABASE_URL` | Backend connection URL using the same PostgreSQL credentials |
 | `GOOGLE_CLIENT_ID` | Google OAuth web client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | Exact registered callback; local default is `https://localhost:4430/oauth/google` |
@@ -105,6 +107,7 @@ Set every non-default value in `.env`:
 | `SMTP_FROM` | Sender shown on invitation messages |
 | `OAUTH_AUTO_LINK_VERIFIED_EMAIL` | Toy-project option for linking a verified Google email to an existing local user |
 | `WS_*` | Optional WebSocket timeout, heartbeat, payload, and rate-limit tuning |
+| `ALLOW_DB_SEED` | Explicit development-only seed guard; keep this `false` in production |
 
 A suitable development JWT secret can be generated with:
 
@@ -132,12 +135,17 @@ deployment, register the exact public HTTPS callback and update both
 ### 3. Build and run
 
 ```bash
-docker compose up -d --build
+make dev-up
+make dev-seed
 ```
 
 The backend entrypoint generates the Prisma client and applies pending
 migrations automatically. Nginx generates a self-signed development
 certificate when no certificate is mounted.
+
+The seed command can be run repeatedly without duplicating its workspace,
+lists, or cards. The default development account is configured by
+`DEV_SEED_EMAIL` and `DEV_SEED_PASSWORD` in `.env.dev`.
 
 Open:
 
@@ -151,14 +159,36 @@ for this development environment.
 Useful lifecycle commands:
 
 ```bash
-docker compose logs -f
-docker compose down
+make dev-logs
+make dev-down
 ```
 
-`docker compose down -v` removes the local PostgreSQL and Redis volumes and
-therefore deletes development data.
+`make`, `make up`, `make down`, and `make logs` remain aliases for the
+development commands. `make dev-reset` removes only the `taskflow-dev`
+containers and volumes and therefore deletes all development data.
 
-### 4. Run checks
+### 4. Run Production
+
+Create a separate production environment file and replace every placeholder:
+
+```bash
+cp .env.prod.example .env.prod
+make prod-up
+```
+
+Production uses compiled backend and frontend images without source mounts.
+Its PostgreSQL and Redis volumes belong to the separate `taskflow-prod`
+Compose project, so development resets cannot delete production data. Use
+`make prod-logs` and `make prod-down` for its lifecycle.
+
+With the default `TLS_CERT_DIR=./.taskflow/tls`, Nginx creates a self-signed
+localhost certificate when the directory does not contain one. To use a domain
+certificate later, place its files at `fullchain.pem` and `privkey.pem` in a
+dedicated host directory, set `TLS_CERT_DIR` to that directory, and restart the
+production services. Also update `APP_ORIGIN` and `GOOGLE_REDIRECT_URI` to the
+exact public HTTPS domain. Never enable `ALLOW_DB_SEED` in production.
+
+### 5. Run checks
 
 ```bash
 cd backend
