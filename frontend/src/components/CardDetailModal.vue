@@ -464,7 +464,7 @@ onUnmounted(() => {
               </span>
               <div v-if="editable" class="card-detail-label-controls">
                 <select v-model="selectedLabelId" :disabled="labelsLoading || labelPending !== null">
-                  <option value="">라벨 추가</option>
+                  <option value="">{{ attachableLabels.length ? '라벨 추가' : '라벨 없음' }}</option>
                   <option
                     v-for="label in attachableLabels"
                     :key="label.id"
