@@ -83,6 +83,14 @@ export function workspaceColor(_wsId: UUID): string {
   return COLORS[Math.abs(hash) % COLORS.length]
 }
 
+export interface Label {
+  id: UUID
+  workspace_id: UUID
+  label_name: string
+  label_color: string
+  created_at: ISODateString
+}
+
 export interface List {
   id: UUID
   workspace_id: UUID
@@ -100,6 +108,7 @@ export interface Card {
   is_completed: boolean
   sequence: number
   created_at: ISODateString
+  labels?: CardDetailLabel[]
 }
 
 export interface CardDetailMember {
@@ -135,7 +144,7 @@ export interface CardComment {
   updated_at: ISODateString
 }
 
-export interface CardDetail extends Card {
+export interface CardDetail extends Omit<Card, 'labels'> {
   members: CardDetailMember[]
   labels: CardDetailLabel[]
   attachments: CardAttachment[]

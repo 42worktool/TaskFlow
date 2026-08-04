@@ -34,6 +34,19 @@ function formatDate(iso: string | null) {
 function openCard() {
   if (props.openable) emit('open', props.card)
 }
+
+function getLabelTextColor(hex: string): string {
+  const normalized = hex.replace('#', '')
+  if (!/^[\da-f]{6}$/i.test(normalized)) return '#111827'
+
+  const channels = [0, 2, 4].map((index) => Number.parseInt(normalized.slice(index, index + 2), 16) / 255)
+  const luminance = channels.reduce((total, channel, index) => {
+    const linear = channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
+    return total + linear * [0.2126, 0.7152, 0.0722][index]
+  }, 0)
+
+  return luminance > 0.179 ? '#111827' : '#fff'
+}
 </script>
 
 <template>
@@ -62,6 +75,17 @@ function openCard() {
       >
         ×
       </button>
+    </div>
+    <div v-if="card.labels?.length" class="card-labels" aria-label="카드 라벨">
+      <span
+        v-for="label in card.labels"
+        :key="label.label_id"
+        class="card-label"
+        :style="{ backgroundColor: label.label_color, color: getLabelTextColor(label.label_color) }"
+        :title="label.label_name"
+      >
+        {{ label.label_name }}
+      </span>
     </div>
     <div class="card-meta">
       <button

@@ -92,10 +92,76 @@
 }
 
 .card-detail-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   border: 1px solid;
   border-radius: 999px;
   padding: 2px 7px;
   font-size: 12px;
+}
+
+.card-detail-label button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.card-detail-label button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.card-detail-label-controls {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.card-detail-label-controls select {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  padding: 6px 8px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+}
+
+.card-detail-label-controls button {
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 10px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.card-detail-label-controls button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.card-detail-label-state,
+.card-detail-label-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.card-detail-label-state {
+  color: #64748b;
+}
+
+.card-detail-label-error {
+  color: #b91c1c;
 }
 
 .card-detail-comments {
