@@ -349,7 +349,10 @@ export async function inviteWorkspaceMember(input: {
       workspaceId: input.workspaceId,
     })
     await requireWorkspaceRole(input.workspaceId, input.userId, 'ADMIN')
-    await checkMailRateLimit(email)
+    await checkMailRateLimit({
+      senderUserId: input.userId,
+      recipientEmail: email,
+    })
 
     const token = await workspaceInvitationStore.create({
       workspaceId: input.workspaceId,
