@@ -248,11 +248,13 @@ test('a committed workspace deletion prevents an older authorization query from 
   const [
     { prisma },
     { realtime, RealtimeError },
+    { workspaceInvitationStore },
     realtimeModule,
     workspaceService,
   ] = await Promise.all([
     import('../../db'),
     import('../../realtime'),
+    import('./workspace-invitation.store'),
     import('./workspace.realtime'),
     import('./workspace.service'),
   ])
@@ -279,6 +281,7 @@ test('a committed workspace deletion prevents an older authorization query from 
     }
   })
   stubMethod(t, prisma.workspace, 'update', async () => ({}))
+  stubMethod(t, workspaceInvitationStore, 'discardWorkspace', async () => undefined)
   stubMethod(t, realtime, 'publish', () => undefined)
   stubMethod(t, realtime, 'clearChannel', () => undefined)
 
