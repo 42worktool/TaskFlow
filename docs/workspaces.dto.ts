@@ -70,8 +70,18 @@ export interface InviteMemberResponse {
   ok: true;
 }
 
+// GET /api/workspaces/invite/{token} -> 200
+// Reads invitation metadata without consuming the token.
+export interface InvitationPreviewResponse {
+  workspace_name: string;
+  role: Exclude<Role, 'OWNER'>;
+  already_member: boolean;
+  current_role?: Role;
+}
+
 // POST /api/workspaces/invite/{token} -> 200
-// The authenticated user's normalized email must match the invitation email.
+// Active members keep their current role and do not consume the invitation.
+// Otherwise, atomically removes the invitation before creating or restoring membership.
 export type AcceptInviteResponse = WorkspaceDto;
 
 // PUT /api/workspaces/{workspace_id}/members/{user_id} -> 200, ADMIN+
