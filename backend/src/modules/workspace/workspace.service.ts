@@ -19,6 +19,7 @@ import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
 import { inviteEmail } from '../../lib/mail-templates'
 import { normalizeEmail } from '../../lib/validation'
+import { KeyedLock } from '../../lib/keyed-lock'
 import { workspaceInvitationStore } from './workspace-invitation.store'
 import { notifyWorkspaceMemberJoined } from '../notification/notification.service'
 import { isUserOnline } from '../presence/presence.state'
@@ -37,6 +38,8 @@ class InviteTokenError extends AppError {
     super('INVITE_TOKEN_INVALID', 400, 'invalid or expired invite token')
   }
 }
+
+const workspaceInviteLock = new KeyedLock()
 
 async function requireManagedWorkspace(
   tx: Prisma.TransactionClient,
@@ -339,28 +342,32 @@ export async function inviteWorkspaceMember(input: {
   role: Exclude<Role, 'OWNER'>
 }): Promise<void> {
   const email = normalizeEmail(input.email)
-  const workspace = await getWorkspace({
-    userId: input.userId,
-    workspaceId: input.workspaceId,
-  })
-  await requireWorkspaceRole(input.workspaceId, input.userId, 'ADMIN')
-  await checkMailRateLimit(email)
+  const lockKey = `${input.workspaceId}:${email}`
 
-  const token = await workspaceInvitationStore.create({
-    workspaceId: input.workspaceId,
-    role: input.role,
-  })
-  const inviteUrl = `${config.appOrigin}/invite/${token}`
-
-  try {
-    await enqueue({
-      to: email,
-      ...inviteEmail(workspace.name, inviteUrl),
+  await workspaceInviteLock.run(lockKey, async () => {
+    const workspace = await getWorkspace({
+      userId: input.userId,
+      workspaceId: input.workspaceId,
     })
-  } catch (error) {
-    await workspaceInvitationStore.discard(token)
-    throw error
-  }
+    await requireWorkspaceRole(input.workspaceId, input.userId, 'ADMIN')
+    await checkMailRateLimit(email)
+
+    const token = await workspaceInvitationStore.create({
+      workspaceId: input.workspaceId,
+      role: input.role,
+    })
+    const inviteUrl = `${config.appOrigin}/invite/${token}`
+
+    try {
+      await enqueue({
+        to: email,
+        ...inviteEmail(workspace.name, inviteUrl),
+      })
+    } catch (error) {
+      await workspaceInvitationStore.discard(token)
+      throw error
+    }
+  })
 }
 
 /**
