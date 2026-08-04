@@ -10,20 +10,29 @@
 POST /api/workspaces/:workspaceId/members
   -> validate ADMIN+ and recipient/role
   -> enforce recipient rate limit in Redis
-  -> sign a seven-day, email-bound invitation JWT
+  -> store a hashed, seven-day one-time invitation token in Redis
   -> enqueue the SMTP message in Redis
   -> background mail worker sends through Nodemailer
 
+GET /api/workspaces/invite/:token
+  -> require a signed-in account
+  -> return workspace name, invited role, and current membership without consuming the token
+
 POST /api/workspaces/invite/:token
-  -> verify signature, issuer, audience, expiry, role, and email
-  -> require the signed-in account email to match
+  -> return without consuming the token when the account is already an active member
+  -> atomically read and delete the Redis invitation with GETDEL
   -> create or restore the workspace membership
   -> notify already-connected workspace members
 ```
 
-Invitation acceptance is idempotent for an already-active member. An expired,
-malformed, or deleted-workspace token is rejected. The final workspace owner
-rules remain enforced by the normal member-management service.
+The delivery address is not an account binding: a recipient may accept with a
+different TaskFlow account after confirming that account in the UI. The token is
+not consumed and the role is not changed when that account is already an active
+member. Otherwise, the token is removed before the database membership write,
+so concurrent acceptance has one winner. If the database write then fails, the
+invitation must be sent again. An expired, malformed, consumed, or
+deleted-workspace token is rejected. The final workspace owner rules remain
+enforced by the normal member-management service.
 
 ## Configuration
 
@@ -45,8 +54,11 @@ provider endpoint intended for that mode, such as Gmail on port 587.
 - `backend/src/lib/mail-rate-limiter.ts`: five messages per recipient per hour.
 - `backend/src/lib/mail-queue.ts`: Redis list and a dedicated blocking worker
   connection.
+- `backend/src/modules/workspace/workspace-invitation.store.ts`: opaque
+  invitation creation, hashed Redis storage, preview, and atomic one-time
+  removal.
 - `backend/src/modules/workspace/workspace.service.ts`: authorization, token
-  generation/verification, queueing, and membership acceptance.
+  queueing, preview, and membership acceptance.
 
 The worker starts with the backend and participates in graceful shutdown. Mail
 delivery is deliberately a small prototype queue: failed jobs are logged but

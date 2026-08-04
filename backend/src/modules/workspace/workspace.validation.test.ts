@@ -5,6 +5,8 @@ import {
   createWorkspaceSchema,
   inviteWorkspaceMemberSchema,
   updateWorkspaceSchema,
+  workspaceInvitationSchema,
+  workspaceInvitationTokenSchema,
 } from './workspace.validation'
 
 test('workspace creation defaults visibility to private', () => {
@@ -41,4 +43,27 @@ test('workspace validation enforces partial updates and invitation roles', () =>
     'ADMIN',
   )
   assert.throws(() => changeWorkspaceRoleSchema.parse({ role: 'OWNER' }))
+})
+
+test('stored workspace invitations keep only validated membership data', () => {
+  assert.deepEqual(
+    workspaceInvitationSchema.parse({
+      workspaceId: '00000000-0000-4000-8000-000000000002',
+      role: 'MEMBER',
+      deliveryEmail: 'legacy@example.com',
+      createdBy: '00000000-0000-4000-8000-000000000003',
+    }),
+    {
+      workspaceId: '00000000-0000-4000-8000-000000000002',
+      role: 'MEMBER',
+    },
+  )
+  assert.throws(() =>
+    workspaceInvitationSchema.parse({
+      workspaceId: '00000000-0000-4000-8000-000000000002',
+      role: 'OWNER',
+    }),
+  )
+  assert.equal(workspaceInvitationTokenSchema.parse('a'.repeat(43)).length, 43)
+  assert.throws(() => workspaceInvitationTokenSchema.parse('a'.repeat(42)))
 })
