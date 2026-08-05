@@ -309,6 +309,22 @@ function discardCommentEditor(): void {
   commentEditDraft.value = ''
 }
 
+function reconcileEditedComment(
+  editedCommentId: string | null,
+  comments: readonly CardComment[],
+): void {
+  if (
+    !editedCommentId ||
+    comments.some((comment) => comment.id === editedCommentId)
+  ) {
+    return
+  }
+  discardCommentEditor()
+  commentError.value = props.lastChangeActorName
+    ? `${props.lastChangeActorName}님이 이 댓글을 이미 삭제했습니다.`
+    : '이 댓글은 다른 사용자에 의해 이미 삭제되었습니다.'
+}
+
 async function loadCard(
   options: { background?: boolean } = {},
 ): Promise<void> {
@@ -323,6 +339,7 @@ async function loadCard(
     const card = await CardAPI.get(props.cardId)
     void loadLabels()
     if (generation === loadGeneration) {
+      const editedCommentId = commentEditingId.value
       if (
         background &&
         (
@@ -330,20 +347,15 @@ async function loadCard(
           (props.editable && hasUnsavedChanges())
         )
       ) {
+        if (detail.value) {
+          detail.value = { ...detail.value, comments: card.comments }
+        }
+        reconcileEditedComment(editedCommentId, card.comments)
         remoteUpdatePending.value = true
         return
       }
-      const editedCommentId = commentEditingId.value
       applyDetail(card)
-      if (
-        editedCommentId &&
-        !card.comments.some((comment) => comment.id === editedCommentId)
-      ) {
-        discardCommentEditor()
-        commentError.value = props.lastChangeActorName
-          ? `${props.lastChangeActorName}님이 이 댓글을 이미 삭제했습니다.`
-          : '이 댓글은 다른 사용자에 의해 이미 삭제되었습니다.'
-      }
+      reconcileEditedComment(editedCommentId, card.comments)
       if (background) emit('saved', card)
     }
   } catch (caught) {
