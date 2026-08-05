@@ -770,28 +770,12 @@ export async function removeAttachment(input: {
 
 // ─── Comments ─────────────────────────────────────────────────
 
-class CommentAlreadyDeletedError extends AppError {
-  constructor(deleterName?: string) {
-    super(
-      'COMMENT_ALREADY_DELETED',
-      409,
-      deleterName
-        ? `${deleterName}님이 이 댓글을 삭제했습니다.`
-        : '이 댓글은 삭제되었습니다.',
-    )
-  }
-}
-
-async function commentAlreadyDeletedError(
-  deletedBy: string | null,
-  client: Pick<Prisma.TransactionClient, 'user'> = prisma,
-): Promise<CommentAlreadyDeletedError> {
-  if (!deletedBy) return new CommentAlreadyDeletedError()
-  const deleter = await client.user.findFirst({
-    where: { id: deletedBy, deleted_at: null },
-    select: { name: true },
-  })
-  return new CommentAlreadyDeletedError(deleter?.name)
+function commentAlreadyDeletedError(): AppError {
+  return new AppError(
+    'COMMENT_ALREADY_DELETED',
+    409,
+    '이 댓글은 삭제되었습니다.',
+  )
 }
 
 export async function createComment(input: {
@@ -833,7 +817,7 @@ export async function updateComment(input: {
   if (!comment) throw new NotFoundError()
   if (comment.user_id !== input.userId) throw new ForbiddenError()
   if (comment.deleted_at) {
-    throw await commentAlreadyDeletedError(comment.deleted_by)
+    throw commentAlreadyDeletedError()
   }
   const card = await getCardOrThrow(comment.card_id)
   const location = await workspaceLocationForCard(card)
@@ -853,10 +837,10 @@ export async function updateComment(input: {
     if (result.count !== 1) {
       const latest = await tx.comment.findFirst({
         where: { id: input.commentId },
-        select: { deleted_at: true, deleted_by: true },
+        select: { deleted_at: true },
       })
       if (latest?.deleted_at) {
-        throw await commentAlreadyDeletedError(latest.deleted_by, tx)
+        throw commentAlreadyDeletedError()
       }
       throw new ConflictError('Comment could not be updated')
     }

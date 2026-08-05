@@ -305,7 +305,6 @@ describe('auth session generation', () => {
       apiRequest('/api/friends/requests', { method: 'POST' }),
     ).rejects.toMatchObject({
       name: 'ApiRequestError',
-      status: 409,
       code: 'ALREADY_FRIENDS',
       message: '이미 친구인 사용자입니다.',
     })

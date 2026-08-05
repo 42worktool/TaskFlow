@@ -22,17 +22,14 @@ interface ApiRequestInit extends Omit<RequestInit, 'body'> {
 }
 
 export class ApiRequestError extends Error {
-  readonly status: number
   readonly code?: string
 
   constructor(
     message: string,
-    status: number,
     code?: string,
   ) {
     super(message)
     this.name = 'ApiRequestError'
-    this.status = status
     this.code = code
   }
 }
@@ -143,7 +140,6 @@ export async function authRequestError(response: Response, fallback: string): Pr
     | null
   return new ApiRequestError(
     resolveErrorMessage(body, fallback),
-    response.status,
     body?.error,
   )
 }

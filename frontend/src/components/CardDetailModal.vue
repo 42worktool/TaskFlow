@@ -24,10 +24,9 @@ const props = withDefaults(
     cardId: string
     editable: boolean
     canManageComments?: boolean
-    lastChangeActorName?: string | null
     refreshToken?: number
   }>(),
-  { canManageComments: false, lastChangeActorName: null, refreshToken: 0 },
+  { canManageComments: false, refreshToken: 0 },
 )
 const emit = defineEmits<{
   close: []
@@ -340,9 +339,7 @@ async function loadCard(
         !card.comments.some((comment) => comment.id === editedCommentId)
       ) {
         discardCommentEditor()
-        commentError.value = props.lastChangeActorName
-          ? `${props.lastChangeActorName}님이 이 댓글을 삭제했습니다.`
-          : '이 댓글은 다른 사용자에 의해 삭제되었습니다.'
+        commentError.value = '이 댓글은 삭제되었습니다.'
       }
       if (background) emit('saved', card)
     }

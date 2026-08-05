@@ -9,7 +9,6 @@ const TARGET_LIST_ID = '00000000-0000-4000-8000-000000000004'
 const SOURCE_WORKSPACE_ID = '00000000-0000-4000-8000-000000000005'
 const TARGET_WORKSPACE_ID = '00000000-0000-4000-8000-000000000006'
 const COMMENT_ID = '00000000-0000-4000-8000-000000000007'
-const OTHER_USER_ID = '00000000-0000-4000-8000-000000000008'
 
 function setRequiredEnvironment(): void {
   Object.assign(process.env, {
@@ -897,7 +896,7 @@ test('updateCardDates validates against dates read under the card lock', async (
   assert.equal(publishCalls, 0)
 })
 
-test('updateComment rejects an already deleted comment with the deleter name', async (t) => {
+test('updateComment rejects an already deleted comment with a stable error', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { updateComment }] = await Promise.all([
     import('../../db'),
@@ -907,9 +906,7 @@ test('updateComment rejects an already deleted comment with the deleter name', a
   stubMethod(t, prisma.comment, 'findFirst', async () =>
     comment({
       deleted_at: new Date('2026-08-05T00:00:00.000Z'),
-      deleted_by: OTHER_USER_ID,
     }))
-  stubMethod(t, prisma.user, 'findFirst', async () => ({ name: '관리자' }))
 
   await assert.rejects(
     () =>
@@ -922,7 +919,7 @@ test('updateComment rejects an already deleted comment with the deleter name', a
       error instanceof Error &&
       'code' in error &&
       error.code === 'COMMENT_ALREADY_DELETED' &&
-      error.message === '관리자님이 이 댓글을 삭제했습니다.',
+      error.message === '이 댓글은 삭제되었습니다.',
   )
 })
 
@@ -941,7 +938,6 @@ test('updateComment conditionally updates only an active comment', async (t) => 
       ? comment()
       : {
           deleted_at: new Date('2026-08-05T00:00:00.000Z'),
-          deleted_by: OTHER_USER_ID,
         }
   })
   stubMethod(t, prisma.card, 'findFirst', async () => card())
@@ -953,7 +949,6 @@ test('updateComment conditionally updates only an active comment', async (t) => 
     updateWhere = args.where
     return { count: 0 }
   })
-  stubMethod(t, prisma.user, 'findFirst', async () => ({ name: '관리자' }))
   let publishCount = 0
   stubMethod(t, realtime, 'publish', () => {
     publishCount += 1
