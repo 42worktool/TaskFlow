@@ -76,14 +76,20 @@ export function toCardLabelDto(cardLabel: CardLabelWithLabel) {
   }
 }
 
-export function toCommentDto(comment: CommentWithUser) {
+export function toCommentDto(
+  comment: CommentWithUser,
+  deletedBy: SelectedUserSummary | null = null,
+) {
+  const deleted = comment.deleted_at !== null
   return {
     id: comment.id,
     card_id: comment.card_id,
     author: toUserSummary(comment.user),
-    comment_str: comment.comment_str,
+    comment_str: deleted ? null : comment.comment_str,
     created_at: comment.created_at,
     updated_at: comment.updated_at,
+    deleted_at: comment.deleted_at,
+    deleted_by: deleted && deletedBy ? toUserSummary(deletedBy) : null,
   }
 }
 
@@ -93,12 +99,19 @@ export function toCardDetailDto(
   labels: CardLabelWithLabel[],
   attachments: Attachment[],
   comments: CommentWithUser[],
+  commentDeleters: ReadonlyMap<string, SelectedUserSummary> = new Map(),
 ) {
   return {
     ...toCardDto(card),
     members: members.map(toCardMemberDto),
     labels: labels.map(toCardLabelDto),
     attachments: attachments.map(toAttachmentDto),
-    comments: comments.map(toCommentDto),
+    comments: comments.map((comment) =>
+      toCommentDto(
+        comment,
+        comment.deleted_by
+          ? commentDeleters.get(comment.deleted_by) ?? null
+          : null,
+      )),
   }
 }

@@ -179,9 +179,9 @@ export const updateComment: RequestHandler = async (req, res) => {
 }
 
 export const deleteComment: RequestHandler = async (req, res) => {
-  await svc.deleteComment({
+  const comment = await svc.deleteComment({
     userId: authenticatedUserId(req),
     commentId: req.params.comment_id as string,
   })
-  res.status(204).send()
+  res.status(200).json(comment)
 }

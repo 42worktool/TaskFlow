@@ -141,9 +141,15 @@ export interface CardComment {
     name: string
     profile_image_url: string | null
   }
-  comment_str: string
+  comment_str: string | null
   created_at: ISODateString
   updated_at: ISODateString
+  deleted_at: ISODateString | null
+  deleted_by: {
+    user_id: UUID
+    name: string
+    profile_image_url: string | null
+  } | null
 }
 
 export interface CardDetail extends Omit<Card, 'labels'> {

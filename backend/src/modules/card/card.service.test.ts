@@ -638,7 +638,7 @@ test('moveCard rechecks inbox ownership after locking the card', async (t) => {
   assert.equal(updateCalls, 0)
 })
 
-test('getCard includes active labels and comments in its detail response', async (t) => {
+test('getCard includes labels and comment tombstone fields in its detail response', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { getCard }] = await Promise.all([
     import('../../db'),
@@ -714,9 +714,11 @@ test('getCard includes active labels and comments in its detail response', async
     comment_str: 'From workspace chat',
     created_at: new Date('2026-07-27T00:00:00.000Z'),
     updated_at: new Date('2026-07-27T00:00:00.000Z'),
+    deleted_at: null,
+    deleted_by: null,
   }])
   assert.deepEqual(commentQuery, {
-    where: { card_id: CARD_ID, deleted_at: null },
+    where: { card_id: CARD_ID },
     orderBy: { created_at: 'asc' },
     include: {
       user: {
@@ -979,6 +981,56 @@ test('updateComment conditionally updates only an active comment', async (t) => 
     deleted_at: null,
   })
   assert.equal(publishCount, 0)
+})
+
+test('deleteComment returns a tombstone with deletion audit details', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { deleteComment }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.comment, 'findFirst', async () => comment())
+  stubMethod(t, prisma.card, 'findFirst', async () => card())
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  let deleteWhere: unknown
+  let deleteData: Partial<Comment> = {}
+  stubMethod(t, prisma.comment, 'updateMany', async (args) => {
+    deleteWhere = args.where
+    deleteData = args.data
+    return { count: 1 }
+  })
+  stubMethod(t, prisma.comment, 'findUniqueOrThrow', async () => ({
+    ...comment(deleteData),
+    user: {
+      id: USER_ID,
+      name: 'Author',
+      profile_image_url: null,
+    },
+  }))
+  stubMethod(t, prisma.user, 'findUnique', async () => ({
+    id: USER_ID,
+    name: 'Author',
+    profile_image_url: null,
+  }))
+  stubMethod(t, realtime, 'publish', () => {})
+
+  const deleted = await deleteComment({
+    userId: USER_ID,
+    commentId: COMMENT_ID,
+  })
+
+  assert.equal(deleted.comment_str, null)
+  assert.ok(deleted.deleted_at instanceof Date)
+  assert.deepEqual(deleteWhere, { id: COMMENT_ID, deleted_at: null })
+  assert.deepEqual(deleted.deleted_by, {
+    user_id: USER_ID,
+    name: 'Author',
+    profile_image_url: null,
+  })
 })
 
 const ATTACHMENT_ID = '00000000-0000-4000-8000-000000000009'

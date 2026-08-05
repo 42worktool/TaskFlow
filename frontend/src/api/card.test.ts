@@ -110,9 +110,27 @@ describe('CardAPI', () => {
   })
 
   it('removes a comment through the comment route', async () => {
-    vi.mocked(apiRequest).mockResolvedValueOnce(undefined)
+    const deleted = {
+      id: 'comment-1',
+      card_id: 'card-1',
+      author: {
+        user_id: 'user-1',
+        name: 'User',
+        profile_image_url: null,
+      },
+      comment_str: null,
+      created_at: '2026-08-05T00:00:00.000Z',
+      updated_at: '2026-08-05T01:00:00.000Z',
+      deleted_at: '2026-08-05T01:00:00.000Z',
+      deleted_by: {
+        user_id: 'admin-1',
+        name: 'Admin',
+        profile_image_url: null,
+      },
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(deleted)
 
-    await CardAPI.removeComment('comment-1')
+    await expect(CardAPI.removeComment('comment-1')).resolves.toEqual(deleted)
 
     expect(apiRequest).toHaveBeenCalledWith(
       '/api/comments/comment-1',

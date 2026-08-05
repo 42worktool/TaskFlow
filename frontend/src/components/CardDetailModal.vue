@@ -24,10 +24,9 @@ const props = withDefaults(
     cardId: string
     editable: boolean
     canManageComments?: boolean
-    lastChangeActorName?: string | null
     refreshToken?: number
   }>(),
-  { canManageComments: false, lastChangeActorName: null, refreshToken: 0 },
+  { canManageComments: false, refreshToken: 0 },
 )
 const emit = defineEmits<{
   close: []
@@ -93,8 +92,19 @@ function isCommentAuthor(comment: CardComment): boolean {
   return comment.author.user_id === authState.user?.id
 }
 
+function isActiveComment(comment: CardComment): boolean {
+  return comment.deleted_at === null
+}
+
+function canEditComment(comment: CardComment): boolean {
+  return isActiveComment(comment) && isCommentAuthor(comment)
+}
+
 function canDeleteComment(comment: CardComment): boolean {
-  return props.canManageComments || isCommentAuthor(comment)
+  return (
+    isActiveComment(comment) &&
+    (props.canManageComments || isCommentAuthor(comment))
+  )
 }
 
 function formatBytes(bytes: number | null): string {
@@ -300,7 +310,10 @@ function formatCommentTime(value: string): string {
 }
 
 function wasCommentEdited(comment: CardComment): boolean {
-  return Date.parse(comment.updated_at) > Date.parse(comment.created_at)
+  return (
+    !comment.deleted_at &&
+    Date.parse(comment.updated_at) > Date.parse(comment.created_at)
+  )
 }
 
 function discardCommentEditor(): void {
@@ -335,13 +348,13 @@ async function loadCard(
       }
       const editedCommentId = commentEditingId.value
       applyDetail(card)
-      if (
-        editedCommentId &&
-        !card.comments.some((comment) => comment.id === editedCommentId)
-      ) {
+      const editedComment = editedCommentId
+        ? card.comments.find((comment) => comment.id === editedCommentId)
+        : null
+      if (editedComment?.deleted_at) {
         discardCommentEditor()
-        commentError.value = props.lastChangeActorName
-          ? `${props.lastChangeActorName}님이 이 댓글을 이미 삭제했습니다.`
+        commentError.value = editedComment.deleted_by
+          ? `${editedComment.deleted_by.name}님이 이 댓글을 이미 삭제했습니다.`
           : '이 댓글은 다른 사용자에 의해 이미 삭제되었습니다.'
       }
       if (background) emit('saved', card)
@@ -431,14 +444,14 @@ async function submitComment(): Promise<void> {
 
 function startEditingComment(comment: CardComment): void {
   if (
-    !isCommentAuthor(comment) ||
+    !canEditComment(comment) ||
     commentMutationPending.value
   ) {
     return
   }
   commentEditSubmitter.reset()
   commentEditingId.value = comment.id
-  commentEditDraft.value = comment.comment_str
+  commentEditDraft.value = comment.comment_str ?? ''
   commentError.value = ''
 }
 
@@ -451,7 +464,7 @@ async function updateComment(comment: CardComment): Promise<void> {
   const cardId = props.cardId
   const nextComment = commentEditDraft.value.trim()
   if (
-    !isCommentAuthor(comment) ||
+    !canEditComment(comment) ||
     commentEditingId.value !== comment.id ||
     commentMutationPending.value
   ) {
@@ -486,15 +499,8 @@ async function updateComment(comment: CardComment): Promise<void> {
         caught instanceof ApiRequestError &&
         caught.code === 'COMMENT_ALREADY_DELETED'
       ) {
-        detail.value = detail.value
-          ? {
-              ...detail.value,
-              comments: detail.value.comments.filter(
-                (item) => item.id !== comment.id,
-              ),
-            }
-          : null
         discardCommentEditor()
+        await loadCard({ background: true })
       }
     }
   } finally {
@@ -515,11 +521,13 @@ async function removeComment(comment: CardComment): Promise<void> {
   commentDeletingId.value = comment.id
   commentError.value = ''
   try {
-    await CardAPI.removeComment(comment.id)
+    const deleted = await CardAPI.removeComment(comment.id)
     if (!active || cardId !== props.cardId || !detail.value) return
     detail.value = {
       ...detail.value,
-      comments: detail.value.comments.filter((item) => item.id !== comment.id),
+      comments: detail.value.comments.map((item) =>
+        item.id === deleted.id ? deleted : item,
+      ),
     }
     if (commentEditingId.value === comment.id) cancelEditingComment()
   } catch (caught) {
@@ -957,7 +965,7 @@ onUnmounted(() => {
                     수정 {{ formatCommentTime(comment.updated_at) }}
                   </time>
                   <button
-                    v-if="isCommentAuthor(comment)"
+                    v-if="canEditComment(comment)"
                     type="button"
                     class="card-detail-comment-edit"
                     :disabled="commentMutationPending"
@@ -978,7 +986,20 @@ onUnmounted(() => {
                   </button>
                 </header>
                 <div
-                  v-if="commentEditingId === comment.id"
+                  v-if="comment.deleted_at"
+                  class="card-detail-comment-tombstone"
+                  role="status"
+                >
+                  <p>삭제된 댓글입니다.</p>
+                  <small>
+                    <template v-if="comment.deleted_by">
+                      {{ comment.deleted_by.name }}님이
+                    </template>
+                    {{ formatCommentTime(comment.deleted_at) }} 삭제
+                  </small>
+                </div>
+                <div
+                  v-else-if="commentEditingId === comment.id"
                   class="card-detail-comment-editor"
                 >
                   <textarea

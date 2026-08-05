@@ -58,7 +58,7 @@ async function buildCardDetail(card: Card) {
       orderBy: { created_at: 'asc' },
     }),
     prisma.comment.findMany({
-      where: { card_id: card.id, deleted_at: null },
+      where: { card_id: card.id },
       orderBy: { created_at: 'asc' },
       include: {
         user: { select: userSummarySelect },
@@ -66,7 +66,28 @@ async function buildCardDetail(card: Card) {
     }),
   ])
 
-  return toCardDetailDto(card, members, labels, attachments, comments)
+  const deleterIds = Array.from(
+    new Set(
+      comments
+        .map((comment) => comment.deleted_by)
+        .filter((userId): userId is string => userId !== null),
+    ),
+  )
+  const deleters = deleterIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: deleterIds } },
+        select: userSummarySelect,
+      })
+    : []
+
+  return toCardDetailDto(
+    card,
+    members,
+    labels,
+    attachments,
+    comments,
+    new Map(deleters.map((user) => [user.id, user])),
+  )
 }
 
 // ─── Access helpers ───────────────────────────────────────────
@@ -879,7 +900,7 @@ export async function updateComment(input: {
 export async function deleteComment(input: {
   userId: string
   commentId: string
-}): Promise<void> {
+}) {
   const comment = await prisma.comment.findFirst({
     where: { id: input.commentId, deleted_at: null },
   })
@@ -893,9 +914,31 @@ export async function deleteComment(input: {
   }
   const location = await workspaceLocationForCard(card)
 
-  await prisma.comment.update({
-    where: { id: input.commentId },
-    data: softDeletedBy(input.userId),
+  const [deleted, deleter] = await prisma.$transaction(async (tx) => {
+    const result = await tx.comment.updateMany({
+      where: { id: input.commentId, deleted_at: null },
+      data: softDeletedBy(input.userId),
+    })
+    if (result.count !== 1) {
+      const latest = await tx.comment.findUnique({
+        where: { id: input.commentId },
+        select: { deleted_at: true, deleted_by: true },
+      })
+      if (latest?.deleted_at) {
+        throw await commentAlreadyDeletedError(latest.deleted_by, tx)
+      }
+      throw new ConflictError('Comment could not be deleted')
+    }
+
+    const deletedComment = await tx.comment.findUniqueOrThrow({
+      where: { id: input.commentId },
+      include: { user: { select: userSummarySelect } },
+    })
+    const deletingUser = await tx.user.findUnique({
+      where: { id: input.userId },
+      select: userSummarySelect,
+    })
+    return [deletedComment, deletingUser] as const
   })
 
   publishCardChange({
@@ -904,4 +947,5 @@ export async function deleteComment(input: {
     location,
     action: 'updated',
   })
+  return toCommentDto(deleted, deleter)
 }

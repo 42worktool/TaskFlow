@@ -114,4 +114,40 @@ test('card detail and comment DTOs preserve nested user shapes', () => {
     name: 'User',
     profile_image_url: null,
   })
+
+  const deletedAt = new Date('2026-07-28T00:00:00Z')
+  const deleter = {
+    id: 'admin-id',
+    name: 'Admin',
+    profile_image_url: null,
+  }
+  assert.deepEqual(
+    toCommentDto(
+      {
+        ...comment,
+        updated_at: deletedAt,
+        deleted_at: deletedAt,
+        deleted_by: deleter.id,
+      },
+      deleter,
+    ),
+    {
+      id: 'comment-id',
+      card_id: 'card-id',
+      author: {
+        user_id: 'user-id',
+        name: 'User',
+        profile_image_url: null,
+      },
+      comment_str: null,
+      created_at: timestamp,
+      updated_at: deletedAt,
+      deleted_at: deletedAt,
+      deleted_by: {
+        user_id: 'admin-id',
+        name: 'Admin',
+        profile_image_url: null,
+      },
+    },
+  )
 })
