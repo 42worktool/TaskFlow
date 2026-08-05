@@ -302,6 +302,7 @@ function wasCommentEdited(comment: CardComment): boolean {
 }
 
 function discardCommentEditor(): void {
+  commentEditSubmitter.reset()
   commentEditingId.value = null
   commentEditDraft.value = ''
 }
@@ -434,6 +435,7 @@ function startEditingComment(comment: CardComment): void {
   ) {
     return
   }
+  commentEditSubmitter.reset()
   commentEditingId.value = comment.id
   commentEditDraft.value = comment.comment_str
   commentError.value = ''
@@ -540,6 +542,18 @@ const commentSubmitter = createComposerEnterSubmitter(
   },
 )
 
+const commentEditSubmitter = createComposerEnterSubmitter(
+  () => {
+    const comment = detail.value?.comments.find(
+      (item) => item.id === commentEditingId.value,
+    )
+    if (comment) void updateComment(comment)
+  },
+  (callback) => {
+    void nextTick(callback)
+  },
+)
+
 async function submit(): Promise<void> {
   if (
     !props.editable ||
@@ -621,8 +635,7 @@ watch(
     commentGeneration += 1
     commentDraft.value = ''
     commentSaving.value = false
-    commentEditingId.value = null
-    commentEditDraft.value = ''
+    discardCommentEditor()
     commentUpdatingId.value = null
     commentDeletingId.value = null
     commentError.value = ''
@@ -654,6 +667,7 @@ watch(
 
 onUnmounted(() => {
   commentSubmitter.reset()
+  commentEditSubmitter.reset()
   active = false
   loadGeneration += 1
   commentGeneration += 1
@@ -981,25 +995,33 @@ onUnmounted(() => {
                     maxlength="2000"
                     :disabled="commentUpdatingId === comment.id"
                     :aria-label="`${comment.author.name}님의 댓글 내용 수정`"
+                    :aria-describedby="`comment-edit-hint-${comment.id}`"
+                    @keydown.enter.exact="commentEditSubmitter.handleEnter"
+                    @compositionend="commentEditSubmitter.handleCompositionEnd"
                   />
                   <div class="card-detail-comment-editor-actions">
-                    <button
-                      type="button"
-                      :disabled="commentUpdatingId !== null"
-                      @click="cancelEditingComment"
-                    >
-                      취소
-                    </button>
-                    <button
-                      type="button"
-                      :disabled="
-                        commentUpdatingId !== null ||
-                        !commentEditDraft.trim()
-                      "
-                      @click="updateComment(comment)"
-                    >
-                      {{ commentUpdatingId === comment.id ? '저장 중…' : '저장' }}
-                    </button>
+                    <small :id="`comment-edit-hint-${comment.id}`">
+                      Enter로 저장 · Shift+Enter로 줄바꿈
+                    </small>
+                    <div class="card-detail-comment-editor-buttons">
+                      <button
+                        type="button"
+                        :disabled="commentUpdatingId !== null"
+                        @click="cancelEditingComment"
+                      >
+                        취소
+                      </button>
+                      <button
+                        type="button"
+                        :disabled="
+                          commentUpdatingId !== null ||
+                          !commentEditDraft.trim()
+                        "
+                        @click="updateComment(comment)"
+                      >
+                        {{ commentUpdatingId === comment.id ? '저장 중…' : '저장' }}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <p v-else>{{ comment.comment_str }}</p>
