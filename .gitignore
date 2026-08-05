@@ -1,6 +1,9 @@
 .env
 .env.*
-!.env.example
+!/.env.dev.example
+!/.env.prod.example
+
+.taskflow/
 
 backend/node_modules/
 backend/dist/
