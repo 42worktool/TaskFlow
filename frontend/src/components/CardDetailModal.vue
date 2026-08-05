@@ -47,6 +47,9 @@ const commentEditingId = ref<string | null>(null)
 const commentEditDraft = ref('')
 const commentUpdatingId = ref<string | null>(null)
 const commentDeletingId = ref<string | null>(null)
+const commentMutationPending = computed(
+  () => commentUpdatingId.value !== null || commentDeletingId.value !== null,
+)
 const commentError = ref('')
 const availableLabels = ref<Label[]>([])
 const labelsLoading = ref(false)
@@ -79,20 +82,19 @@ function close(): void {
   if (
     !saving.value &&
     !commentSaving.value &&
-    !commentUpdatingId.value &&
-    !commentDeletingId.value &&
+    !commentMutationPending.value &&
     !attachmentUploading.value
   ) {
     emit('close')
   }
 }
 
-function canEditComment(comment: CardComment): boolean {
+function isCommentAuthor(comment: CardComment): boolean {
   return comment.author.user_id === authState.user?.id
 }
 
 function canDeleteComment(comment: CardComment): boolean {
-  return props.canManageComments || comment.author.user_id === authState.user?.id
+  return props.canManageComments || isCommentAuthor(comment)
 }
 
 function formatBytes(bytes: number | null): string {
@@ -429,9 +431,8 @@ async function submitComment(): Promise<void> {
 
 function startEditingComment(comment: CardComment): void {
   if (
-    !canEditComment(comment) ||
-    commentDeletingId.value ||
-    commentUpdatingId.value
+    !isCommentAuthor(comment) ||
+    commentMutationPending.value
   ) {
     return
   }
@@ -450,10 +451,9 @@ async function updateComment(comment: CardComment): Promise<void> {
   const cardId = props.cardId
   const nextComment = commentEditDraft.value.trim()
   if (
-    !canEditComment(comment) ||
+    !isCommentAuthor(comment) ||
     commentEditingId.value !== comment.id ||
-    commentUpdatingId.value ||
-    commentDeletingId.value
+    commentMutationPending.value
   ) {
     return
   }
@@ -506,8 +506,7 @@ async function removeComment(comment: CardComment): Promise<void> {
   const cardId = props.cardId
   if (
     !canDeleteComment(comment) ||
-    commentDeletingId.value ||
-    commentUpdatingId.value ||
+    commentMutationPending.value ||
     !window.confirm('이 댓글을 삭제할까요?')
   ) {
     return
@@ -533,13 +532,15 @@ async function removeComment(comment: CardComment): Promise<void> {
   }
 }
 
+function deferComposerSubmit(callback: () => void): void {
+  void nextTick(callback)
+}
+
 const commentSubmitter = createComposerEnterSubmitter(
   () => {
     void submitComment()
   },
-  (callback) => {
-    void nextTick(callback)
-  },
+  deferComposerSubmit,
 )
 
 const commentEditSubmitter = createComposerEnterSubmitter(
@@ -549,9 +550,7 @@ const commentEditSubmitter = createComposerEnterSubmitter(
     )
     if (comment) void updateComment(comment)
   },
-  (callback) => {
-    void nextTick(callback)
-  },
+  deferComposerSubmit,
 )
 
 async function submit(): Promise<void> {
@@ -695,8 +694,7 @@ onUnmounted(() => {
             :disabled="
               saving ||
               commentSaving ||
-              commentUpdatingId !== null ||
-              commentDeletingId !== null ||
+              commentMutationPending ||
               attachmentUploading
             "
             @click="close"
@@ -959,13 +957,10 @@ onUnmounted(() => {
                     수정 {{ formatCommentTime(comment.updated_at) }}
                   </time>
                   <button
-                    v-if="canEditComment(comment)"
+                    v-if="isCommentAuthor(comment)"
                     type="button"
                     class="card-detail-comment-edit"
-                    :disabled="
-                      commentUpdatingId !== null ||
-                      commentDeletingId !== null
-                    "
+                    :disabled="commentMutationPending"
                     :aria-label="`${comment.author.name}님의 댓글 수정`"
                     @click="startEditingComment(comment)"
                   >
@@ -975,10 +970,7 @@ onUnmounted(() => {
                     v-if="canDeleteComment(comment)"
                     type="button"
                     class="card-detail-comment-delete"
-                    :disabled="
-                      commentDeletingId !== null ||
-                      commentUpdatingId !== null
-                    "
+                    :disabled="commentMutationPending"
                     :aria-label="`${comment.author.name}님의 댓글 삭제`"
                     @click="removeComment(comment)"
                   >

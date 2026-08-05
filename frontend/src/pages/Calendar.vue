@@ -11,6 +11,7 @@ import {
   buildCalendarWeeks,
   type CalendarRangeSegment,
 } from '../utils/calendar'
+import { workspaceMemberNameFor } from '../utils/workspacePermissions'
 
 const route = useRoute()
 const props = withDefaults(
@@ -88,8 +89,10 @@ function openCard(cardId: string): void {
 }
 
 function rememberCardChangeActor(userId: string): void {
-  cardDetailChangeActorName.value =
-    props.workspaceMembers.find((member) => member.user_id === userId)?.user.name ?? null
+  cardDetailChangeActorName.value = workspaceMemberNameFor(
+    props.workspaceMembers,
+    userId,
+  )
 }
 
 const calendarWeeks = computed(() =>

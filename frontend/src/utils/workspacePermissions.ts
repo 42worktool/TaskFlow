@@ -1,4 +1,4 @@
-import type { Workspace, WorkspaceRole } from '../types'
+import type { Workspace, WorkspaceMember, WorkspaceRole } from '../types'
 
 const ROLE_RANK: Record<WorkspaceRole, number> = {
   VIEWER: 0,
@@ -15,6 +15,13 @@ export function workspaceRoleFor(
   return (
     workspace.members.find((member) => member.user_id === userId)?.role ?? null
   )
+}
+
+export function workspaceMemberNameFor(
+  members: readonly WorkspaceMember[],
+  userId: string,
+): string | null {
+  return members.find((member) => member.user_id === userId)?.user.name ?? null
 }
 
 export function hasWorkspaceRole(

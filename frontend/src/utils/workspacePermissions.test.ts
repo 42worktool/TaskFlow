@@ -4,6 +4,7 @@ import {
   canChangeWorkspaceMemberRole,
   hasWorkspaceRole,
   partitionWorkspacesByOwnership,
+  workspaceMemberNameFor,
   workspaceRoleFor,
 } from './workspacePermissions'
 
@@ -42,6 +43,11 @@ describe('workspace permissions', () => {
     expect(workspaceRoleFor(workspace, 'owner-1')).toBe('OWNER')
     expect(workspaceRoleFor(workspace, 'visitor-1')).toBeNull()
     expect(workspaceRoleFor(workspace, undefined)).toBeNull()
+  })
+
+  it('finds a workspace member name', () => {
+    expect(workspaceMemberNameFor(workspace.members, 'owner-1')).toBe('Owner')
+    expect(workspaceMemberNameFor(workspace.members, 'visitor-1')).toBeNull()
   })
 
   it.each([

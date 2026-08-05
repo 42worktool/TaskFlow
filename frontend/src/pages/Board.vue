@@ -25,6 +25,7 @@ import {
 import type { Card, DraggableChange, ListWithCards, WorkspaceMember } from '../types'
 import { horizontalEdgeScrollDelta } from '../utils/dragAutoScroll'
 import { neighborIds } from '../utils/ordering'
+import { workspaceMemberNameFor } from '../utils/workspacePermissions'
 
 const route = useRoute()
 const router = useRouter()
@@ -548,8 +549,10 @@ function closeCard() {
 }
 
 function rememberCardChangeActor(userId: string): void {
-  cardDetailChangeActorName.value =
-    props.workspaceMembers.find((member) => member.user_id === userId)?.user.name ?? null
+  cardDetailChangeActorName.value = workspaceMemberNameFor(
+    props.workspaceMembers,
+    userId,
+  )
 }
 
 function onCardSaved(saved: Card) {
