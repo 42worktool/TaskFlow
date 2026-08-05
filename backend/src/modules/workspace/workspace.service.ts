@@ -131,7 +131,10 @@ async function lockMembershipPair<T>(
   operation: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId}), hashtext(${userId}))`
+    // pg_advisory_xact_lock returns PostgreSQL `void`, which Prisma cannot
+    // deserialize through $queryRaw (P2010). This is an effect-only statement,
+    // so execute it without asking Prisma to decode a result row.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId}), hashtext(${userId}))`
     return operation(tx)
   })
 }
