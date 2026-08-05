@@ -797,8 +797,8 @@ class CommentAlreadyDeletedError extends AppError {
       'COMMENT_ALREADY_DELETED',
       409,
       deleterName
-        ? `${deleterName}님이 이 댓글을 이미 삭제했습니다.`
-        : '이 댓글은 이미 삭제되었습니다.',
+        ? `${deleterName}님이 이 댓글을 삭제했습니다.`
+        : '이 댓글은 삭제되었습니다.',
     )
   }
 }

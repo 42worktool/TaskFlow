@@ -353,9 +353,9 @@ async function loadCard(
         : null
       if (editedComment?.deleted_at) {
         discardCommentEditor()
-        commentError.value = editedComment.deleted_by
-          ? `${editedComment.deleted_by.name}님이 이 댓글을 이미 삭제했습니다.`
-          : '이 댓글은 다른 사용자에 의해 이미 삭제되었습니다.'
+        commentError.value = props.lastChangeActorName
+          ? `${props.lastChangeActorName}님이 이 댓글을 삭제했습니다.`
+          : '이 댓글은 다른 사용자에 의해 삭제되었습니다.'
       }
       if (background) emit('saved', card)
     }
