@@ -62,6 +62,12 @@ export const CardAPI = {
       json: { comment_str: comment },
     }),
 
+  updateComment: (commentId: string, comment: string) =>
+    apiRequest<CardComment>(`/api/comments/${commentId}`, {
+      method: 'PATCH',
+      json: { comment_str: comment },
+    }),
+
   removeComment: (commentId: string) =>
     apiRequest<void>(`/api/comments/${commentId}`, { method: 'DELETE' }),
 

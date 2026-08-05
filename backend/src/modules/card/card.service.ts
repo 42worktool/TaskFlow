@@ -9,7 +9,13 @@
 import path from 'node:path'
 import { prisma } from '../../db'
 import type { Card, List, Prisma, Role } from '@prisma/client'
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../errors'
+import {
+  AppError,
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '../../errors'
 import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
 import { userSummarySelect } from '../../lib/user-summary'
@@ -764,6 +770,30 @@ export async function removeAttachment(input: {
 
 // ─── Comments ─────────────────────────────────────────────────
 
+class CommentAlreadyDeletedError extends AppError {
+  constructor(deleterName?: string) {
+    super(
+      'COMMENT_ALREADY_DELETED',
+      409,
+      deleterName
+        ? `${deleterName}님이 이 댓글을 이미 삭제했습니다.`
+        : '이 댓글은 이미 삭제되었습니다.',
+    )
+  }
+}
+
+async function commentAlreadyDeletedError(
+  deletedBy: string | null,
+  client: Pick<Prisma.TransactionClient, 'user'> = prisma,
+): Promise<CommentAlreadyDeletedError> {
+  if (!deletedBy) return new CommentAlreadyDeletedError()
+  const deleter = await client.user.findFirst({
+    where: { id: deletedBy, deleted_at: null },
+    select: { name: true },
+  })
+  return new CommentAlreadyDeletedError(deleter?.name)
+}
+
 export async function createComment(input: {
   userId: string
   cardId: string
@@ -797,21 +827,44 @@ export async function updateComment(input: {
   commentId: string
   comment: string
 }) {
-  const comment = await prisma.comment.findFirst({
-    where: { id: input.commentId, deleted_at: null },
+  const comment = await prisma.comment.findUnique({
+    where: { id: input.commentId },
   })
   if (!comment) throw new NotFoundError()
   if (comment.user_id !== input.userId) throw new ForbiddenError()
+  if (comment.deleted_at) {
+    throw await commentAlreadyDeletedError(comment.deleted_by)
+  }
   const card = await getCardOrThrow(comment.card_id)
   const location = await workspaceLocationForCard(card)
 
-  const updated = await prisma.comment.update({
-    where: { id: input.commentId },
-    data: {
-      comment_str: input.comment,
-      ...updatedBy(input.userId),
-    },
-    include: { user: { select: userSummarySelect } },
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.comment.updateMany({
+      where: {
+        id: input.commentId,
+        user_id: input.userId,
+        deleted_at: null,
+      },
+      data: {
+        comment_str: input.comment,
+        ...updatedBy(input.userId),
+      },
+    })
+    if (result.count !== 1) {
+      const latest = await tx.comment.findUnique({
+        where: { id: input.commentId },
+        select: { deleted_at: true, deleted_by: true },
+      })
+      if (latest?.deleted_at) {
+        throw await commentAlreadyDeletedError(latest.deleted_by, tx)
+      }
+      throw new ConflictError('Comment could not be updated')
+    }
+
+    return tx.comment.findUniqueOrThrow({
+      where: { id: input.commentId },
+      include: { user: { select: userSummarySelect } },
+    })
   })
   const dto = toCommentDto(updated)
   publishCardChange({

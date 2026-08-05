@@ -22,7 +22,7 @@ import {
   setInboxDestinations,
   startCardDrag,
 } from '../services/messenger'
-import type { Card, DraggableChange, ListWithCards } from '../types'
+import type { Card, DraggableChange, ListWithCards, WorkspaceMember } from '../types'
 import { horizontalEdgeScrollDelta } from '../utils/dragAutoScroll'
 import { neighborIds } from '../utils/ordering'
 
@@ -33,12 +33,14 @@ const props = withDefaults(
     canEditBoard?: boolean
     canViewCardDetails?: boolean
     canManageComments?: boolean
+    workspaceMembers?: WorkspaceMember[]
     workspaceSyncVersion?: number
   }>(),
   {
     canEditBoard: false,
     canViewCardDetails: false,
     canManageComments: false,
+    workspaceMembers: () => [],
     workspaceSyncVersion: 0,
   },
 )
@@ -50,6 +52,7 @@ const actionError = ref('')
 const completingCardIds = ref<Set<string>>(new Set())
 const selectedCardId = ref<string | null>(null)
 const cardDetailRefreshToken = ref(0)
+const cardDetailChangeActorName = ref<string | null>(null)
 const boardColumns = ref<{ $el: HTMLElement } | null>(null)
 let listLoadGeneration = 0
 let dragDepth = 0
@@ -525,6 +528,7 @@ function onBoardCardDragEnd(): void {
 
 function openCard(card: Card) {
   if (!props.canViewCardDetails) return
+  cardDetailChangeActorName.value = null
   selectedCardId.value = card.id
   void router.replace({
     query: {
@@ -535,11 +539,17 @@ function openCard(card: Card) {
 }
 
 function closeCard() {
+  cardDetailChangeActorName.value = null
   selectedCardId.value = null
   if (typeof route.query.card !== 'string') return
   const query = { ...route.query }
   delete query.card
   void router.replace({ query })
+}
+
+function rememberCardChangeActor(userId: string): void {
+  cardDetailChangeActorName.value =
+    props.workspaceMembers.find((member) => member.user_id === userId)?.user.name ?? null
 }
 
 function onCardSaved(saved: Card) {
@@ -582,6 +592,7 @@ const removeWorkspaceChangeListener = realtime.on(
         event.entity === 'card' &&
         selectedCardId.value === event.entity_id
       ) {
+        rememberCardChangeActor(event.actor_user_id)
         cardDetailRefreshToken.value += 1
       }
       queueFullRefresh()
@@ -621,6 +632,7 @@ const removeWorkspaceChangeListener = realtime.on(
     ) {
       closeCard()
     } else if (selectedCardId.value === event.entity_id) {
+      rememberCardChangeActor(event.actor_user_id)
       cardDetailRefreshToken.value += 1
     }
     event.list_ids.forEach((id) => pendingListIds.add(id))
@@ -740,6 +752,7 @@ onUnmounted(() => {
       :card-id="selectedCardId"
       :editable="canEditBoard"
       :can-manage-comments="canManageComments"
+      :last-change-actor-name="cardDetailChangeActorName"
       :refresh-token="cardDetailRefreshToken"
       @saved="onCardSaved"
       @close="closeCard"

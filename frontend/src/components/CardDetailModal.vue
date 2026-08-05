@@ -3,7 +3,7 @@ import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { CardAPI } from '../api/card'
 import { LabelAPI } from '../api/label'
-import { authState } from '../services/auth'
+import { ApiRequestError, authState } from '../services/auth'
 import type { Card, CardAttachment, CardComment, CardDetail, Label } from '../types'
 import {
   isDateRangeValid,
@@ -24,9 +24,10 @@ const props = withDefaults(
     cardId: string
     editable: boolean
     canManageComments?: boolean
+    lastChangeActorName?: string | null
     refreshToken?: number
   }>(),
-  { canManageComments: false, refreshToken: 0 },
+  { canManageComments: false, lastChangeActorName: null, refreshToken: 0 },
 )
 const emit = defineEmits<{
   close: []
@@ -42,6 +43,9 @@ const loading = ref(true)
 const saving = ref(false)
 const commentDraft = ref('')
 const commentSaving = ref(false)
+const commentEditingId = ref<string | null>(null)
+const commentEditDraft = ref('')
+const commentUpdatingId = ref<string | null>(null)
 const commentDeletingId = ref<string | null>(null)
 const commentError = ref('')
 const availableLabels = ref<Label[]>([])
@@ -75,11 +79,16 @@ function close(): void {
   if (
     !saving.value &&
     !commentSaving.value &&
+    !commentUpdatingId.value &&
     !commentDeletingId.value &&
     !attachmentUploading.value
   ) {
     emit('close')
   }
+}
+
+function canEditComment(comment: CardComment): boolean {
+  return comment.author.user_id === authState.user?.id
 }
 
 function canDeleteComment(comment: CardComment): boolean {
@@ -288,6 +297,15 @@ function formatCommentTime(value: string): string {
   })
 }
 
+function wasCommentEdited(comment: CardComment): boolean {
+  return Date.parse(comment.updated_at) > Date.parse(comment.created_at)
+}
+
+function discardCommentEditor(): void {
+  commentEditingId.value = null
+  commentEditDraft.value = ''
+}
+
 async function loadCard(
   options: { background?: boolean } = {},
 ): Promise<void> {
@@ -304,12 +322,25 @@ async function loadCard(
     if (generation === loadGeneration) {
       if (
         background &&
-        (saving.value || (props.editable && hasUnsavedChanges()))
+        (
+          saving.value ||
+          (props.editable && hasUnsavedChanges())
+        )
       ) {
         remoteUpdatePending.value = true
         return
       }
+      const editedCommentId = commentEditingId.value
       applyDetail(card)
+      if (
+        editedCommentId &&
+        !card.comments.some((comment) => comment.id === editedCommentId)
+      ) {
+        discardCommentEditor()
+        commentError.value = props.lastChangeActorName
+          ? `${props.lastChangeActorName}님이 이 댓글을 이미 삭제했습니다.`
+          : '이 댓글은 다른 사용자에 의해 이미 삭제되었습니다.'
+      }
       if (background) emit('saved', card)
     }
   } catch (caught) {
@@ -343,7 +374,14 @@ async function reloadAfterFailedSave(
 async function submitComment(): Promise<void> {
   const cardId = props.cardId
   const nextComment = commentDraft.value.trim()
-  if (!nextComment || commentSaving.value || saving.value) return
+  if (
+    !nextComment ||
+    commentSaving.value ||
+    commentUpdatingId.value ||
+    saving.value
+  ) {
+    return
+  }
 
   const generation = ++commentGeneration
   commentSaving.value = true
@@ -388,11 +426,86 @@ async function submitComment(): Promise<void> {
   }
 }
 
+function startEditingComment(comment: CardComment): void {
+  if (
+    !canEditComment(comment) ||
+    commentDeletingId.value ||
+    commentUpdatingId.value
+  ) {
+    return
+  }
+  commentEditingId.value = comment.id
+  commentEditDraft.value = comment.comment_str
+  commentError.value = ''
+}
+
+function cancelEditingComment(): void {
+  if (commentUpdatingId.value) return
+  discardCommentEditor()
+}
+
+async function updateComment(comment: CardComment): Promise<void> {
+  const cardId = props.cardId
+  const nextComment = commentEditDraft.value.trim()
+  if (
+    !canEditComment(comment) ||
+    commentEditingId.value !== comment.id ||
+    commentUpdatingId.value ||
+    commentDeletingId.value
+  ) {
+    return
+  }
+  if (!nextComment) {
+    commentError.value = '댓글 내용을 입력해 주세요.'
+    return
+  }
+  if (nextComment === comment.comment_str) {
+    cancelEditingComment()
+    return
+  }
+
+  commentUpdatingId.value = comment.id
+  commentError.value = ''
+  try {
+    const updated = await CardAPI.updateComment(comment.id, nextComment)
+    if (!active || cardId !== props.cardId || !detail.value) return
+    detail.value = {
+      ...detail.value,
+      comments: detail.value.comments.map((item) =>
+        item.id === updated.id ? updated : item,
+      ),
+    }
+    discardCommentEditor()
+  } catch (caught) {
+    if (active && cardId === props.cardId) {
+      commentError.value =
+        caught instanceof Error ? caught.message : '댓글을 수정하지 못했습니다.'
+      if (
+        caught instanceof ApiRequestError &&
+        caught.code === 'COMMENT_ALREADY_DELETED'
+      ) {
+        detail.value = detail.value
+          ? {
+              ...detail.value,
+              comments: detail.value.comments.filter(
+                (item) => item.id !== comment.id,
+              ),
+            }
+          : null
+        discardCommentEditor()
+      }
+    }
+  } finally {
+    if (active && cardId === props.cardId) commentUpdatingId.value = null
+  }
+}
+
 async function removeComment(comment: CardComment): Promise<void> {
   const cardId = props.cardId
   if (
     !canDeleteComment(comment) ||
     commentDeletingId.value ||
+    commentUpdatingId.value ||
     !window.confirm('이 댓글을 삭제할까요?')
   ) {
     return
@@ -407,6 +520,7 @@ async function removeComment(comment: CardComment): Promise<void> {
       ...detail.value,
       comments: detail.value.comments.filter((item) => item.id !== comment.id),
     }
+    if (commentEditingId.value === comment.id) cancelEditingComment()
   } catch (caught) {
     if (active && cardId === props.cardId) {
       commentError.value =
@@ -427,7 +541,14 @@ const commentSubmitter = createComposerEnterSubmitter(
 )
 
 async function submit(): Promise<void> {
-  if (!props.editable || saving.value || commentSaving.value) return
+  if (
+    !props.editable ||
+    saving.value ||
+    commentSaving.value ||
+    commentUpdatingId.value
+  ) {
+    return
+  }
   const cardId = props.cardId
   const trimmedTitle = title.value.trim()
   const nextDescription = description.value
@@ -500,6 +621,9 @@ watch(
     commentGeneration += 1
     commentDraft.value = ''
     commentSaving.value = false
+    commentEditingId.value = null
+    commentEditDraft.value = ''
+    commentUpdatingId.value = null
     commentDeletingId.value = null
     commentError.value = ''
     attachmentGeneration += 1
@@ -554,7 +678,13 @@ onUnmounted(() => {
             class="close-btn"
             type="button"
             aria-label="닫기"
-            :disabled="saving || commentSaving || attachmentUploading"
+            :disabled="
+              saving ||
+              commentSaving ||
+              commentUpdatingId !== null ||
+              commentDeletingId !== null ||
+              attachmentUploading
+            "
             @click="close"
           >
             ✕
@@ -807,18 +937,72 @@ onUnmounted(() => {
                   <time :datetime="comment.created_at">
                     {{ formatCommentTime(comment.created_at) }}
                   </time>
+                  <time
+                    v-if="wasCommentEdited(comment)"
+                    class="card-detail-comment-edited"
+                    :datetime="comment.updated_at"
+                  >
+                    수정 {{ formatCommentTime(comment.updated_at) }}
+                  </time>
+                  <button
+                    v-if="canEditComment(comment)"
+                    type="button"
+                    class="card-detail-comment-edit"
+                    :disabled="
+                      commentUpdatingId !== null ||
+                      commentDeletingId !== null
+                    "
+                    :aria-label="`${comment.author.name}님의 댓글 수정`"
+                    @click="startEditingComment(comment)"
+                  >
+                    수정
+                  </button>
                   <button
                     v-if="canDeleteComment(comment)"
                     type="button"
                     class="card-detail-comment-delete"
-                    :disabled="commentDeletingId !== null"
+                    :disabled="
+                      commentDeletingId !== null ||
+                      commentUpdatingId !== null
+                    "
                     :aria-label="`${comment.author.name}님의 댓글 삭제`"
                     @click="removeComment(comment)"
                   >
                     {{ commentDeletingId === comment.id ? '삭제 중…' : '삭제' }}
                   </button>
                 </header>
-                <p>{{ comment.comment_str }}</p>
+                <div
+                  v-if="commentEditingId === comment.id"
+                  class="card-detail-comment-editor"
+                >
+                  <textarea
+                    v-model="commentEditDraft"
+                    rows="3"
+                    maxlength="2000"
+                    :disabled="commentUpdatingId === comment.id"
+                    :aria-label="`${comment.author.name}님의 댓글 내용 수정`"
+                  />
+                  <div class="card-detail-comment-editor-actions">
+                    <button
+                      type="button"
+                      :disabled="commentUpdatingId !== null"
+                      @click="cancelEditingComment"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      :disabled="
+                        commentUpdatingId !== null ||
+                        !commentEditDraft.trim()
+                      "
+                      @click="updateComment(comment)"
+                    >
+                      {{ commentUpdatingId === comment.id ? '저장 중…' : '저장' }}
+                    </button>
+                  </div>
+                </div>
+                <p v-else>{{ comment.comment_str }}</p>
               </div>
             </article>
           </section>

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test, { type TestContext } from 'node:test'
-import type { Card, List } from '@prisma/client'
+import type { Card, Comment, List } from '@prisma/client'
 
 const USER_ID = '00000000-0000-4000-8000-000000000001'
 const CARD_ID = '00000000-0000-4000-8000-000000000002'
@@ -8,6 +8,8 @@ const SOURCE_LIST_ID = '00000000-0000-4000-8000-000000000003'
 const TARGET_LIST_ID = '00000000-0000-4000-8000-000000000004'
 const SOURCE_WORKSPACE_ID = '00000000-0000-4000-8000-000000000005'
 const TARGET_WORKSPACE_ID = '00000000-0000-4000-8000-000000000006'
+const COMMENT_ID = '00000000-0000-4000-8000-000000000007'
+const OTHER_USER_ID = '00000000-0000-4000-8000-000000000008'
 
 function setRequiredEnvironment(): void {
   Object.assign(process.env, {
@@ -78,6 +80,23 @@ function list(id: string, workspaceId: string): List {
     updated_by: USER_ID,
     deleted_at: null,
     deleted_by: null,
+  }
+}
+
+function comment(overrides: Partial<Comment> = {}): Comment {
+  const now = new Date('2026-07-27T00:00:00.000Z')
+  return {
+    id: COMMENT_ID,
+    card_id: CARD_ID,
+    user_id: USER_ID,
+    comment_str: 'Comment',
+    created_at: now,
+    created_by: USER_ID,
+    updated_at: now,
+    updated_by: USER_ID,
+    deleted_at: null,
+    deleted_by: null,
+    ...overrides,
   }
 }
 
@@ -876,6 +895,90 @@ test('updateCardDates validates against dates read under the card lock', async (
   )
   assert.equal(updateCalls, 0)
   assert.equal(publishCalls, 0)
+})
+
+test('updateComment rejects an already deleted comment with the deleter name', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { updateComment }] = await Promise.all([
+    import('../../db'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.comment, 'findUnique', async () =>
+    comment({
+      deleted_at: new Date('2026-08-05T00:00:00.000Z'),
+      deleted_by: OTHER_USER_ID,
+    }))
+  stubMethod(t, prisma.user, 'findFirst', async () => ({ name: '관리자' }))
+
+  await assert.rejects(
+    () =>
+      updateComment({
+        userId: USER_ID,
+        commentId: COMMENT_ID,
+        comment: 'Updated comment',
+      }),
+    (error: unknown) =>
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'COMMENT_ALREADY_DELETED' &&
+      error.message === '관리자님이 이 댓글을 이미 삭제했습니다.',
+  )
+})
+
+test('updateComment conditionally updates only an active comment', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { updateComment }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  let commentReadCount = 0
+  stubMethod(t, prisma.comment, 'findUnique', async () => {
+    commentReadCount += 1
+    return commentReadCount === 1
+      ? comment()
+      : {
+          deleted_at: new Date('2026-08-05T00:00:00.000Z'),
+          deleted_by: OTHER_USER_ID,
+        }
+  })
+  stubMethod(t, prisma.card, 'findFirst', async () => card())
+  stubMethod(t, prisma.list, 'findFirst', async () =>
+    list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  let updateWhere: unknown
+  stubMethod(t, prisma.comment, 'updateMany', async (args) => {
+    updateWhere = args.where
+    return { count: 0 }
+  })
+  stubMethod(t, prisma.user, 'findFirst', async () => ({ name: '관리자' }))
+  let publishCount = 0
+  stubMethod(t, realtime, 'publish', () => {
+    publishCount += 1
+  })
+
+  await assert.rejects(
+    () =>
+      updateComment({
+        userId: USER_ID,
+        commentId: COMMENT_ID,
+        comment: 'Updated comment',
+      }),
+    (error: unknown) =>
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'COMMENT_ALREADY_DELETED',
+  )
+
+  assert.deepEqual(updateWhere, {
+    id: COMMENT_ID,
+    user_id: USER_ID,
+    deleted_at: null,
+  })
+  assert.equal(publishCount, 0)
 })
 
 const ATTACHMENT_ID = '00000000-0000-4000-8000-000000000009'

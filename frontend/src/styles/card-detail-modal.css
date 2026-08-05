@@ -427,20 +427,75 @@
   font-size: 9px;
 }
 
+.card-detail-comment .card-detail-comment-edited {
+  color: #64748b;
+}
+
+.card-detail-comment-edit,
 .card-detail-comment-delete {
-  margin-left: auto;
   border: 0;
   padding: 2px 4px;
   background: transparent;
-  color: #b91c1c;
   font-size: 10px;
 }
 
+.card-detail-comment-edit {
+  margin-left: auto;
+  color: #475569;
+}
+
+.card-detail-comment-delete {
+  color: #b91c1c;
+}
+
+.card-detail-comment time + .card-detail-comment-delete {
+  margin-left: auto;
+}
+
+.card-detail-comment-edit:hover:not(:disabled),
 .card-detail-comment-delete:hover:not(:disabled) {
   text-decoration: underline;
 }
 
+.card-detail-comment-edit:disabled,
 .card-detail-comment-delete:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.card-detail-comment-editor {
+  margin-top: 6px;
+}
+
+.card-detail-comment-editor textarea {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+}
+
+.card-detail-comment-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.card-detail-comment-editor-actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 9px;
+  background: #fff;
+  color: #475569;
+  font-size: 11px;
+}
+
+.card-detail-comment-editor-actions button:last-child {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+}
+
+.card-detail-comment-editor-actions button:disabled {
   cursor: default;
   opacity: 0.55;
 }

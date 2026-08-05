@@ -21,6 +21,22 @@ interface ApiRequestInit extends Omit<RequestInit, 'body'> {
   json?: unknown
 }
 
+export class ApiRequestError extends Error {
+  readonly status: number
+  readonly code?: string
+
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+  ) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+    this.code = code
+  }
+}
+
 const EXPLICIT_LOGOUT_KEY = 'ft.auth.explicit-logout'
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -125,7 +141,11 @@ export async function authRequestError(response: Response, fallback: string): Pr
   const body = (await response.json().catch(() => null)) as
     | { error?: string; message?: string }
     | null
-  return new Error(resolveErrorMessage(body, fallback))
+  return new ApiRequestError(
+    resolveErrorMessage(body, fallback),
+    response.status,
+    body?.error,
+  )
 }
 
 function applyAuthenticatedSession(
@@ -337,4 +357,3 @@ export async function logout(): Promise<void> {
     headers: { Accept: 'application/json' },
   })
 }
-

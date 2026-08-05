@@ -120,6 +120,31 @@ describe('CardAPI', () => {
     )
   })
 
+  it('updates a comment through the comment route', async () => {
+    const updated = {
+      id: 'comment-1',
+      card_id: 'card-1',
+      author: {
+        user_id: 'user-1',
+        name: 'User',
+        profile_image_url: null,
+      },
+      comment_str: 'Updated comment',
+      created_at: '2026-08-05T00:00:00.000Z',
+      updated_at: '2026-08-05T01:00:00.000Z',
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(updated)
+
+    await expect(
+      CardAPI.updateComment('comment-1', 'Updated comment'),
+    ).resolves.toEqual(updated)
+
+    expect(apiRequest).toHaveBeenCalledWith('/api/comments/comment-1', {
+      method: 'PATCH',
+      json: { comment_str: 'Updated comment' },
+    })
+  })
+
   it('updates completion without moving the card to another list', async () => {
     const completed = {
       id: 'card-1',

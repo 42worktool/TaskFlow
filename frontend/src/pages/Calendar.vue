@@ -6,7 +6,7 @@ import CardDetailModal from '../components/CardDetailModal.vue'
 import { ListAPI } from '../api/list'
 import { realtime } from '../services/realtime'
 import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
-import type { Card, ListWithCards } from '../types'
+import type { Card, ListWithCards, WorkspaceMember } from '../types'
 import {
   buildCalendarWeeks,
   type CalendarRangeSegment,
@@ -18,12 +18,14 @@ const props = withDefaults(
     canEditBoard?: boolean
     canViewCardDetails?: boolean
     canManageComments?: boolean
+    workspaceMembers?: WorkspaceMember[]
     workspaceSyncVersion?: number
   }>(),
   {
     canEditBoard: false,
     canViewCardDetails: false,
     canManageComments: false,
+    workspaceMembers: () => [],
     workspaceSyncVersion: 0,
   },
 )
@@ -36,6 +38,7 @@ const loading = ref(false)
 const error = ref('')
 const selectedCardId = ref<string | null>(null)
 const cardDetailRefreshToken = ref(0)
+const cardDetailChangeActorName = ref<string | null>(null)
 let loadGeneration = 0
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
 let refreshRunning = false
@@ -79,7 +82,14 @@ function updateSavedCard(saved: Card): void {
 }
 
 function openCard(cardId: string): void {
-  if (props.canViewCardDetails) selectedCardId.value = cardId
+  if (!props.canViewCardDetails) return
+  cardDetailChangeActorName.value = null
+  selectedCardId.value = cardId
+}
+
+function rememberCardChangeActor(userId: string): void {
+  cardDetailChangeActorName.value =
+    props.workspaceMembers.find((member) => member.user_id === userId)?.user.name ?? null
 }
 
 const calendarWeeks = computed(() =>
@@ -283,6 +293,7 @@ const removeWorkspaceChangeListener = realtime.on(
         event.entity === 'card' &&
         selectedCardId.value === event.entity_id
       ) {
+        rememberCardChangeActor(event.actor_user_id)
         cardDetailRefreshToken.value += 1
       }
       fullRefreshPending = true
@@ -324,6 +335,7 @@ const removeWorkspaceChangeListener = realtime.on(
     ) {
       selectedCardId.value = null
     } else if (selectedCardId.value === event.entity_id) {
+      rememberCardChangeActor(event.actor_user_id)
       cardDetailRefreshToken.value += 1
     }
     event.list_ids.forEach((id) => pendingListIds.add(id))
@@ -421,6 +433,7 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
       :card-id="selectedCardId"
       :editable="canEditBoard"
       :can-manage-comments="canManageComments"
+      :last-change-actor-name="cardDetailChangeActorName"
       :refresh-token="cardDetailRefreshToken"
       @saved="updateSavedCard"
       @close="selectedCardId = null"
