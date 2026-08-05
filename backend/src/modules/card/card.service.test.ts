@@ -904,7 +904,7 @@ test('updateComment rejects an already deleted comment with the deleter name', a
     import('./card.service'),
   ])
 
-  stubMethod(t, prisma.comment, 'findUnique', async () =>
+  stubMethod(t, prisma.comment, 'findFirst', async () =>
     comment({
       deleted_at: new Date('2026-08-05T00:00:00.000Z'),
       deleted_by: OTHER_USER_ID,
@@ -922,7 +922,7 @@ test('updateComment rejects an already deleted comment with the deleter name', a
       error instanceof Error &&
       'code' in error &&
       error.code === 'COMMENT_ALREADY_DELETED' &&
-      error.message === '관리자님이 이 댓글을 이미 삭제했습니다.',
+      error.message === '관리자님이 이 댓글을 삭제했습니다.',
   )
 })
 
@@ -935,7 +935,7 @@ test('updateComment conditionally updates only an active comment', async (t) => 
   ])
 
   let commentReadCount = 0
-  stubMethod(t, prisma.comment, 'findUnique', async () => {
+  stubMethod(t, prisma.comment, 'findFirst', async () => {
     commentReadCount += 1
     return commentReadCount === 1
       ? comment()

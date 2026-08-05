@@ -827,7 +827,7 @@ export async function updateComment(input: {
   commentId: string
   comment: string
 }) {
-  const comment = await prisma.comment.findUnique({
+  const comment = await prisma.comment.findFirst({
     where: { id: input.commentId },
   })
   if (!comment) throw new NotFoundError()
@@ -851,7 +851,7 @@ export async function updateComment(input: {
       },
     })
     if (result.count !== 1) {
-      const latest = await tx.comment.findUnique({
+      const latest = await tx.comment.findFirst({
         where: { id: input.commentId },
         select: { deleted_at: true, deleted_by: true },
       })
@@ -861,7 +861,7 @@ export async function updateComment(input: {
       throw new ConflictError('Comment could not be updated')
     }
 
-    return tx.comment.findUniqueOrThrow({
+    return tx.comment.findFirstOrThrow({
       where: { id: input.commentId },
       include: { user: { select: userSummarySelect } },
     })
