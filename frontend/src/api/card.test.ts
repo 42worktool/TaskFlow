@@ -115,7 +115,7 @@ describe('CardAPI', () => {
     await CardAPI.removeComment('comment-1')
 
     expect(apiRequest).toHaveBeenCalledWith(
-      '/api/cards/comments/comment-1',
+      '/api/comments/comment-1',
       { method: 'DELETE' },
     )
   })

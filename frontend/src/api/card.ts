@@ -63,7 +63,7 @@ export const CardAPI = {
     }),
 
   removeComment: (commentId: string) =>
-    apiRequest<void>(`/api/cards/comments/${commentId}`, { method: 'DELETE' }),
+    apiRequest<void>(`/api/comments/${commentId}`, { method: 'DELETE' }),
 
   uploadAttachment: (cardId: string, file: File, onProgress?: (percent: number) => void) =>
     uploadFile<CardAttachment>(`/api/cards/${cardId}/attachments`, file, onProgress),
