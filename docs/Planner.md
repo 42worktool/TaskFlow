@@ -908,12 +908,6 @@ Cards
 	/cards/{card_id}/inbox
 	인박스로 이동
 	POST
-	/cards/{card_id}/members
-	카드 멤버 지정
-	DELETE
-	/cards/{card_id}/members/{user_id}
-	카드 멤버 제거
-	POST
 	/cards/{card_id}/attachments
 	파일 첨부
 	DELETE

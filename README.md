@@ -144,8 +144,8 @@ migrations automatically. Nginx generates a self-signed development
 certificate when no certificate is mounted.
 
 The seed command creates two workspaces with role-based members, 24 board and
-Inbox cards, relative Calendar dates, Dashboard activity, labels, assignees,
-comments, attachments, friendships, requests, workspace messages, and DMs.
+Inbox cards, relative Calendar dates, Dashboard activity, labels, comments,
+attachments, friendships, requests, workspace messages, and DMs.
 The dates are recalculated around the day the seed runs so recent activity and
 upcoming work remain visible.
 
@@ -321,7 +321,6 @@ read-only Prisma model for dashboard aggregation.
 | `WorkspaceMessages` | `id UUID`, `workspace_id UUID`, `user_id UUID`, `card_id UUID?`, `content Text`, `created_at DateTime` | Append-only default-room messages; an optional card link is cleared if the card is deleted |
 | `Lists` | `id UUID`, `workspace_id UUID`, `name String`, `sequence Float`, `is_done Boolean` | Fractional sequence supports reordering; `is_done` is a visual workflow marker |
 | `Cards` | `id UUID`, `list_id UUID?`, `user_id UUID?`, `title String`, `description Text`, `is_completed Boolean`, `start_at DateTime?`, `deadline DateTime?`, `sequence Float` | A null `list_id` denotes a personal inbox card; completion is independent from list position |
-| `CardMembers` | `card_id UUID`, `user_id UUID` | Composite assignment relation |
 | `Labels` | `id UUID`, `workspace_id UUID`, `label_name String`, `label_color String` | Labels are workspace-scoped |
 | `CardLabels` | `label_id UUID`, `card_id UUID` | Composite card-to-label relation |
 | `Attachments` | `id UUID`, `card_id UUID`, `file_url String?`, `file_name String?` | Stores URL metadata, not uploaded file bytes |

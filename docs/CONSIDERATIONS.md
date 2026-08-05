@@ -67,15 +67,15 @@
 
 ## Cards
 
-- **`CardDto.user_id`(inbox 소유자)와 담당자(assignee)는 다르다.**
-  담당자는 `CardMembers`(N:M) 테이블로 별도 관리한다. 응답에서 둘을 혼동하지 않아야 한다.
+- **`Card.user_id`는 inbox 카드 소유자이다.**
+  보드 카드에는 담당자(assignee) 기능을 두지 않는다.
 
 - **카드 수정(`PUT /cards/{card_id}`)은 부분 수정이다.**
   - 필드 없음(undefined) = 유지
   - `null` = 값 제거
 
 - **카드 이동(`PUT /cards/{card_id}/move`) 시 대상 리스트가 같은 워크스페이스인지 반드시 검증한다.**
-  다른 워크스페이스로 이동하면 라벨·멤버 데이터 누수가 발생한다.
+  다른 워크스페이스로 이동하면 라벨 데이터 누수가 발생한다.
 
 - **카드 이동과 동시에 순서도 결정해야 한다.**
   `MoveCardRequest`에 `before_card_id` / `after_card_id`를 함께 받는다.
@@ -86,17 +86,15 @@
 - **카드를 inbox로 이동하면 sequence 값이 의미를 잃는다.**
   서버에서 sequence를 정리하는 처리가 필요하다.
 
-- **카드를 inbox로 이동하면 워크스페이스 전용 멤버·라벨 연결을 해제한다.**
+- **카드를 inbox로 이동하면 워크스페이스 전용 라벨 연결을 해제한다.**
   개인 inbox 카드는 다른 워크스페이스의 리스트로 이동할 수 있으므로,
-  `CardMembers`와 `CardLabels`를 soft-delete해 관계 데이터가 따라가지 않게 한다.
+  `CardLabels`를 soft-delete해 관계 데이터가 따라가지 않게 한다.
   리스트 삭제로 카드가 inbox에 들어가는 경우에도 같은 규칙을 적용한다.
 
-- **카드 삭제는 cascade로 CardMembers, CardLabel, Attachments, Comment가 연쇄 삭제된다.**
+- **카드 삭제는 cascade로 CardLabel, Attachments, Comment가 연쇄 삭제된다.**
 
 - **첨부파일 삭제(`DELETE /cards/attachments/{attachment_id}`)는 경로에 `card_id`가 없다.**
   `attachment_id`만으로 소유 카드와 워크스페이스 권한을 역추적해서 검증해야 한다.
-
-- **카드 멤버(담당자) 추가 시 해당 유저가 워크스페이스 멤버인지 검증해야 한다.**
 
 ---
 

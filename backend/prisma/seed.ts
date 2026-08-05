@@ -321,25 +321,6 @@ async function main() {
       })
     }
 
-    const cardMembers = [
-      [ids.cards.onboarding, ids.users.member], [ids.cards.onboarding, ids.users.admin],
-      [ids.cards.search, ids.users.admin], [ids.cards.websocket, ids.users.owner],
-      [ids.cards.calendar, ids.users.member], [ids.cards.calendar, ids.users.owner],
-      [ids.cards.accessibility, ids.users.admin], [ids.cards.accessibility, ids.users.viewer],
-      [ids.cards.responsive, ids.users.owner], [ids.cards.invitation, ids.users.admin],
-      [ids.cards.release, ids.users.owner], [ids.cards.release, ids.users.member],
-      [ids.cards.database, ids.users.admin], [ids.cards.darkMode, ids.users.admin],
-      [ids.cards.translations, ids.users.owner],
-    ] as const
-
-    for (const [cardId, userId] of cardMembers) {
-      await tx.cardMember.upsert({
-        where: { card_id_user_id: { card_id: cardId, user_id: userId } },
-        update: { updated_by: ids.users.owner, deleted_at: null, deleted_by: null },
-        create: { card_id: cardId, user_id: userId, ...audit(ids.users.owner) },
-      })
-    }
-
     const cardLabels = [
       [ids.cards.onboarding, ids.labels.urgent], [ids.cards.onboarding, ids.labels.design],
       [ids.cards.search, ids.labels.feature], [ids.cards.search, ids.labels.backend],

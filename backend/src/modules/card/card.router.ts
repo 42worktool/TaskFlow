@@ -10,7 +10,6 @@ import { ATTACHMENT_MIME_ALLOWLIST, attachmentUpload, requireMagicBytesMatch } f
 export const cardRouter = Router()
 cardRouter.param('attachment_id', uuidParam)
 cardRouter.param('card_id', uuidParam)
-cardRouter.param('user_id', uuidParam)
 cardRouter.param('label_id', uuidParam)
 
 // More specific routes before the wildcard /:card_id
@@ -25,8 +24,6 @@ cardRouter.put('/:card_id/move', ctrl.move)
 cardRouter.patch('/:card_id/dates', ctrl.updateDates)
 cardRouter.patch('/:card_id/completion', ctrl.updateCompletion)
 cardRouter.put('/:card_id/inbox', ctrl.moveToInbox)
-cardRouter.post('/:card_id/members', ctrl.addMember)
-cardRouter.delete('/:card_id/members/:user_id', ctrl.removeMember)
 cardRouter.post(
   '/:card_id/attachments',
   attachmentUpload.single('file'),

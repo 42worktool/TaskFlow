@@ -270,7 +270,7 @@ The delete-label route should be mounted before any wildcard route that could co
 
 Keep the existing card-detail label query and DTO shape. Add label mutations in the label service or card service, but avoid duplicating card authorization logic. If label operations live in a separate service, share small access helpers rather than copying inconsistent checks.
 
-Inbox behavior must remain consistent with existing card movement logic: when a workspace card moves to the inbox, active members and labels are detached. When an inbox card moves to a workspace list, it starts without workspace labels.
+Inbox behavior must remain consistent with existing card movement logic: when a workspace card moves to the inbox, active labels are detached. When an inbox card moves to a workspace list, it starts without workspace labels.
 
 ## 5. Permission Matrix
 

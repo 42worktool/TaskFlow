@@ -56,18 +56,12 @@ test('deleteList detaches relations and transfers cards to the member inbox', as
   stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
 
   let cardUpdate: unknown
-  let memberUpdate: any
   let labelUpdate: any
   const operationOrder: string[] = []
   stubMethod(t, prisma.card, 'updateMany', (args) => {
     operationOrder.push('cards')
     cardUpdate = args
     return Promise.resolve({ count: 2 })
-  })
-  stubMethod(t, prisma.cardMember, 'updateMany', async (args) => {
-    operationOrder.push('members')
-    memberUpdate = args
-    return { count: 2 }
   })
   stubMethod(t, prisma.cardLabel, 'updateMany', async (args) => {
     operationOrder.push('labels')
@@ -94,7 +88,6 @@ test('deleteList detaches relations and transfers cards to the member inbox', as
   assert.deepEqual(operationOrder, [
     'list',
     'lock',
-    'members',
     'labels',
     'cards',
     'publish',
@@ -127,15 +120,13 @@ test('deleteList detaches relations and transfers cards to the member inbox', as
       actor_user_id: USER_ID,
     },
   )
-  for (const update of [memberUpdate, labelUpdate]) {
-    assert.deepEqual(update.where, {
-      deleted_at: null,
-      card: { list_id: LIST_ID, deleted_at: null },
-    })
-    assert.equal(update.data.updated_by, USER_ID)
-    assert.equal(update.data.deleted_by, USER_ID)
-    assert.ok(update.data.deleted_at instanceof Date)
-  }
+  assert.deepEqual(labelUpdate.where, {
+    deleted_at: null,
+    card: { list_id: LIST_ID, deleted_at: null },
+  })
+  assert.equal(labelUpdate.data.updated_by, USER_ID)
+  assert.equal(labelUpdate.data.deleted_by, USER_ID)
+  assert.ok(labelUpdate.data.deleted_at instanceof Date)
   assert.deepEqual(cardUpdate, {
     where: { list_id: LIST_ID, deleted_at: null },
     data: { list_id: null, user_id: USER_ID, updated_by: USER_ID },

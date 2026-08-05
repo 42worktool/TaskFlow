@@ -4,7 +4,6 @@ import { BadRequestError } from '../../errors'
 import { withUploadCleanup } from '../../lib/upload'
 import * as svc from './card.service'
 import {
-  addCardMemberSchema,
   cardCompletionSchema,
   cardDatesSchema,
   cardNeighborSchema,
@@ -109,25 +108,6 @@ export const moveToInbox: RequestHandler = async (req, res) => {
     cardId: req.params.card_id as string,
   })
   res.status(200).json(card)
-}
-
-export const addMember: RequestHandler = async (req, res) => {
-  const body = addCardMemberSchema.parse(req.body)
-  const member = await svc.addCardMember({
-    userId: authenticatedUserId(req),
-    cardId: req.params.card_id as string,
-    targetUserId: body.user_id,
-  })
-  res.status(201).json(member)
-}
-
-export const removeMember: RequestHandler = async (req, res) => {
-  await svc.removeCardMember({
-    userId: authenticatedUserId(req),
-    cardId: req.params.card_id as string,
-    targetUserId: req.params.user_id as string,
-  })
-  res.status(204).send()
 }
 
 export const addAttachment: RequestHandler = async (req, res) => {

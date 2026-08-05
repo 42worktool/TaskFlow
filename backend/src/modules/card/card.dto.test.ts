@@ -97,12 +97,7 @@ test('card detail and comment DTOs preserve nested user shapes', () => {
     label_name: 'Urgent',
     label_color: '#ef4444',
   })
-  const detail = toCardDetailDto(card, [member], [label], [], [comment])
-  assert.deepEqual(detail.members[0], {
-    user_id: 'user-id',
-    name: 'User',
-    profile_image_url: null,
-  })
+  const detail = toCardDetailDto(card, [label], [], [comment])
   assert.deepEqual(detail.labels[0], {
     label_id: 'label-id',
     label_name: 'Urgent',

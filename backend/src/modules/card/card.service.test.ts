@@ -420,7 +420,7 @@ test('moveCard rejects a target list deleted before its row lock', async (t) => 
   assert.equal(updateCalls, 0)
 })
 
-test('moveCard detaches stale workspace relations from an inbox card', async (t) => {
+test('moveCard detaches stale workspace labels from an inbox card', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { moveCard }] = await Promise.all([
     import('../../db'),
@@ -436,12 +436,7 @@ test('moveCard detaches stale workspace relations from an inbox card', async (t)
   )
   stubMethod(t, prisma.card, 'findMany', async () => [])
 
-  let memberUpdate: any
   let labelUpdate: any
-  stubMethod(t, prisma.cardMember, 'updateMany', async (args) => {
-    memberUpdate = args
-    return { count: 1 }
-  })
   stubMethod(t, prisma.cardLabel, 'updateMany', async (args) => {
     labelUpdate = args
     return { count: 1 }
@@ -455,18 +450,16 @@ test('moveCard detaches stale workspace relations from an inbox card', async (t)
     targetListId: TARGET_LIST_ID,
   })
 
-  for (const update of [memberUpdate, labelUpdate]) {
-    assert.deepEqual(update.where, {
-      card_id: CARD_ID,
-      deleted_at: null,
-    })
-    assert.equal(update.data.updated_by, USER_ID)
-    assert.equal(update.data.deleted_by, USER_ID)
-    assert.ok(update.data.deleted_at instanceof Date)
-  }
+  assert.deepEqual(labelUpdate.where, {
+    card_id: CARD_ID,
+    deleted_at: null,
+  })
+  assert.equal(labelUpdate.data.updated_by, USER_ID)
+  assert.equal(labelUpdate.data.deleted_by, USER_ID)
+  assert.ok(labelUpdate.data.deleted_at instanceof Date)
 })
 
-test('moveCardToInbox detaches workspace members and labels', async (t) => {
+test('moveCardToInbox detaches workspace labels', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { moveCardToInbox }] = await Promise.all([
     import('../../db'),
@@ -483,13 +476,8 @@ test('moveCardToInbox detaches workspace members and labels', async (t) => {
     user_id: null,
   }])
 
-  let memberUpdate: any
   let labelUpdate: any
   let cardUpdate: any
-  stubMethod(t, prisma.cardMember, 'updateMany', async (args) => {
-    memberUpdate = args
-    return { count: 1 }
-  })
   stubMethod(t, prisma.cardLabel, 'updateMany', async (args) => {
     labelUpdate = args
     return { count: 1 }
@@ -505,15 +493,13 @@ test('moveCardToInbox detaches workspace members and labels', async (t) => {
   })
 
   assert.equal(moved.list_id, null)
-  for (const update of [memberUpdate, labelUpdate]) {
-    assert.deepEqual(update.where, {
-      card_id: CARD_ID,
-      deleted_at: null,
-    })
-    assert.equal(update.data.updated_by, USER_ID)
-    assert.equal(update.data.deleted_by, USER_ID)
-    assert.ok(update.data.deleted_at instanceof Date)
-  }
+  assert.deepEqual(labelUpdate.where, {
+    card_id: CARD_ID,
+    deleted_at: null,
+  })
+  assert.equal(labelUpdate.data.updated_by, USER_ID)
+  assert.equal(labelUpdate.data.deleted_by, USER_ID)
+  assert.ok(labelUpdate.data.deleted_at instanceof Date)
   assert.deepEqual(cardUpdate, {
     where: { id: CARD_ID },
     data: {
@@ -522,36 +508,6 @@ test('moveCardToInbox detaches workspace members and labels', async (t) => {
       updated_by: USER_ID,
     },
   })
-})
-
-test('addCardMember rejects inbox cards while holding the card lock', async (t) => {
-  setRequiredEnvironment()
-  const [{ prisma }, { addCardMember }] = await Promise.all([
-    import('../../db'),
-    import('./card.service'),
-  ])
-
-  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
-  stubMethod(t, prisma, '$queryRaw', async () => [{
-    list_id: null,
-    user_id: USER_ID,
-  }])
-
-  let createCalls = 0
-  stubMethod(t, prisma.cardMember, 'create', async () => {
-    createCalls += 1
-    return {}
-  })
-
-  await assert.rejects(
-    () => addCardMember({
-      userId: USER_ID,
-      cardId: CARD_ID,
-      targetUserId: TARGET_WORKSPACE_ID,
-    }),
-    /Cannot assign members to inbox cards/,
-  )
-  assert.equal(createCalls, 0)
 })
 
 test('moveCard rejects viewers before mutating a card', async (t) => {
@@ -628,7 +584,6 @@ test('getCard includes active labels and comments in its detail response', async
 
   stubMethod(t, prisma.card, 'findFirst', async () =>
     card({ list_id: null, user_id: USER_ID }))
-  stubMethod(t, prisma.cardMember, 'findMany', async () => [])
   let labelQuery: unknown
   stubMethod(t, prisma.cardLabel, 'findMany', async (args) => {
     labelQuery = args

@@ -62,8 +62,6 @@ Repository 레이어 없이 card.service.ts가 Prisma를 직접 호출 (workspac
 - PUT    /api/cards/:cardId/move           (대상 리스트가 같은 workspace인지 검증)
 - PATCH  /api/cards/:cardId/dates          (start_at <= deadline 검증)
 - PUT    /api/cards/:cardId/inbox
-- POST   /api/cards/:cardId/members
-- DELETE /api/cards/:cardId/members/:userId  (대상이 워크스페이스 멤버인지 검증)
 - POST   /api/cards/:cardId/attachments      (메타데이터만, 실제 업로드는 범위 밖)
 - DELETE /api/cards/attachments/:attachmentId
 - POST   /api/cards/:cardId/comments
