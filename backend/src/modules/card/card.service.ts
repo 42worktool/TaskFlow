@@ -647,6 +647,14 @@ export async function removeAttachment(input: {
 
 // ─── Comments ─────────────────────────────────────────────────
 
+function commentAlreadyDeletedError(): AppError {
+  return new AppError(
+    'COMMENT_ALREADY_DELETED',
+    409,
+    '이 댓글은 삭제되었습니다.',
+  )
+}
+
 export async function createComment(input: {
   userId: string
   cardId: string
@@ -686,11 +694,7 @@ export async function updateComment(input: {
   if (!comment) throw new NotFoundError()
   if (comment.user_id !== input.userId) throw new ForbiddenError()
   if (comment.deleted_at) {
-    throw new AppError(
-      'COMMENT_ALREADY_DELETED',
-      409,
-      '이 댓글은 삭제되었습니다.',
-    )
+    throw commentAlreadyDeletedError()
   }
   const card = await getCardOrThrow(comment.card_id)
   const location = await workspaceLocationForCard(card)
@@ -708,11 +712,7 @@ export async function updateComment(input: {
       },
     })
     if (result.count !== 1) {
-      throw new AppError(
-        'COMMENT_ALREADY_DELETED',
-        409,
-        '이 댓글은 삭제되었습니다.',
-      )
+      throw commentAlreadyDeletedError()
     }
     return tx.comment.findFirstOrThrow({
       where: { id: input.commentId },
@@ -745,11 +745,7 @@ export async function deleteComment(input: {
     await requireWorkspaceRole(list.workspace_id, input.userId, 'ADMIN')
   }
   if (comment.deleted_at) {
-    throw new AppError(
-      'COMMENT_ALREADY_DELETED',
-      409,
-      '이 댓글은 삭제되었습니다.',
-    )
+    throw commentAlreadyDeletedError()
   }
   const location = await workspaceLocationForCard(card)
 
@@ -758,11 +754,7 @@ export async function deleteComment(input: {
     data: softDeletedBy(input.userId),
   })
   if (result.count !== 1) {
-    throw new AppError(
-      'COMMENT_ALREADY_DELETED',
-      409,
-      '이 댓글은 삭제되었습니다.',
-    )
+    throw commentAlreadyDeletedError()
   }
 
   publishCardChange({
