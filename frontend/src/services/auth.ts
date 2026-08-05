@@ -125,7 +125,7 @@ export async function authRequestError(response: Response, fallback: string): Pr
   const body = (await response.json().catch(() => null)) as
     | { error?: string; message?: string }
     | null
-  return new Error(resolveErrorMessage(body, fallback))
+  return new Error(resolveErrorMessage(body, fallback), { cause: body?.error })
 }
 
 function applyAuthenticatedSession(

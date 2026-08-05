@@ -303,6 +303,9 @@ describe('auth session generation', () => {
 
     await expect(
       apiRequest('/api/friends/requests', { method: 'POST' }),
-    ).rejects.toThrow('이미 친구인 사용자입니다.')
+    ).rejects.toMatchObject({
+      message: '이미 친구인 사용자입니다.',
+      cause: 'ALREADY_FRIENDS',
+    })
   })
 })
