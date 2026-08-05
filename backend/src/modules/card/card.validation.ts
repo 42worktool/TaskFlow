@@ -44,8 +44,6 @@ export const cardCompletionSchema = z.object({
   is_completed: z.boolean(),
 })
 
-export const addCardMemberSchema = z.object({ user_id: uuidSchema })
-
 export const commentSchema = z.object({
   comment_str: z.string().min(1).max(2000),
 })

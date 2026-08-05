@@ -1,5 +1,5 @@
 // ============================================================
-// cards.dto.ts — Cards (+ Members, Attachments, Inbox 통합)
+// cards.dto.ts — Cards (+ Attachments, Inbox 통합)
 // ============================================================
 import { UUID, ISODateString } from './common.dto';
 
@@ -8,9 +8,7 @@ import { UUID, ISODateString } from './common.dto';
 //   DBML Cards: id, list_id(null 가능=inbox), user_id(null 가능=inbox owner),
 //               title, description, is_completed, start_at, deadline,
 //               sequence, created_at
-//   ⚠️ user_id 는 "inbox 카드 소유자"이지 "담당자"가 아니다.
-//      담당자(assignee)는 CardMembers(N:M) 로 따로 관리.
-//      → 응답에서 둘을 분명히 구분해야 한다.
+//   ⚠️ user_id 는 inbox 카드 소유자이며, 별도 담당자 기능은 없다.
 // ------------------------------------------------------------
 export interface CardDto {
   id: UUID;
@@ -22,16 +20,8 @@ export interface CardDto {
   deadline: ISODateString | null;
   sequence: number;
   created_at: ISODateString;
-  members?: CardMemberDto[];      // 상세 조회 시 포함
   labels?: CardLabelDto[];        // 상세 조회 시 포함
   attachments?: AttachmentDto[];  // 상세 조회 시 포함
-}
-
-/** 카드 담당자 (CardMembers + Users 조인) */
-export interface CardMemberDto {
-  user_id: UUID;
-  name: string;
-  profile_image_url: string | null;
 }
 
 /** 카드에 붙은 라벨 (CardLabel + Label 조인) */
@@ -84,7 +74,7 @@ export type UpdateCardResponse = CardDto;
 
 // ------------------------------------------------------------
 // DELETE /cards/{card_id}  → 204 (body 없음)
-//   ⚠️ cascade: CardMembers, CardLabel, Attachments, Comment 연쇄 삭제.
+//   ⚠️ cascade: CardLabel, Attachments, Comment 연쇄 삭제.
 // ------------------------------------------------------------
 
 // ------------------------------------------------------------
@@ -142,18 +132,6 @@ export type UpdateCardCompletionResponse = CardDto;
 //      "보드 상의 위치(sequence)"는 의미를 잃음. 서버에서 정리.
 // ------------------------------------------------------------
 export type MoveCardToInboxResponse = CardDto;   // Request body 없음
-
-// ------------------------------------------------------------
-// 카드 멤버 (담당자) — CardMembers
-// ------------------------------------------------------------
-// POST /cards/{card_id}/members  → 201
-//   ⚠️ 지정하려는 user 가 해당 워크스페이스 멤버인지 검증 필요.
-export interface AddCardMemberRequest {
-  user_id: UUID;
-}
-export type AddCardMemberResponse = CardMemberDto;
-
-// DELETE /cards/{card_id}/members/{user_id}  → 204 (body 없음)
 
 // ------------------------------------------------------------
 // 첨부파일 — Attachments

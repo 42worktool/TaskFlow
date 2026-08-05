@@ -111,12 +111,6 @@ export interface Card {
   labels?: CardDetailLabel[]
 }
 
-export interface CardDetailMember {
-  user_id: UUID
-  name: string
-  profile_image_url: string | null
-}
-
 export interface CardDetailLabel {
   label_id: UUID
   label_name: string

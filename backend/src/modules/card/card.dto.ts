@@ -31,12 +31,6 @@ export function toCardDto(card: Card, labels: BoardCardLabel[] = []) {
   }
 }
 
-export function toCardMemberDto(member: {
-  user: SelectedUserSummary
-}) {
-  return toUserSummary(member.user)
-}
-
 export function toAttachmentDto(attachment: Attachment) {
   return {
     id: attachment.id,
@@ -89,14 +83,12 @@ export function toCommentDto(comment: CommentWithUser) {
 
 export function toCardDetailDto(
   card: Card,
-  members: Parameters<typeof toCardMemberDto>[0][],
   labels: CardLabelWithLabel[],
   attachments: Attachment[],
   comments: CommentWithUser[],
 ) {
   return {
     ...toCardDto(card),
-    members: members.map(toCardMemberDto),
     labels: labels.map(toCardLabelDto),
     attachments: attachments.map(toAttachmentDto),
     comments: comments.map(toCommentDto),

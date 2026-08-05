@@ -93,7 +93,6 @@ Goal: card detail becomes the single place for richer card editing.
 
 - Add card detail modal from `GetCardResponse`.
 - Edit title, description, start date, and deadline.
-- Display and edit assignees using `CardMemberDto`.
 - Display labels using `CardLabelDto`.
 - Display attachments metadata using `AttachmentDto`; upload can remain a later hook.
 - Add comments list and comment creation using `CommentDto`.
@@ -102,7 +101,6 @@ Verify:
 
 - `null` date and description values render correctly.
 - Date updates follow `start_at <= deadline` in the UI before submit.
-- Assignee UI does not confuse inbox owner with card members.
 
 ## Milestone 5: Members, Roles, Labels
 

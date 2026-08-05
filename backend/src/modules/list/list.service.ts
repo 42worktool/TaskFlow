@@ -186,13 +186,6 @@ export async function deleteList(input: { userId: string; listId: string }): Pro
         AND "deleted_at" IS NULL
       FOR UPDATE
     `
-    await tx.cardMember.updateMany({
-      where: {
-        deleted_at: null,
-        card: { list_id: input.listId, deleted_at: null },
-      },
-      data: detachedRelation,
-    })
     await tx.cardLabel.updateMany({
       where: {
         deleted_at: null,
