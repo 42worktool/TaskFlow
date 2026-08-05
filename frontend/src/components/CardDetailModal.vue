@@ -3,7 +3,8 @@ import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { CardAPI } from '../api/card'
 import { LabelAPI } from '../api/label'
-import type { Card, CardAttachment, CardDetail, Label } from '../types'
+import { authState } from '../services/auth'
+import type { Card, CardAttachment, CardComment, CardDetail, Label } from '../types'
 import {
   isDateRangeValid,
   toDateInput,
@@ -22,9 +23,10 @@ const props = withDefaults(
   defineProps<{
     cardId: string
     editable: boolean
+    canManageComments?: boolean
     refreshToken?: number
   }>(),
-  { refreshToken: 0 },
+  { canManageComments: false, refreshToken: 0 },
 )
 const emit = defineEmits<{
   close: []
@@ -40,6 +42,7 @@ const loading = ref(true)
 const saving = ref(false)
 const commentDraft = ref('')
 const commentSaving = ref(false)
+const commentDeletingId = ref<string | null>(null)
 const commentError = ref('')
 const availableLabels = ref<Label[]>([])
 const labelsLoading = ref(false)
@@ -69,7 +72,18 @@ let initialStartDate = ''
 let initialDeadline = ''
 
 function close(): void {
-  if (!saving.value && !commentSaving.value && !attachmentUploading.value) emit('close')
+  if (
+    !saving.value &&
+    !commentSaving.value &&
+    !commentDeletingId.value &&
+    !attachmentUploading.value
+  ) {
+    emit('close')
+  }
+}
+
+function canDeleteComment(comment: CardComment): boolean {
+  return props.canManageComments || comment.author.user_id === authState.user?.id
 }
 
 function formatBytes(bytes: number | null): string {
@@ -374,6 +388,35 @@ async function submitComment(): Promise<void> {
   }
 }
 
+async function removeComment(comment: CardComment): Promise<void> {
+  const cardId = props.cardId
+  if (
+    !canDeleteComment(comment) ||
+    commentDeletingId.value ||
+    !window.confirm('이 댓글을 삭제할까요?')
+  ) {
+    return
+  }
+
+  commentDeletingId.value = comment.id
+  commentError.value = ''
+  try {
+    await CardAPI.removeComment(comment.id)
+    if (!active || cardId !== props.cardId || !detail.value) return
+    detail.value = {
+      ...detail.value,
+      comments: detail.value.comments.filter((item) => item.id !== comment.id),
+    }
+  } catch (caught) {
+    if (active && cardId === props.cardId) {
+      commentError.value =
+        caught instanceof Error ? caught.message : '댓글을 삭제하지 못했습니다.'
+    }
+  } finally {
+    if (active && cardId === props.cardId) commentDeletingId.value = null
+  }
+}
+
 const commentSubmitter = createComposerEnterSubmitter(
   () => {
     void submitComment()
@@ -457,6 +500,7 @@ watch(
     commentGeneration += 1
     commentDraft.value = ''
     commentSaving.value = false
+    commentDeletingId.value = null
     commentError.value = ''
     attachmentGeneration += 1
     attachmentUploading.value = false
@@ -763,6 +807,16 @@ onUnmounted(() => {
                   <time :datetime="comment.created_at">
                     {{ formatCommentTime(comment.created_at) }}
                   </time>
+                  <button
+                    v-if="canDeleteComment(comment)"
+                    type="button"
+                    class="card-detail-comment-delete"
+                    :disabled="commentDeletingId !== null"
+                    :aria-label="`${comment.author.name}님의 댓글 삭제`"
+                    @click="removeComment(comment)"
+                  >
+                    {{ commentDeletingId === comment.id ? '삭제 중…' : '삭제' }}
+                  </button>
                 </header>
                 <p>{{ comment.comment_str }}</p>
               </div>

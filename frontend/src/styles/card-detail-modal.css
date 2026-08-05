@@ -427,6 +427,24 @@
   font-size: 9px;
 }
 
+.card-detail-comment-delete {
+  margin-left: auto;
+  border: 0;
+  padding: 2px 4px;
+  background: transparent;
+  color: #b91c1c;
+  font-size: 10px;
+}
+
+.card-detail-comment-delete:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.card-detail-comment-delete:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .card-detail-comment p {
   margin: 4px 0 0;
   color: #334155;

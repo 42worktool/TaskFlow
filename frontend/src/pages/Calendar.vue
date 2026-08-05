@@ -17,11 +17,13 @@ const props = withDefaults(
   defineProps<{
     canEditBoard?: boolean
     canViewCardDetails?: boolean
+    canManageComments?: boolean
     workspaceSyncVersion?: number
   }>(),
   {
     canEditBoard: false,
     canViewCardDetails: false,
+    canManageComments: false,
     workspaceSyncVersion: 0,
   },
 )
@@ -418,6 +420,7 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
       v-if="selectedCardId"
       :card-id="selectedCardId"
       :editable="canEditBoard"
+      :can-manage-comments="canManageComments"
       :refresh-token="cardDetailRefreshToken"
       @saved="updateSavedCard"
       @close="selectedCardId = null"

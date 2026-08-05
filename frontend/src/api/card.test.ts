@@ -109,6 +109,17 @@ describe('CardAPI', () => {
     })
   })
 
+  it('removes a comment through the comment route', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce(undefined)
+
+    await CardAPI.removeComment('comment-1')
+
+    expect(apiRequest).toHaveBeenCalledWith(
+      '/api/cards/comments/comment-1',
+      { method: 'DELETE' },
+    )
+  })
+
   it('updates completion without moving the card to another list', async () => {
     const completed = {
       id: 'card-1',

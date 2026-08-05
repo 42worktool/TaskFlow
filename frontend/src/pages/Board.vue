@@ -32,11 +32,13 @@ const props = withDefaults(
   defineProps<{
     canEditBoard?: boolean
     canViewCardDetails?: boolean
+    canManageComments?: boolean
     workspaceSyncVersion?: number
   }>(),
   {
     canEditBoard: false,
     canViewCardDetails: false,
+    canManageComments: false,
     workspaceSyncVersion: 0,
   },
 )
@@ -737,6 +739,7 @@ onUnmounted(() => {
       v-if="selectedCardId"
       :card-id="selectedCardId"
       :editable="canEditBoard"
+      :can-manage-comments="canManageComments"
       :refresh-token="cardDetailRefreshToken"
       @saved="onCardSaved"
       @close="closeCard"

@@ -510,6 +510,7 @@ onUnmounted(() => {
             :is="Component"
             :can-edit-board="canEditBoard"
             :can-view-card-details="canViewCardDetails"
+            :can-manage-comments="canManageMembers"
             :workspace-sync-version="workspaceSyncVersion"
           />
         </RouterView>
