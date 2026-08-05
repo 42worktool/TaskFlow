@@ -39,6 +39,32 @@
   margin-bottom: 40px;
 }
 
+.project-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.project-section-heading .section-desc {
+  margin-bottom: 0;
+}
+
+.project-section-count {
+  display: inline-flex;
+  min-width: 30px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .section-title {
   font-size: 20px;
   font-weight: 700;
@@ -50,6 +76,47 @@
   font-size: 13px;
   color: #6b7280;
   margin-bottom: 20px;
+}
+
+.project-load-state,
+.project-section-empty {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.project-load-state {
+  width: min(100%, 1440px);
+  margin-inline: auto;
+  padding: 24px;
+}
+
+.project-load-state--error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.project-load-state--error button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.project-section-empty {
+  margin-top: 12px;
+  padding: 20px;
+  text-align: center;
 }
 
 .project-grid {
@@ -206,6 +273,12 @@
   line-height: 1;
 }
 
+.card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .card-badge--private {
   background: #f3f4f6;
   color: #6b7280;
@@ -214,6 +287,11 @@
 .card-badge--public {
   background: #eff6ff;
   color: #2563eb;
+}
+
+.card-badge--role {
+  background: #f5f3ff;
+  color: #6d28d9;
 }
 
 .card-footer {
@@ -321,8 +399,16 @@
   }
 
   .section-desc {
-    margin-bottom: 16px;
     line-height: 19px;
+  }
+
+  .project-section-heading {
+    margin-bottom: 16px;
+  }
+
+  .project-load-state--error {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .project-grid {
