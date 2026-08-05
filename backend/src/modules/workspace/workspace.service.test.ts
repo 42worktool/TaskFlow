@@ -61,13 +61,13 @@ function stubSequence<T>(
 }
 
 /**
- * Stubs every `$queryRaw` call issued inside the membership-transition
- * transactions: the (workspace_id, user_id) advisory lock (return value
- * unused) and, for the public-join path, `lockWorkspaceRow`'s `FOR UPDATE`
- * existence check (return value gates whether the workspace is treated as
- * still present).
+ * Stubs the raw calls issued inside membership-transition transactions: the
+ * effect-only advisory lock uses `$executeRaw`, while `lockWorkspaceRow` uses
+ * `$queryRaw` because its returned row determines whether the workspace still
+ * exists.
  */
 function stubQueryRaw(t: TestContext, target: object, workspaceRowExists: boolean): void {
+  stubMethod(t, target, '$executeRaw', async () => 1)
   stubMethod(t, target, '$queryRaw', async (strings: TemplateStringsArray) =>
     strings.join(' ').includes('FROM "Workspaces"')
       ? (workspaceRowExists ? [{ id: 'locked' }] : [])
@@ -301,6 +301,11 @@ test('public workspace reads hide member email addresses', async (t) => {
       stubMethod(t, prisma.workspace, 'findFirst', async () => publicWorkspace)
       stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
       const queries: string[] = []
+      const executions: string[] = []
+      stubMethod(t, prisma, '$executeRaw', async (strings: TemplateStringsArray) => {
+        executions.push(strings.join(' '))
+        return 1
+      })
       stubMethod(t, prisma, '$queryRaw', async (strings: TemplateStringsArray) => {
         const query = strings.join(' ')
         queries.push(query)
@@ -320,6 +325,10 @@ test('public workspace reads hide member email addresses', async (t) => {
       const workspaceLockQuery = queries.find((query) => query.includes('FROM "Workspaces"'))
       assert.ok(workspaceLockQuery, 'expected a raw query locking the Workspaces row')
       assert.match(workspaceLockQuery!, /FOR UPDATE/)
+      assert.ok(
+        executions.some((query) => query.includes('pg_advisory_xact_lock')),
+        'expected an effect-only advisory lock execution',
+      )
     },
   )
 
@@ -711,7 +720,7 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
     }))
     stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
     stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
-    stubMethod(t, prisma, '$queryRaw', async () => [])
+    stubMethod(t, prisma, '$executeRaw', async () => 1)
     stubMethod(t, prisma.workspaceMember, 'findUnique', async () => null)
 
     let membershipCreate: unknown
