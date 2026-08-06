@@ -254,14 +254,15 @@ export class RealtimeClient<
 
     const generation = this.connectionGeneration
     const socket = this.socket
-    let operation!: Promise<void>
-    operation = this.performAuthenticationRefresh(forceHttpRefresh, generation, socket).finally(
-      () => {
-        if (this.authenticationRefreshInFlight === operation) {
-          this.authenticationRefreshInFlight = null
-        }
-      },
-    )
+    const operation = this.performAuthenticationRefresh(
+      forceHttpRefresh,
+      generation,
+      socket,
+    ).finally(() => {
+      if (this.authenticationRefreshInFlight === operation) {
+        this.authenticationRefreshInFlight = null
+      }
+    })
     this.authenticationRefreshInFlight = operation
     return operation
   }

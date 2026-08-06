@@ -86,8 +86,7 @@ async function notifyPresence(userId: string, online: boolean): Promise<void> {
 }
 
 function schedulePresenceNotification(userId: string, online: boolean): void {
-  let task: Promise<void>
-  task = notifyPresence(userId, online)
+  const task = notifyPresence(userId, online)
     .catch((error: unknown) => {
       console.error(
         '[presence] notification failed',

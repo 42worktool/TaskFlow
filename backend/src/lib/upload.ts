@@ -54,6 +54,7 @@ export const MAX_ORIGINAL_FILENAME_LENGTH = 255
  */
 export function normalizeOriginalname(name: string): string {
   const base = name.split(/[/\\]/).pop() ?? name
+  // eslint-disable-next-line no-control-regex -- Uploaded filenames must not contain ASCII controls.
   return base.replace(/[\x00-\x1f\x7f]/g, '').trim()
 }
 

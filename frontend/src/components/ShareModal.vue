@@ -99,10 +99,12 @@ async function handleRemoveMember(userId: string) {
   memberSuccess.value = ''
   try {
     await WorkspaceAPI.removeMember(props.workspaceId, userId)
-    const index = props.workspace.members.findIndex((m) => m.user_id === userId)
-    if (index !== -1) props.workspace.members.splice(index, 1)
-  } catch (e: any) {
-    memberError.value = e.message || '멤버를 제거하지 못했습니다.'
+    emit('workspaceUpdated', {
+      ...props.workspace,
+      members: props.workspace.members.filter((member) => member.user_id !== userId),
+    })
+  } catch (caught) {
+    memberError.value = caught instanceof Error ? caught.message : '멤버를 제거하지 못했습니다.'
   } finally {
     removing.value = null
   }

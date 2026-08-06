@@ -395,6 +395,11 @@ function onCardChange(listId: string, event: DraggableChange<Card>) {
   cardChangeTimers.add(timer)
 }
 
+function onUpdateCards(listId: string, cards: Card[]): void {
+  if (!props.canEditBoard) return
+  lists.value = lists.value.map((list) => (list.id === listId ? { ...list, cards } : list))
+}
+
 async function onAddCard(listId: string, title: string) {
   if (!props.canEditBoard) return
   try {
@@ -623,6 +628,7 @@ onUnmounted(() => {
           :can-open-details="canViewCardDetails"
           :completing-card-ids="completingCardIds"
           @open-card="openCard"
+          @update-cards="onUpdateCards"
           @card-change="onCardChange"
           @card-drag-start="onBoardCardDragStart"
           @card-drag-end="onBoardCardDragEnd"

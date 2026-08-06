@@ -176,9 +176,7 @@ async function requestRefresh(expectedGeneration = authGeneration): Promise<bool
   if (refreshInFlight?.generation === generation) return refreshInFlight.promise
 
   const controller = new AbortController()
-  let promise!: Promise<boolean>
-
-  promise = (async () => {
+  const promise = (async () => {
     const response = await fetch('/api/auth/refresh', {
       method: 'POST',
       credentials: 'same-origin',
