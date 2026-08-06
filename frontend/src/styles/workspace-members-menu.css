@@ -211,6 +211,11 @@
   white-space: nowrap;
 }
 
+.workspace-member-name:hover {
+  color: #0c66e4;
+  text-decoration: underline;
+}
+
 .workspace-member-role {
   margin-top: 1px;
   color: #626f86;

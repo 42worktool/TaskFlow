@@ -37,6 +37,8 @@ const session = {
     email: 'user@example.com',
     name: 'Realtime User',
     profile_image_url: null,
+    headline: '안녕하세요',
+    linkedin_url: null,
     created_at: '2026-07-28T00:00:00.000Z',
     auth_provider: 'password' as const,
   },

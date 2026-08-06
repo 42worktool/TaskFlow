@@ -331,7 +331,11 @@ onUnmounted(() => {
               <li v-for="request in incomingRequests" :key="request.id" class="person-row">
                 <PersonAvatar :name="request.name" :image-url="request.profile_image_url" />
                 <div class="person-meta">
-                  <strong>{{ request.name }}</strong>
+                  <strong>
+                    <RouterLink :to="`/profiles/${request.id}`" class="person-profile-link">
+                      {{ request.name }}
+                    </RouterLink>
+                  </strong>
                   <span>{{ formatDate(request.requested_at) }} 요청</span>
                 </div>
                 <div class="person-actions">
@@ -364,7 +368,11 @@ onUnmounted(() => {
               <li v-for="request in outgoingRequests" :key="request.id" class="person-row">
                 <PersonAvatar :name="request.name" :image-url="request.profile_image_url" />
                 <div class="person-meta">
-                  <strong>{{ request.name }}</strong>
+                  <strong>
+                    <RouterLink :to="`/profiles/${request.id}`" class="person-profile-link">
+                      {{ request.name }}
+                    </RouterLink>
+                  </strong>
                   <span>{{ formatDate(request.requested_at) }}부터 대기 중</span>
                 </div>
                 <button
@@ -385,7 +393,11 @@ onUnmounted(() => {
               <li v-for="friend in friends" :key="friend.id" class="person-row">
                 <PersonAvatar :name="friend.name" :image-url="friend.profile_image_url" />
                 <div class="person-meta">
-                  <strong>{{ friend.name }}</strong>
+                  <strong>
+                    <RouterLink :to="`/profiles/${friend.id}`" class="person-profile-link">
+                      {{ friend.name }}
+                    </RouterLink>
+                  </strong>
                   <span
                     class="friend-presence"
                     :class="{ 'friend-presence--online': friend.online }"

@@ -229,6 +229,11 @@ button:disabled {
   white-space: nowrap;
 }
 
+.person-profile-link:hover {
+  color: #0c66e4;
+  text-decoration: underline;
+}
+
 .person-meta span {
   margin-top: 3px;
   color: #64748b;

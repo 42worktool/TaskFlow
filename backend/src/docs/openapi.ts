@@ -1,6 +1,15 @@
 const userSchema = {
   type: 'object',
-  required: ['id', 'email', 'name', 'profile_image_url', 'created_at', 'auth_provider'],
+  required: [
+    'id',
+    'email',
+    'name',
+    'profile_image_url',
+    'headline',
+    'linkedin_url',
+    'created_at',
+    'auth_provider',
+  ],
   properties: {
     id: { type: 'string', format: 'uuid' },
     email: { type: 'string', format: 'email', example: 'user@example.com' },
@@ -10,6 +19,18 @@ const userSchema = {
       format: 'uri',
       nullable: true,
       example: null,
+    },
+    headline: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 160,
+      example: '제품과 사용자를 연결하는 프론트엔드 개발자입니다.',
+    },
+    linkedin_url: {
+      type: 'string',
+      format: 'uri',
+      nullable: true,
+      example: 'https://www.linkedin.com/in/example/',
     },
     created_at: { type: 'string', format: 'date-time' },
     auth_provider: {
@@ -59,6 +80,7 @@ export const openApiDocument = {
     { name: 'Google OAuth', description: 'Google Authorization Code Flow' },
     { name: 'Session', description: 'Access/Refresh 세션 관리' },
     { name: 'Account', description: '현재 사용자 계정 관리' },
+    { name: 'Profile', description: '인증 없이 조회할 수 있는 공개 사용자 프로필' },
   ],
   paths: {
     '/api/health': {
@@ -320,6 +342,27 @@ export const openApiDocument = {
         },
       },
     },
+    '/api/users/{userId}/profile': {
+      get: {
+        tags: ['Profile'],
+        summary: '공개 사용자 프로필 조회',
+        description: '로그인하지 않은 사용자도 조회할 수 있으며 이메일은 노출하지 않습니다.',
+        operationId: 'getPublicProfile',
+        parameters: [{ $ref: '#/components/parameters/UserId' }],
+        responses: {
+          '200': {
+            description: '공개 프로필',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PublicProfile' },
+              },
+            },
+          },
+          '400': errorResponse('올바르지 않은 사용자 ID'),
+          '404': errorResponse('프로필 없음'),
+        },
+      },
+    },
     '/api/workspaces/{workspaceId}/labels': {
       get: {
         tags: ['Workspace'],
@@ -491,6 +534,12 @@ export const openApiDocument = {
         required: true,
         schema: { type: 'string', format: 'uuid' },
       },
+      UserId: {
+        name: 'userId',
+        in: 'path',
+        required: true,
+        schema: { type: 'string', format: 'uuid' },
+      },
     },
     schemas: {
       Label: {
@@ -536,6 +585,18 @@ export const openApiDocument = {
         properties: { status: { type: 'string', enum: ['ok'] } },
       },
       User: userSchema,
+      PublicProfile: {
+        type: 'object',
+        required: ['id', 'name', 'profile_image_url', 'headline', 'linkedin_url', 'created_at'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string', minLength: 2, maxLength: 80 },
+          profile_image_url: { type: 'string', format: 'uri', nullable: true },
+          headline: { type: 'string', minLength: 1, maxLength: 160 },
+          linkedin_url: { type: 'string', format: 'uri', nullable: true },
+          created_at: { type: 'string', format: 'date-time' },
+        },
+      },
       SignupRequest: {
         type: 'object',
         required: ['name', 'email', 'password'],
@@ -563,10 +624,17 @@ export const openApiDocument = {
       },
       UpdateAccountRequest: {
         type: 'object',
-        required: ['name'],
+        minProperties: 1,
         additionalProperties: false,
         properties: {
           name: { type: 'string', minLength: 2, maxLength: 80, example: '새 이름' },
+          headline: { type: 'string', minLength: 1, maxLength: 160, example: '안녕하세요' },
+          linkedin_url: {
+            type: 'string',
+            format: 'uri',
+            nullable: true,
+            maxLength: 2048,
+          },
         },
       },
       AuthSessionResponse: {

@@ -5,6 +5,8 @@ export interface AuthUser {
   email: string
   name: string
   profile_image_url: string | null
+  headline: string
+  linkedin_url: string | null
   created_at: string
   auth_provider: 'password' | 'google'
 }
