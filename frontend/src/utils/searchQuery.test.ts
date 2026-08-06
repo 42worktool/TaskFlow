@@ -29,6 +29,24 @@ describe('advanced search query parsing', () => {
     })
   })
 
+  it('supports the user category command', () => {
+    expect(parseSearchExpression('/user product developer')).toEqual({
+      text: 'product developer',
+      category: 'user',
+      workspace: null,
+      label: null,
+    })
+  })
+
+  it('treats a leading mention as a user search shortcut', () => {
+    expect(parseSearchExpression('@프로필 사용자')).toEqual({
+      text: '프로필 사용자',
+      category: 'user',
+      workspace: null,
+      label: null,
+    })
+  })
+
   it('preserves invalid scoped commands as searchable text', () => {
     expect(parseSearchExpression('/type:person kim')).toEqual({
       text: 'type:person kim',
@@ -92,6 +110,22 @@ describe('advanced search route state', () => {
         label: 'label-id',
       }),
     ).toEqual({ q: 'oauth', type: 'card' })
+  })
+
+  it('drops a label from categories where labels do not apply', () => {
+    expect(
+      criteriaFromRouteQuery({
+        q: 'profile',
+        type: 'user',
+        workspace: 'workspace-id',
+        label: 'label-id',
+      }),
+    ).toEqual({
+      text: 'profile',
+      category: 'user',
+      workspace: 'workspace-id',
+      label: null,
+    })
   })
 })
 

@@ -363,6 +363,48 @@ export const openApiDocument = {
         },
       },
     },
+    '/api/users/search': {
+      get: {
+        tags: ['Profile'],
+        summary: '공개 사용자 프로필 검색',
+        description: '인증된 사용자가 이름과 한 줄 소개로 공개 프로필을 검색합니다.',
+        operationId: 'searchPublicProfiles',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'q',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', minLength: 1, maxLength: 80 },
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            required: false,
+            schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+          },
+          {
+            name: 'workspace_id',
+            in: 'query',
+            required: false,
+            description: '지정하면 해당 워크스페이스의 활성 구성원으로 범위를 좁힙니다.',
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: '공개 프로필 검색 결과',
+            content: {
+              'application/json': {
+                schema: { type: 'array', items: { $ref: '#/components/schemas/PublicProfile' } },
+              },
+            },
+          },
+          '400': errorResponse('올바르지 않은 검색 조건'),
+          '401': errorResponse('인증 필요'),
+        },
+      },
+    },
     '/api/workspaces/{workspaceId}/labels': {
       get: {
         tags: ['Workspace'],

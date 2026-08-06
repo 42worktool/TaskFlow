@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import { LabelAPI } from '../api/label'
 import { ListAPI } from '../api/list'
+import { ProfileAPI, type PublicProfile } from '../api/profile'
 import { WorkspaceAPI } from '../api/workspace'
 import { workspaceColor } from '../types'
 import type { Label, ListWithCards, Workspace } from '../types'
@@ -20,11 +21,15 @@ const router = useRouter()
 const allWorkspaces = ref<Workspace[]>([])
 const lists = ref<ListWithCards[]>([])
 const workspaceLabels = ref<Label[]>([])
+const searchedUsers = ref<PublicProfile[]>([])
 const loading = ref(true)
 const labelsLoading = ref(false)
+const usersLoading = ref(false)
 const loadError = ref('')
 const labelLoadError = ref('')
+const userLoadError = ref('')
 let labelRequestVersion = 0
+let userRequestVersion = 0
 
 const criteria = computed(() =>
   criteriaFromRouteQuery({
@@ -80,9 +85,17 @@ const selectedLabel = computed(() =>
   selectedWorkspace.value ? resolveLabel(criteria.value.label) : null,
 )
 const hasLabelScope = computed(() => Boolean(selectedWorkspace.value && criteria.value.label))
+const labelFilterUnavailable = computed(
+  () => criteria.value.category === 'workspace' || criteria.value.category === 'user',
+)
 
 const workspaceResults = computed(() => {
-  if (criteria.value.category === 'card' || hasLabelScope.value) return []
+  if (
+    criteria.value.category === 'card' ||
+    criteria.value.category === 'user' ||
+    hasLabelScope.value
+  )
+    return []
   return allWorkspaces.value.filter(
     (workspace) =>
       matchesScope(criteria.value.workspace, workspace.id, workspace.name) &&
@@ -94,7 +107,7 @@ const workspaceResults = computed(() => {
 })
 
 const cardResults = computed(() => {
-  if (criteria.value.category === 'workspace') return []
+  if (criteria.value.category === 'workspace' || criteria.value.category === 'user') return []
 
   return lists.value.flatMap((list) => {
     const workspace = allWorkspaces.value.find((item) => item.id === list.workspace_id)
@@ -131,7 +144,23 @@ const cardResults = computed(() => {
   })
 })
 
-const totalResults = computed(() => workspaceResults.value.length + cardResults.value.length)
+const userResults = computed(() => {
+  if (
+    criteria.value.category === 'workspace' ||
+    criteria.value.category === 'card' ||
+    hasLabelScope.value
+  )
+    return []
+  if (criteria.value.workspace && !selectedWorkspace.value) return []
+  if (!selectedWorkspace.value) return searchedUsers.value
+
+  const memberIds = new Set(selectedWorkspace.value.members.map((member) => member.user_id))
+  return searchedUsers.value.filter((user) => memberIds.has(user.id))
+})
+
+const totalResults = computed(
+  () => workspaceResults.value.length + cardResults.value.length + userResults.value.length,
+)
 const hasResults = computed(() => totalResults.value > 0)
 const workspaceSelectValue = computed(() => selectedWorkspace.value?.id ?? '')
 const labelSelectValue = computed(() => selectedLabel.value?.id ?? '')
@@ -140,13 +169,27 @@ const workspaceScopeLabel = computed(
 )
 const labelScopeLabel = computed(() => selectedLabel.value?.label_name ?? criteria.value.label)
 
+function userWorkspaceSummary(userId: string): string {
+  if (selectedWorkspace.value) return `${selectedWorkspace.value.name} 구성원`
+
+  const workspaceNames = allWorkspaces.value
+    .filter((workspace) => workspace.members.some((member) => member.user_id === userId))
+    .map((workspace) => workspace.name)
+  if (workspaceNames.length === 0) return '공개 프로필'
+  if (workspaceNames.length === 1) return workspaceNames[0]
+  return `${workspaceNames[0]} 외 ${workspaceNames.length - 1}개 워크스페이스`
+}
+
 function updateCriteria(patch: Partial<AdvancedSearchCriteria>) {
   const next = { ...criteria.value, ...patch }
   void router.replace({ path: '/search', query: criteriaToRouteQuery(next) })
 }
 
 function setCategory(category: SearchCategory) {
-  updateCriteria({ category })
+  updateCriteria({
+    category,
+    ...(category === 'workspace' || category === 'user' ? { label: null } : {}),
+  })
 }
 
 function selectWorkspace(event: Event) {
@@ -158,7 +201,9 @@ function selectLabel(event: Event) {
   const label = (event.target as HTMLSelectElement).value || null
   updateCriteria({
     label,
-    ...(label && criteria.value.category === 'workspace' ? { category: 'card' as const } : {}),
+    ...(label && (criteria.value.category === 'workspace' || criteria.value.category === 'user')
+      ? { category: 'card' as const }
+      : {}),
   })
 }
 
@@ -217,6 +262,44 @@ watch([loading, () => criteria.value.label, selectedWorkspace], ([isLoading, lab
   if (!isLoading && label && !workspace) updateCriteria({ label: null })
 })
 
+watch(
+  [
+    query,
+    () => criteria.value.category,
+    hasLabelScope,
+    () => selectedWorkspace.value?.id ?? null,
+    () => criteria.value.workspace,
+  ],
+  async ([text, category, labelScoped, workspaceId, workspaceScope]) => {
+    const requestVersion = ++userRequestVersion
+    searchedUsers.value = []
+    userLoadError.value = ''
+    if (
+      !text ||
+      (category !== 'all' && category !== 'user') ||
+      labelScoped ||
+      (workspaceScope && !workspaceId)
+    ) {
+      usersLoading.value = false
+      return
+    }
+
+    usersLoading.value = true
+    try {
+      const users = await ProfileAPI.search(text, workspaceId ?? undefined)
+      if (requestVersion !== userRequestVersion) return
+      searchedUsers.value = users
+    } catch (caught) {
+      if (requestVersion !== userRequestVersion) return
+      userLoadError.value =
+        caught instanceof Error ? caught.message : '사용자를 검색하지 못했습니다.'
+    } finally {
+      if (requestVersion === userRequestVersion) usersLoading.value = false
+    }
+  },
+  { immediate: true },
+)
+
 onMounted(() => {
   void loadSearchData()
 })
@@ -240,9 +323,10 @@ onMounted(() => {
           <summary>/ 명령어</summary>
           <div class="search-help-popover">
             <code>/keyword</code><span>keyword를 바로 검색</span> <code>/card</code
-            ><span>카드만 표시</span> <code>/workspace</code><span>워크스페이스만 표시</span>
-            <code>/workspace:"이름"</code><span>워크스페이스 범위 지정</span>
-            <code>/label:이름</code><span>선택한 워크스페이스 안의 카드만 표시</span>
+            ><span>카드만 표시</span> <code>/user</code><span>사용자만 표시</span>
+            <code>/workspace</code><span>워크스페이스만 표시</span> <code>/workspace:"이름"</code
+            ><span>워크스페이스 범위 지정</span> <code>/label:이름</code
+            ><span>선택한 워크스페이스 안의 카드만 표시</span>
           </div>
         </details>
       </div>
@@ -256,6 +340,7 @@ onMounted(() => {
                 { value: 'all', label: '전체' },
                 { value: 'workspace', label: '워크스페이스' },
                 { value: 'card', label: '카드' },
+                { value: 'user', label: '사용자' },
               ]"
               :key="option.value"
               type="button"
@@ -283,23 +368,28 @@ onMounted(() => {
           <span class="search-filter-label">레이블</span>
           <select
             :value="labelSelectValue"
-            :disabled="loading || labelsLoading || !selectedWorkspace"
+            :disabled="loading || labelsLoading || !selectedWorkspace || labelFilterUnavailable"
             @change="selectLabel"
           >
             <option value="">
               {{
-                !selectedWorkspace
-                  ? '워크스페이스를 먼저 선택하세요'
-                  : labelsLoading
-                    ? '레이블을 불러오는 중…'
-                    : '모든 레이블'
+                labelFilterUnavailable
+                  ? '현재 카테고리에서는 사용하지 않음'
+                  : !selectedWorkspace
+                    ? '워크스페이스를 먼저 선택하세요'
+                    : labelsLoading
+                      ? '레이블을 불러오는 중…'
+                      : '모든 레이블'
               }}
             </option>
             <option v-for="label in workspaceLabels" :key="label.id" :value="label.id">
               {{ label.label_name }}
             </option>
           </select>
-          <small v-if="!selectedWorkspace" class="search-filter-hint">
+          <small v-if="labelFilterUnavailable" class="search-filter-hint">
+            레이블 필터는 전체 또는 카드 검색에서 사용합니다.
+          </small>
+          <small v-else-if="!selectedWorkspace" class="search-filter-hint">
             레이블은 하나의 워크스페이스 안에서만 검색할 수 있습니다.
           </small>
           <small v-else-if="labelLoadError" class="search-filter-hint search-filter-hint--error">
@@ -319,7 +409,14 @@ onMounted(() => {
           class="search-filter-chip"
           @click="updateCriteria({ category: 'all' })"
         >
-          {{ criteria.category === 'card' ? '카드' : '워크스페이스' }} ×
+          {{
+            criteria.category === 'card'
+              ? '카드'
+              : criteria.category === 'user'
+                ? '사용자'
+                : '워크스페이스'
+          }}
+          ×
         </button>
         <button
           v-if="criteria.workspace"
@@ -341,14 +438,28 @@ onMounted(() => {
       </div>
 
       <div v-if="loadError" class="empty-state" role="alert">{{ loadError }}</div>
-      <div v-else-if="loading" class="empty-state" role="status">검색 데이터를 불러오는 중…</div>
+      <div v-else-if="loading || usersLoading" class="empty-state" role="status">
+        검색 데이터를 불러오는 중…
+      </div>
+      <div v-else-if="userLoadError && !hasResults" class="empty-state" role="alert">
+        {{ userLoadError }}
+      </div>
       <div v-else-if="!hasSearchIntent" class="empty-state">
         상단 검색창에 키워드를 입력하거나 카테고리·범위 필터를 선택하세요.
       </div>
-      <div v-else-if="!hasResults" class="empty-state">조건에 맞는 검색 결과가 없습니다.</div>
+      <div v-else-if="!hasResults" class="empty-state">
+        {{
+          criteria.category === 'user' && !query
+            ? '검색할 사용자 이름이나 한 줄 소개를 입력하세요.'
+            : '조건에 맞는 검색 결과가 없습니다.'
+        }}
+      </div>
 
       <template v-else>
-        <section v-if="criteria.category !== 'card' && !hasLabelScope" class="result-section">
+        <section
+          v-if="criteria.category !== 'card' && criteria.category !== 'user' && !hasLabelScope"
+          class="result-section"
+        >
           <div class="section-header">
             <h2 class="section-title">워크스페이스</h2>
             <span class="result-count">{{ workspaceResults.length }}</span>
@@ -374,7 +485,10 @@ onMounted(() => {
           <div v-else class="section-empty">일치하는 워크스페이스가 없습니다.</div>
         </section>
 
-        <section v-if="criteria.category !== 'workspace'" class="result-section">
+        <section
+          v-if="criteria.category !== 'workspace' && criteria.category !== 'user'"
+          class="result-section"
+        >
           <div class="section-header">
             <h2 class="section-title">카드</h2>
             <span class="result-count">{{ cardResults.length }}</span>
@@ -412,6 +526,45 @@ onMounted(() => {
             </RouterLink>
           </div>
           <div v-else class="section-empty">일치하는 카드가 없습니다.</div>
+        </section>
+
+        <section
+          v-if="criteria.category !== 'workspace' && criteria.category !== 'card' && !hasLabelScope"
+          class="result-section"
+        >
+          <div class="section-header">
+            <h2 class="section-title">사람</h2>
+            <span class="result-count">{{ userResults.length }}</span>
+          </div>
+          <div v-if="userLoadError" class="section-empty" role="alert">{{ userLoadError }}</div>
+          <div v-else-if="userResults.length" class="result-list result-list--people">
+            <RouterLink
+              v-for="user in userResults"
+              :key="user.id"
+              :to="`/profiles/${user.id}`"
+              class="result-row result-person-row"
+            >
+              <img
+                v-if="user.profile_image_url"
+                :src="user.profile_image_url"
+                :alt="`${user.name} 프로필 사진`"
+                class="result-user-avatar"
+              />
+              <span v-else class="result-user-avatar result-user-avatar--fallback">
+                {{ user.name.trim().charAt(0).toUpperCase() || '?' }}
+              </span>
+              <div class="result-content">
+                <div class="result-person-name-line">
+                  <p class="result-title">{{ user.name }}</p>
+                  <span>사람</span>
+                </div>
+                <p class="result-person-headline">{{ user.headline }}</p>
+                <p class="result-person-context">{{ userWorkspaceSummary(user.id) }}</p>
+              </div>
+              <span class="result-person-action">프로필 보기</span>
+            </RouterLink>
+          </div>
+          <div v-else class="section-empty">일치하는 사용자가 없습니다.</div>
         </section>
       </template>
     </main>

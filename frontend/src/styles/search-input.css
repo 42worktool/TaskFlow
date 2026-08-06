@@ -38,6 +38,136 @@
   color: #172b4d;
 }
 
+.search-people-list {
+  position: absolute;
+  z-index: 300;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(480px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid #dcdfe4;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(9, 30, 66, 0.24);
+  color: #172b4d;
+}
+
+.search-people-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 7px;
+  color: #626f86;
+  font-size: 11px;
+}
+
+.search-people-heading strong {
+  color: #172b4d;
+  font-size: 12px;
+}
+
+.search-person-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 0;
+  background: #fff;
+  color: #172b4d;
+  text-align: left;
+}
+
+.search-person-option:hover,
+.search-person-option--active {
+  background: #e9f2ff;
+}
+
+.search-person-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.search-person-avatar--fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dbeafe;
+  color: #0c66e4;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.search-person-copy {
+  min-width: 0;
+  display: block;
+}
+
+.search-person-copy strong,
+.search-person-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-person-copy strong {
+  font-size: 13px;
+}
+
+.search-person-copy small {
+  margin-top: 2px;
+  color: #626f86;
+  font-size: 11px;
+}
+
+.search-people-state {
+  padding: 9px 12px 11px;
+  color: #626f86;
+  font-size: 11px;
+}
+
+.search-people-all {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-top: 1px solid #f1f2f4;
+  background: #fff;
+  color: #0c66e4;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.search-people-all-icon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #e9f2ff;
+  font-size: 15px;
+}
+
+.search-people-all kbd {
+  margin-left: auto;
+  padding: 2px 5px;
+  border: 1px solid #dcdfe4;
+  border-radius: 4px;
+  background: #f7f8f9;
+  color: #626f86;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 600;
+}
+
 .search-command-option {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);

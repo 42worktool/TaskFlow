@@ -1,4 +1,4 @@
-export type SearchCategory = 'all' | 'workspace' | 'card'
+export type SearchCategory = 'all' | 'workspace' | 'card' | 'user'
 
 export interface AdvancedSearchCriteria {
   text: string
@@ -10,7 +10,7 @@ export interface AdvancedSearchCriteria {
 type RouteQueryValue = string | null | Array<string | null> | undefined
 
 const SCOPED_COMMAND = /(^|\s)\/(type|workspace|in|label):(?:"([^"]*)"|([^\s]+))/gi
-const CATEGORY_COMMAND = /(^|\s)\/(all|card|cards|workspace|workspaces)(?=\s|$)/gi
+const CATEGORY_COMMAND = /(^|\s)\/(all|card|cards|workspace|workspaces|user|users)(?=\s|$)/gi
 
 function routeString(value: RouteQueryValue): string {
   const selected = Array.isArray(value) ? value.find((item) => typeof item === 'string') : value
@@ -27,20 +27,29 @@ function searchCategory(value: string): SearchCategory | null {
     case 'workspace':
     case 'workspaces':
       return 'workspace'
+    case 'user':
+    case 'users':
+      return 'user'
     default:
       return null
   }
+}
+
+function categorySupportsLabels(category: SearchCategory): boolean {
+  return category === 'all' || category === 'card'
 }
 
 export function parseSearchExpression(
   expression: string,
   defaultWorkspace: string | null = null,
 ): AdvancedSearchCriteria {
+  const userShortcut = expression.trim().match(/^@(.+)$/)
+  const normalizedExpression = userShortcut ? `/user ${userShortcut[1]}` : expression
   let category: SearchCategory = 'all'
   let workspace: string | null = defaultWorkspace
   let label: string | null = null
 
-  let remaining = expression.replace(
+  let remaining = normalizedExpression.replace(
     SCOPED_COMMAND,
     (match, leading: string, command: string, quoted: string, plain: string) => {
       const value = String(quoted ?? plain ?? '').trim()
@@ -75,7 +84,7 @@ export function parseSearchExpression(
     text: remaining.replace(/\s+/g, ' ').trim(),
     category,
     workspace,
-    label: workspace ? label : null,
+    label: workspace && categorySupportsLabels(category) ? label : null,
   }
 }
 
@@ -86,12 +95,13 @@ export function criteriaFromRouteQuery(query: {
   label?: RouteQueryValue
 }): AdvancedSearchCriteria {
   const workspace = routeString(query.workspace) || null
+  const category = searchCategory(routeString(query.type)) ?? 'all'
 
   return {
     text: routeString(query.q),
-    category: searchCategory(routeString(query.type)) ?? 'all',
+    category,
     workspace,
-    label: workspace ? routeString(query.label) || null : null,
+    label: workspace && categorySupportsLabels(category) ? routeString(query.label) || null : null,
   }
 }
 
@@ -100,7 +110,9 @@ export function criteriaToRouteQuery(criteria: AdvancedSearchCriteria): Record<s
     ...(criteria.text ? { q: criteria.text } : {}),
     ...(criteria.category !== 'all' ? { type: criteria.category } : {}),
     ...(criteria.workspace ? { workspace: criteria.workspace } : {}),
-    ...(criteria.workspace && criteria.label ? { label: criteria.label } : {}),
+    ...(criteria.workspace && criteria.label && categorySupportsLabels(criteria.category)
+      ? { label: criteria.label }
+      : {}),
   }
 }
 

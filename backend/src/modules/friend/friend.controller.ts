@@ -30,6 +30,14 @@ export const sendRequest: RequestHandler = async (req, res) => {
   res.status(201).json(request)
 }
 
+export const sendRequestToUser: RequestHandler<FriendUserParams> = async (req, res) => {
+  const request = await friendService.sendFriendRequestToUser({
+    userId: authenticatedUserId(req),
+    targetUserId: req.params.friendUserId,
+  })
+  res.status(201).json(request)
+}
+
 export const acceptRequest: RequestHandler<FriendUserParams> = async (req, res) => {
   const friend = await friendService.acceptFriendRequest({
     userId: authenticatedUserId(req),

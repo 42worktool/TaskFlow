@@ -1,1 +1,1 @@
-export { profileRouter } from './profile.router'
+export { profileRouter, profileSearchRouter } from './profile.router'

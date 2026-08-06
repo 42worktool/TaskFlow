@@ -72,6 +72,16 @@ describe('FriendAPI', () => {
     })
   })
 
+  it('sends a friend request from a profile search result', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce({ id: 'user-2' })
+
+    await FriendAPI.sendRequestToUser('user-2')
+
+    expect(apiRequest).toHaveBeenCalledWith('/api/friends/requests/user-2', {
+      method: 'POST',
+    })
+  })
+
   it('accepts, rejects or cancels pending requests', async () => {
     vi.mocked(apiRequest).mockResolvedValueOnce({ id: 'user-2' }).mockResolvedValueOnce(undefined)
 
