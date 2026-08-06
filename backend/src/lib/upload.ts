@@ -67,7 +67,10 @@ function storageFor(subdir: string): multer.StorageEngine {
     filename: (_req, file, cb) => {
       const normalized = normalizeOriginalname(fixOriginalnameEncoding(file.originalname))
       if (normalized.length < 1 || normalized.length > MAX_ORIGINAL_FILENAME_LENGTH) {
-        cb(new AppError('INVALID_FILE_NAME', 400, 'File name must be between 1 and 255 characters'), '')
+        cb(
+          new AppError('INVALID_FILE_NAME', 400, 'File name must be between 1 and 255 characters'),
+          '',
+        )
         return
       }
       file.originalname = normalized
@@ -97,7 +100,10 @@ function fileFilterFor(allowlist: Set<string>) {
  * signatures, so it appears as two entries.
  */
 const IMAGE_SIGNATURES: { mime: string; checks: { offset: number; bytes: number[] }[] }[] = [
-  { mime: 'image/png', checks: [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] }] },
+  {
+    mime: 'image/png',
+    checks: [{ offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] }],
+  },
   { mime: 'image/jpeg', checks: [{ offset: 0, bytes: [0xff, 0xd8, 0xff] }] },
   { mime: 'image/gif', checks: [{ offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x37, 0x61] }] },
   { mime: 'image/gif', checks: [{ offset: 0, bytes: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61] }] },
@@ -119,7 +125,9 @@ function matchesSignature(header: Buffer, checks: { offset: number; bytes: numbe
 }
 
 function detectImageMimeType(header: Buffer): string | null {
-  return IMAGE_SIGNATURES.find((signature) => matchesSignature(header, signature.checks))?.mime ?? null
+  return (
+    IMAGE_SIGNATURES.find((signature) => matchesSignature(header, signature.checks))?.mime ?? null
+  )
 }
 
 // MP4 (ISO base media) files are a sequence of boxes; the first box is
@@ -168,7 +176,10 @@ async function readHeaderBytes(filePath: string, length: number): Promise<Buffer
  * rejects the request on mismatch, since a spoofed Content-Type is exactly
  * what a malicious upload would use to slip past `fileFilter`.
  */
-export function requireMagicBytesMatch(subdir: string, allowlist: ReadonlySet<string>): RequestHandler {
+export function requireMagicBytesMatch(
+  subdir: string,
+  allowlist: ReadonlySet<string>,
+): RequestHandler {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     const file = req.file
     if (!file) {

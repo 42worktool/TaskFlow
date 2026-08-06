@@ -60,11 +60,7 @@ async function create(input: WorkspaceInvitation): Promise<string> {
 
     const indexKey = invitationIndexKey(invitation.workspaceId)
     try {
-      await redis
-        .multi()
-        .sAdd(indexKey, key)
-        .expire(indexKey, INVITE_TTL_SECONDS)
-        .exec()
+      await redis.multi().sAdd(indexKey, key).expire(indexKey, INVITE_TTL_SECONDS).exec()
       return token
     } catch (error) {
       await redis.del(key)

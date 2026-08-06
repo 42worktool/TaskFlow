@@ -85,13 +85,7 @@ test('deleteList detaches relations and transfers cards to the member inbox', as
 
   await deleteList({ userId: USER_ID, listId: LIST_ID })
 
-  assert.deepEqual(operationOrder, [
-    'list',
-    'lock',
-    'labels',
-    'cards',
-    'publish',
-  ])
+  assert.deepEqual(operationOrder, ['list', 'lock', 'labels', 'cards', 'publish'])
   assert.equal(publication![0], `workspace:${WORKSPACE_ID}`)
   assert.equal(publication![1], 'workspace.changed')
   const event = publication![2] as {
@@ -157,10 +151,7 @@ test('deleteList rejects viewers before creating transaction operations', async 
     return { id: LIST_ID }
   })
 
-  await assert.rejects(
-    () => deleteList({ userId: USER_ID, listId: LIST_ID }),
-    /Forbidden/,
-  )
+  await assert.rejects(() => deleteList({ userId: USER_ID, listId: LIST_ID }), /Forbidden/)
   assert.equal(cardUpdateCalls, 0)
   assert.equal(listUpdateCalls, 0)
 })
@@ -220,7 +211,10 @@ test('getList returns one list with cards under the board read policy', async (t
   const result = await getList({ userId: USER_ID, listId: LIST_ID })
 
   assert.equal(result.id, LIST_ID)
-  assert.deepEqual(result.cards.map((card) => card.id), [CARD_ID])
+  assert.deepEqual(
+    result.cards.map((card) => card.id),
+    [CARD_ID],
+  )
   assert.deepEqual(result.cards[0]?.labels, [
     { label_id: LABEL_ID, label_name: 'Bug', label_color: '#ff0000' },
   ])

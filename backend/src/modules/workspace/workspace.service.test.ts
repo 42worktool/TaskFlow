@@ -46,12 +46,7 @@ function stubMethod(
  * on a later call, e.g. a re-check inside a lock seeing a row that changed
  * or disappeared since an earlier, unlocked read.
  */
-function stubSequence<T>(
-  t: TestContext,
-  target: object,
-  name: string,
-  values: readonly T[],
-): void {
+function stubSequence<T>(t: TestContext, target: object, name: string, values: readonly T[]): void {
   let call = 0
   stubMethod(t, target, name, async () => {
     const value = values[Math.min(call, values.length - 1)]
@@ -70,8 +65,11 @@ function stubQueryRaw(t: TestContext, target: object, workspaceRowExists: boolea
   stubMethod(t, target, '$executeRaw', async () => 1)
   stubMethod(t, target, '$queryRaw', async (strings: TemplateStringsArray) =>
     strings.join(' ').includes('FROM "Workspaces"')
-      ? (workspaceRowExists ? [{ id: 'locked' }] : [])
-      : [])
+      ? workspaceRowExists
+        ? [{ id: 'locked' }]
+        : []
+      : [],
+  )
 }
 
 function workspace() {
@@ -154,14 +152,8 @@ test('public workspace reads hide member email addresses', async (t) => {
 
     const result = await listWorkspaces({ userId: USER_ID })
 
-    assert.equal(
-      result.my[0]?.members[0]?.user.email,
-      'owner@example.com',
-    )
-    assert.equal(
-      'email' in (result.public[0]?.members[0]?.user ?? {}),
-      false,
-    )
+    assert.equal(result.my[0]?.members[0]?.user.email, 'owner@example.com')
+    assert.equal('email' in (result.public[0]?.members[0]?.user ?? {}), false)
   })
 
   await t.test(
@@ -197,7 +189,8 @@ test('public workspace reads hide member email addresses', async (t) => {
       // post-join re-check see the same "not yet a member" state forever.
       let joined = false
       stubMethod(t, prisma.workspace, 'findFirst', async () =>
-        joined ? joinedWorkspace : publicWorkspace)
+        joined ? joinedWorkspace : publicWorkspace,
+      )
       stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
       stubQueryRaw(t, prisma, true)
       stubMethod(t, prisma.workspaceMember, 'findUnique', async () => null)
@@ -368,10 +361,7 @@ test('public workspace reads hide member email addresses', async (t) => {
       workspaceId: WORKSPACE_ID,
     })
 
-    assert.equal(
-      result.members[0]?.user.email,
-      'owner@example.com',
-    )
+    assert.equal(result.members[0]?.user.email, 'owner@example.com')
   })
 })
 
@@ -442,14 +432,8 @@ test('workspace member role changes preserve the ownership boundary', async (t) 
     },
   ] as const) {
     await t.test(scenario.name, async (t) => {
-      const before = workspaceForRoleChange(
-        scenario.callerRole,
-        scenario.targetRole,
-      )
-      const after = workspaceForRoleChange(
-        scenario.callerRole,
-        scenario.newRole,
-      )
+      const before = workspaceForRoleChange(scenario.callerRole, scenario.targetRole)
+      const after = workspaceForRoleChange(scenario.callerRole, scenario.newRole)
       let readCount = 0
       let updateArgs: unknown
       const publications: unknown[][] = []
@@ -515,10 +499,7 @@ test('workspace member role changes preserve the ownership boundary', async (t) 
     },
   ] as const) {
     await t.test(scenario.name, async (t) => {
-      const current = workspaceForRoleChange(
-        scenario.callerRole,
-        scenario.targetRole,
-      )
+      const current = workspaceForRoleChange(scenario.callerRole, scenario.targetRole)
       let updateCount = 0
 
       stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
@@ -561,35 +542,27 @@ test('workspace member removal protects ADMIN and OWNER targets', async (t) => {
     { callerRole: 'ADMIN', targetRole: 'VIEWER' },
     { callerRole: 'OWNER', targetRole: 'VIEWER' },
   ] as const) {
-    await t.test(
-      `${scenario.callerRole} can remove a ${scenario.targetRole}`,
-      async (t) => {
-        const current = workspaceForRoleChange(
-          scenario.callerRole,
-          scenario.targetRole,
-        )
-        let updateCount = 0
+    await t.test(`${scenario.callerRole} can remove a ${scenario.targetRole}`, async (t) => {
+      const current = workspaceForRoleChange(scenario.callerRole, scenario.targetRole)
+      let updateCount = 0
 
-        stubMethod(t, prisma, '$transaction', async (operation) =>
-          operation(prisma),
-        )
-        stubMethod(t, prisma.workspace, 'findFirst', async () => current)
-        stubMethod(t, prisma.workspaceMember, 'update', async () => {
-          updateCount += 1
-          return {}
-        })
-        stubMethod(t, realtime, 'publish', () => {})
-        stubMethod(t, realtime, 'leaveUserChannel', () => {})
+      stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+      stubMethod(t, prisma.workspace, 'findFirst', async () => current)
+      stubMethod(t, prisma.workspaceMember, 'update', async () => {
+        updateCount += 1
+        return {}
+      })
+      stubMethod(t, realtime, 'publish', () => {})
+      stubMethod(t, realtime, 'leaveUserChannel', () => {})
 
-        await removeMember({
-          userId: USER_ID,
-          workspaceId: WORKSPACE_ID,
-          targetUserId: OWNER_ID,
-        })
+      await removeMember({
+        userId: USER_ID,
+        workspaceId: WORKSPACE_ID,
+        targetUserId: OWNER_ID,
+      })
 
-        assert.equal(updateCount, 1)
-      },
-    )
+      assert.equal(updateCount, 1)
+    })
   }
 
   for (const scenario of [
@@ -598,56 +571,44 @@ test('workspace member removal protects ADMIN and OWNER targets', async (t) => {
     { callerRole: 'ADMIN', targetRole: 'OWNER' },
     { callerRole: 'OWNER', targetRole: 'OWNER' },
   ] as const) {
-    await t.test(
-      `${scenario.callerRole} cannot remove a ${scenario.targetRole}`,
-      async (t) => {
-        const current = workspaceForRoleChange(
-          scenario.callerRole,
-          scenario.targetRole,
-        )
-        let updateCount = 0
+    await t.test(`${scenario.callerRole} cannot remove a ${scenario.targetRole}`, async (t) => {
+      const current = workspaceForRoleChange(scenario.callerRole, scenario.targetRole)
+      let updateCount = 0
 
-        stubMethod(t, prisma, '$transaction', async (operation) =>
-          operation(prisma),
-        )
-        stubMethod(t, prisma.workspace, 'findFirst', async () => current)
-        stubMethod(t, prisma.workspaceMember, 'update', async () => {
-          updateCount += 1
-          return {}
-        })
+      stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+      stubMethod(t, prisma.workspace, 'findFirst', async () => current)
+      stubMethod(t, prisma.workspaceMember, 'update', async () => {
+        updateCount += 1
+        return {}
+      })
 
-        await assert.rejects(
-          () =>
-            removeMember({
-              userId: USER_ID,
-              workspaceId: WORKSPACE_ID,
-              targetUserId: OWNER_ID,
-            }),
-          (error: unknown) =>
-            typeof error === 'object' &&
-            error !== null &&
-            'code' in error &&
-            error.code === 'FORBIDDEN',
-        )
-        assert.equal(updateCount, 0)
-      },
-    )
+      await assert.rejects(
+        () =>
+          removeMember({
+            userId: USER_ID,
+            workspaceId: WORKSPACE_ID,
+            targetUserId: OWNER_ID,
+          }),
+        (error: unknown) =>
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'FORBIDDEN',
+      )
+      assert.equal(updateCount, 0)
+    })
   }
 })
 
 test('workspace invitations are one-time bearer invitations', async (t) => {
   setRequiredEnvironment()
-  const [
-    { prisma },
-    { realtime },
-    { workspaceInvitationStore },
-    { acceptInvite, previewInvite },
-  ] = await Promise.all([
-    import('../../db'),
-    import('../../realtime'),
-    import('./workspace-invitation.store'),
-    import('./workspace.service'),
-  ])
+  const [{ prisma }, { realtime }, { workspaceInvitationStore }, { acceptInvite, previewInvite }] =
+    await Promise.all([
+      import('../../db'),
+      import('../../realtime'),
+      import('./workspace-invitation.store'),
+      import('./workspace.service'),
+    ])
   const invitation = {
     workspaceId: WORKSPACE_ID,
     role: 'MEMBER' as const,
@@ -753,16 +714,8 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
     assert.equal(deliveries.length, 1)
     assert.equal(deliveries[0]?.[0], OWNER_ID)
     assert.equal(deliveries[0]?.[1], 'notification.created')
-    assert.equal(
-      (deliveries[0]?.[2] as { kind?: unknown }).kind,
-      'workspace.member_joined',
-    )
-    assert.deepEqual(operationOrder, [
-      'preview',
-      'take',
-      'membership',
-      'notification',
-    ])
+    assert.equal((deliveries[0]?.[2] as { kind?: unknown }).kind, 'workspace.member_joined')
+    assert.deepEqual(operationOrder, ['preview', 'take', 'membership', 'notification'])
   })
 
   await t.test('keeps an active member role without taking the token', async (t) => {
@@ -780,10 +733,7 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
     const accepted = await acceptInvite({ userId: USER_ID, token: 'token' })
 
     assert.equal(accepted.id, WORKSPACE_ID)
-    assert.equal(
-      accepted.members.find((member) => member.user_id === USER_ID)?.role,
-      'ADMIN',
-    )
+    assert.equal(accepted.members.find((member) => member.user_id === USER_ID)?.role, 'ADMIN')
     assert.equal(takeCount, 0)
     assert.equal(deliveries.length, 0)
   })
@@ -791,12 +741,7 @@ test('workspace invitations are one-time bearer invitations', async (t) => {
 
 test('workspace removal events are published before channel access is revoked', async (t) => {
   setRequiredEnvironment()
-  const [
-    { prisma },
-    { realtime },
-    { workspaceInvitationStore },
-    service,
-  ] = await Promise.all([
+  const [{ prisma }, { realtime }, { workspaceInvitationStore }, service] = await Promise.all([
     import('../../db'),
     import('../../realtime'),
     import('./workspace-invitation.store'),
@@ -865,12 +810,7 @@ test('workspace removal events are published before channel access is revoked', 
       workspaceId: WORKSPACE_ID,
     })
 
-    assert.deepEqual(operationOrder, [
-      'update',
-      'discard-invitations',
-      'publish',
-      'clear',
-    ])
+    assert.deepEqual(operationOrder, ['update', 'discard-invitations', 'publish', 'clear'])
     assert.deepEqual(clearArgs!, [`workspace:${WORKSPACE_ID}`])
   })
 })

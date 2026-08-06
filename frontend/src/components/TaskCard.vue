@@ -39,7 +39,9 @@ function getLabelTextColor(hex: string): string {
   const normalized = hex.replace('#', '')
   if (!/^[\da-f]{6}$/i.test(normalized)) return '#111827'
 
-  const channels = [0, 2, 4].map((index) => Number.parseInt(normalized.slice(index, index + 2), 16) / 255)
+  const channels = [0, 2, 4].map(
+    (index) => Number.parseInt(normalized.slice(index, index + 2), 16) / 255,
+  )
   const luminance = channels.reduce((total, channel, index) => {
     const linear = channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
     return total + linear * [0.2126, 0.7152, 0.0722][index]
@@ -50,10 +52,7 @@ function getLabelTextColor(hex: string): string {
 </script>
 
 <template>
-  <article
-    class="task-card"
-    :class="{ 'task-card--completed': completed }"
-  >
+  <article class="task-card" :class="{ 'task-card--completed': completed }">
     <div class="card-title-row">
       <span
         class="card-title"
@@ -95,11 +94,7 @@ function getLabelTextColor(hex: string): string {
         type="button"
         :disabled="completionPending"
         :aria-label="
-          completionPending
-            ? '카드 상태 변경 중'
-            : completed
-              ? '카드 다시 열기'
-              : '카드 완료'
+          completionPending ? '카드 상태 변경 중' : completed ? '카드 다시 열기' : '카드 완료'
         "
         :title="completed ? '다시 열기' : '완료'"
         @pointerdown.stop

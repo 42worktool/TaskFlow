@@ -1,10 +1,7 @@
 import type { WorkspaceMessage } from '@prisma/client'
 import { z } from 'zod'
 import { messageBaseDtoSchema } from '../../lib/messaging'
-import {
-  toUserSummary,
-  type SelectedUserSummary,
-} from '../../lib/user-summary'
+import { toUserSummary, type SelectedUserSummary } from '../../lib/user-summary'
 import { uuidSchema } from '../../lib/validation'
 
 export const workspaceMessageDtoSchema = messageBaseDtoSchema
@@ -20,9 +17,7 @@ type WorkspaceMessageWithAuthor = WorkspaceMessage & {
 
 export type WorkspaceMessageDto = z.infer<typeof workspaceMessageDtoSchema>
 
-export function toWorkspaceMessageDto(
-  message: WorkspaceMessageWithAuthor,
-): WorkspaceMessageDto {
+export function toWorkspaceMessageDto(message: WorkspaceMessageWithAuthor): WorkspaceMessageDto {
   return workspaceMessageDtoSchema.parse({
     id: message.id,
     workspace_id: message.workspace_id,

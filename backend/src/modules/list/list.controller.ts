@@ -1,11 +1,7 @@
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
 import * as svc from './list.service'
-import {
-  createListSchema,
-  listReorderSchema,
-  updateListSchema,
-} from './list.validation'
+import { createListSchema, listReorderSchema, updateListSchema } from './list.validation'
 
 export const list: RequestHandler = async (req, res) => {
   const lists = await svc.listLists({

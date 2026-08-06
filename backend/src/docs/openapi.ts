@@ -18,7 +18,7 @@ const userSchema = {
       description: '이 계정에서 사용하는 로그인 방식',
     },
   },
-} as const;
+} as const
 
 const errorResponse = (description: string) => ({
   description,
@@ -27,7 +27,7 @@ const errorResponse = (description: string) => ({
       schema: { $ref: '#/components/schemas/ErrorResponse' },
     },
   },
-});
+})
 
 const redirectResponse = (description: string) => ({
   description,
@@ -37,7 +37,7 @@ const redirectResponse = (description: string) => ({
       schema: { type: 'string', format: 'uri-reference' },
     },
   },
-});
+})
 
 export const openApiDocument = {
   openapi: '3.0.3',
@@ -222,7 +222,8 @@ export const openApiDocument = {
       post: {
         tags: ['Session'],
         summary: 'Access Token 갱신',
-        description: 'Refresh Token을 일회성으로 소비하고 새 Refresh Token과 Access Token을 발급합니다.',
+        description:
+          'Refresh Token을 일회성으로 소비하고 새 Refresh Token과 Access Token을 발급합니다.',
         operationId: 'refreshSession',
         security: [{ refreshCookie: [] }],
         responses: {
@@ -320,127 +321,133 @@ export const openApiDocument = {
       },
     },
     '/api/workspaces/{workspaceId}/labels': {
-        get: {
-          tags: ['Workspace'],
-          summary: '워크스페이스 라벨 목록',
-          operationId: 'listWorkspaceLabels',
-          security: [{ bearerAuth: [] }],
-          parameters: [{ $ref: '#/components/parameters/WorkspaceId' }],
-          responses: {
-            '200': {
-              description: '활성 라벨 목록',
-              content: {
-                'application/json': {
-                  schema: { type: 'array', items: { $ref: '#/components/schemas/Label' } },
-                },
+      get: {
+        tags: ['Workspace'],
+        summary: '워크스페이스 라벨 목록',
+        operationId: 'listWorkspaceLabels',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/WorkspaceId' }],
+        responses: {
+          '200': {
+            description: '활성 라벨 목록',
+            content: {
+              'application/json': {
+                schema: { type: 'array', items: { $ref: '#/components/schemas/Label' } },
               },
             },
-            '401': errorResponse('인증 필요'),
-            '403': errorResponse('워크스페이스 접근 권한 없음'),
-            '404': errorResponse('워크스페이스 없음'),
           },
-        },
-        post: {
-          tags: ['Workspace'],
-          summary: '워크스페이스 라벨 생성',
-          operationId: 'createWorkspaceLabel',
-          security: [{ bearerAuth: [] }],
-          parameters: [{ $ref: '#/components/parameters/WorkspaceId' }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateLabelRequest' } } },
-          },
-          responses: {
-            '201': {
-              description: '생성된 라벨',
-              content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
-            },
-            '400': errorResponse('라벨 입력값 검증 실패'),
-            '401': errorResponse('인증 필요'),
-            '403': errorResponse('라벨 생성 권한 없음'),
-            '404': errorResponse('워크스페이스 없음'),
-          },
+          '401': errorResponse('인증 필요'),
+          '403': errorResponse('워크스페이스 접근 권한 없음'),
+          '404': errorResponse('워크스페이스 없음'),
         },
       },
-      '/api/labels/{label_id}': {
-        put: {
-          tags: ['Workspace'],
-          summary: '라벨 수정',
-          operationId: 'updateLabel',
-          security: [{ bearerAuth: [] }],
-          parameters: [{ $ref: '#/components/parameters/LabelId' }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateLabelRequest' } } },
-          },
-          responses: {
-            '200': {
-              description: '수정된 라벨',
-              content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
-            },
-            '400': errorResponse('라벨 입력값 검증 실패'),
-            '401': errorResponse('인증 필요'),
-            '403': errorResponse('라벨 수정 권한 없음'),
-            '404': errorResponse('라벨 없음'),
+      post: {
+        tags: ['Workspace'],
+        summary: '워크스페이스 라벨 생성',
+        operationId: 'createWorkspaceLabel',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/WorkspaceId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/CreateLabelRequest' } },
           },
         },
-        delete: {
-          tags: ['Workspace'],
-          summary: '라벨 삭제',
-          operationId: 'deleteLabel',
-          security: [{ bearerAuth: [] }],
-          parameters: [{ $ref: '#/components/parameters/LabelId' }],
-          responses: {
-            '204': { description: '삭제 완료' },
-            '401': errorResponse('인증 필요'),
-            '403': errorResponse('라벨 삭제 권한 없음'),
-            '404': errorResponse('라벨 없음'),
+        responses: {
+          '201': {
+            description: '생성된 라벨',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
           },
-        },
-      },
-      '/api/cards/{card_id}/labels': {
-        post: {
-          tags: ['Card'],
-          summary: '카드에 라벨 부착',
-          operationId: 'attachCardLabel',
-          security: [{ bearerAuth: [] }],
-          parameters: [{ $ref: '#/components/parameters/CardId' }],
-          requestBody: {
-            required: true,
-            content: { 'application/json': { schema: { $ref: '#/components/schemas/AttachLabelRequest' } } },
-          },
-          responses: {
-            '201': {
-              description: '부착된 라벨',
-              content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
-            },
-            '400': errorResponse('같은 워크스페이스의 라벨만 부착 가능'),
-            '401': errorResponse('인증 필요'),
-            '403': errorResponse('라벨 부착 권한 없음'),
-            '404': errorResponse('카드 또는 라벨 없음'),
-            '409': errorResponse('이미 부착된 라벨'),
-          },
-        },
-      },
-      '/api/cards/{card_id}/labels/{label_id}': {
-        delete: {
-          tags: ['Card'],
-          summary: '카드에서 라벨 제거',
-          operationId: 'detachCardLabel',
-          security: [{ bearerAuth: [] }],
-          parameters: [
-            { $ref: '#/components/parameters/CardId' },
-            { $ref: '#/components/parameters/LabelId' },
-          ],
-          responses: {
-            '204': { description: '제거 완료' },
-            '401': errorResponse('인증 필요'),
-            '403': errorResponse('라벨 제거 권한 없음'),
-            '404': errorResponse('카드, 라벨 또는 부착 관계 없음'),
-          },
+          '400': errorResponse('라벨 입력값 검증 실패'),
+          '401': errorResponse('인증 필요'),
+          '403': errorResponse('라벨 생성 권한 없음'),
+          '404': errorResponse('워크스페이스 없음'),
         },
       },
     },
+    '/api/labels/{label_id}': {
+      put: {
+        tags: ['Workspace'],
+        summary: '라벨 수정',
+        operationId: 'updateLabel',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/LabelId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/UpdateLabelRequest' } },
+          },
+        },
+        responses: {
+          '200': {
+            description: '수정된 라벨',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
+          },
+          '400': errorResponse('라벨 입력값 검증 실패'),
+          '401': errorResponse('인증 필요'),
+          '403': errorResponse('라벨 수정 권한 없음'),
+          '404': errorResponse('라벨 없음'),
+        },
+      },
+      delete: {
+        tags: ['Workspace'],
+        summary: '라벨 삭제',
+        operationId: 'deleteLabel',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/LabelId' }],
+        responses: {
+          '204': { description: '삭제 완료' },
+          '401': errorResponse('인증 필요'),
+          '403': errorResponse('라벨 삭제 권한 없음'),
+          '404': errorResponse('라벨 없음'),
+        },
+      },
+    },
+    '/api/cards/{card_id}/labels': {
+      post: {
+        tags: ['Card'],
+        summary: '카드에 라벨 부착',
+        operationId: 'attachCardLabel',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ $ref: '#/components/parameters/CardId' }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/AttachLabelRequest' } },
+          },
+        },
+        responses: {
+          '201': {
+            description: '부착된 라벨',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Label' } } },
+          },
+          '400': errorResponse('같은 워크스페이스의 라벨만 부착 가능'),
+          '401': errorResponse('인증 필요'),
+          '403': errorResponse('라벨 부착 권한 없음'),
+          '404': errorResponse('카드 또는 라벨 없음'),
+          '409': errorResponse('이미 부착된 라벨'),
+        },
+      },
+    },
+    '/api/cards/{card_id}/labels/{label_id}': {
+      delete: {
+        tags: ['Card'],
+        summary: '카드에서 라벨 제거',
+        operationId: 'detachCardLabel',
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { $ref: '#/components/parameters/CardId' },
+          { $ref: '#/components/parameters/LabelId' },
+        ],
+        responses: {
+          '204': { description: '제거 완료' },
+          '401': errorResponse('인증 필요'),
+          '403': errorResponse('라벨 제거 권한 없음'),
+          '404': errorResponse('카드, 라벨 또는 부착 관계 없음'),
+        },
+      },
+    },
+  },
   components: {
     securitySchemes: {
       bearerAuth: {
@@ -593,4 +600,4 @@ export const openApiDocument = {
       },
     },
   },
-} as const;
+} as const

@@ -1,9 +1,6 @@
 import { prisma } from '../../db'
 import { AppError } from '../../errors'
-import {
-  MESSAGE_HISTORY_LIMIT,
-  newestMessageOrder,
-} from '../../lib/messaging'
+import { MESSAGE_HISTORY_LIMIT, newestMessageOrder } from '../../lib/messaging'
 import { realtime } from '../../realtime'
 import {
   directMessageDtoSchema,
@@ -23,10 +20,7 @@ class FriendshipRequiredError extends AppError {
   }
 }
 
-async function requireAcceptedFriendship(
-  userId: string,
-  friendUserId: string,
-): Promise<void> {
+async function requireAcceptedFriendship(userId: string, friendUserId: string): Promise<void> {
   if (userId === friendUserId) throw new FriendshipRequiredError()
 
   const pair = canonicalFriendPair(userId, friendUserId)
@@ -53,10 +47,7 @@ function publishDirectMessageCreated(message: DirectMessageDto): void {
   }
 }
 
-export async function listDirectMessages(input: {
-  userId: string
-  friendUserId: string
-}) {
+export async function listDirectMessages(input: { userId: string; friendUserId: string }) {
   await requireAcceptedFriendship(input.userId, input.friendUserId)
 
   const messages = await prisma.directMessage.findMany({

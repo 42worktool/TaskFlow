@@ -22,9 +22,7 @@ export const InboxAPI = {
   },
 
   remove(cardId: string): Promise<void> {
-    return queueInboxMutation(() =>
-      apiRequest<void>(`/api/cards/${cardId}`, { method: 'DELETE' }),
-    )
+    return queueInboxMutation(() => apiRequest<void>(`/api/cards/${cardId}`, { method: 'DELETE' }))
   },
 
   moveToInbox: (cardId: string): Promise<Card> =>
@@ -45,6 +43,5 @@ export const InboxAPI = {
       }),
     ),
 
-  removeList: (listId: string): Promise<void> =>
-    queueInboxMutation(() => ListAPI.remove(listId)),
+  removeList: (listId: string): Promise<void> => queueInboxMutation(() => ListAPI.remove(listId)),
 }

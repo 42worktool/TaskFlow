@@ -27,14 +27,13 @@ const previewMembers = computed(() =>
   [...props.members]
     .sort(
       (a, b) =>
-        Number(props.onlineUserIds.has(b.user_id)) -
-        Number(props.onlineUserIds.has(a.user_id)),
+        Number(props.onlineUserIds.has(b.user_id)) - Number(props.onlineUserIds.has(a.user_id)),
     )
     .slice(0, 4),
 )
 
-const hiddenMemberCount = computed(
-  () => Math.max(0, props.members.length - previewMembers.value.length),
+const hiddenMemberCount = computed(() =>
+  Math.max(0, props.members.length - previewMembers.value.length),
 )
 
 const triggerLabel = computed(
@@ -135,9 +134,7 @@ onUnmounted(() => {
         </span>
         <span v-if="members.length === 0" class="workspace-members-empty-icon">＋</span>
       </span>
-      <span class="workspace-members-trigger-count">
-        {{ onlineCount }}/{{ members.length }}
-      </span>
+      <span class="workspace-members-trigger-count"> {{ onlineCount }}/{{ members.length }} </span>
     </button>
 
     <section
@@ -169,11 +166,7 @@ onUnmounted(() => {
         <li v-if="members.length === 0" class="workspace-members-list-empty">
           아직 등록된 팀원이 없습니다.
         </li>
-        <li
-          v-for="member in members"
-          :key="member.user_id"
-          class="workspace-members-list-item"
-        >
+        <li v-for="member in members" :key="member.user_id" class="workspace-members-list-item">
           <span class="workspace-member-list-avatar" aria-hidden="true">
             <img
               v-if="member.user.profile_image_url"

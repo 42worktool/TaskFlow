@@ -33,14 +33,8 @@ let loadGeneration = 0
 function belongsToCurrentConversation(message: DirectMessage): boolean {
   const currentUserId = authState.user?.id
   if (!currentUserId || !props.friendId) return false
-  const participantIds = [
-    message.author.user_id,
-    message.recipient.user_id,
-  ]
-  return (
-    participantIds.includes(currentUserId) &&
-    participantIds.includes(props.friendId)
-  )
+  const participantIds = [message.author.user_id, message.recipient.user_id]
+  return participantIds.includes(currentUserId) && participantIds.includes(props.friendId)
 }
 
 function mergeMessages(incoming: readonly DirectMessage[]): void {
@@ -74,10 +68,7 @@ async function loadMessages(background = false): Promise<void> {
     mergeMessages(loaded)
   } catch (caught) {
     if (generation !== loadGeneration || friendId !== props.friendId) return
-    error.value =
-      caught instanceof Error
-        ? caught.message
-        : '대화 내용을 불러오지 못했습니다.'
+    error.value = caught instanceof Error ? caught.message : '대화 내용을 불러오지 못했습니다.'
   } finally {
     if (generation === loadGeneration) loading.value = false
   }
@@ -99,8 +90,7 @@ async function sendMessage(): Promise<void> {
     sent = true
   } catch (caught) {
     if (friendId !== props.friendId) return
-    error.value =
-      caught instanceof Error ? caught.message : '메시지를 보내지 못했습니다.'
+    error.value = caught instanceof Error ? caught.message : '메시지를 보내지 못했습니다.'
   } finally {
     if (friendId === props.friendId) sending.value = false
   }
@@ -194,13 +184,8 @@ onUnmounted(() => {
     </header>
 
     <div ref="messageList" class="direct-message-list" aria-live="polite">
-      <p v-if="loading" class="direct-message-state">
-        대화 내용을 불러오는 중…
-      </p>
-      <p
-        v-else-if="!error && messages.length === 0"
-        class="direct-message-state"
-      >
+      <p v-if="loading" class="direct-message-state">대화 내용을 불러오는 중…</p>
+      <p v-else-if="!error && messages.length === 0" class="direct-message-state">
         아직 메시지가 없습니다. 먼저 인사를 건네 보세요.
       </p>
       <article
@@ -252,10 +237,7 @@ onUnmounted(() => {
         @keydown.enter.exact="composerSubmitter.handleEnter"
         @compositionend="composerSubmitter.handleCompositionEnd"
       />
-      <button
-        type="submit"
-        :disabled="loading || sending || !content.trim()"
-      >
+      <button type="submit" :disabled="loading || sending || !content.trim()">
         {{ sending ? '전송 중…' : '보내기' }}
       </button>
     </form>

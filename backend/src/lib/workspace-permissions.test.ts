@@ -40,22 +40,13 @@ test('workspace roles follow viewer, member, admin, owner order', () => {
 
 test('minimum workspace role checks share the forbidden policy', () => {
   assert.equal(requireMinimumWorkspaceRole('ADMIN', 'MEMBER'), 'ADMIN')
-  assert.throws(
-    () => requireMinimumWorkspaceRole('VIEWER', 'MEMBER'),
-    ForbiddenError,
-  )
-  assert.throws(
-    () => requireMinimumWorkspaceRole(null, 'VIEWER'),
-    ForbiddenError,
-  )
+  assert.throws(() => requireMinimumWorkspaceRole('VIEWER', 'MEMBER'), ForbiddenError)
+  assert.throws(() => requireMinimumWorkspaceRole(null, 'VIEWER'), ForbiddenError)
 })
 
 test('workspace reads allow public access or active membership', () => {
   assert.equal(
-    requireWorkspaceReadAccess(
-      { is_public: true, members: [] },
-      USER_ID,
-    ).isMember,
+    requireWorkspaceReadAccess({ is_public: true, members: [] }, USER_ID).isMember,
     false,
   )
   assert.equal(
@@ -71,16 +62,9 @@ test('workspace reads allow public access or active membership', () => {
 })
 
 test('workspace reads preserve not-found and forbidden errors', () => {
+  assert.throws(() => requireWorkspaceReadAccess(null, USER_ID), NotFoundError)
   assert.throws(
-    () => requireWorkspaceReadAccess(null, USER_ID),
-    NotFoundError,
-  )
-  assert.throws(
-    () =>
-      requireWorkspaceReadAccess(
-        { is_public: false, members: [] },
-        USER_ID,
-      ),
+    () => requireWorkspaceReadAccess({ is_public: false, members: [] }, USER_ID),
     ForbiddenError,
   )
 })
@@ -120,21 +104,11 @@ test('requireWorkspaceRole returns the role when it meets the minimum', async ()
 
 test('requireWorkspaceRole keeps the existing forbidden policy', async () => {
   await assert.rejects(
-    requireWorkspaceRole(
-      WORKSPACE_ID,
-      USER_ID,
-      'MEMBER',
-      permissionClient('VIEWER'),
-    ),
+    requireWorkspaceRole(WORKSPACE_ID, USER_ID, 'MEMBER', permissionClient('VIEWER')),
     ForbiddenError,
   )
   await assert.rejects(
-    requireWorkspaceRole(
-      WORKSPACE_ID,
-      USER_ID,
-      'VIEWER',
-      permissionClient(null),
-    ),
+    requireWorkspaceRole(WORKSPACE_ID, USER_ID, 'VIEWER', permissionClient(null)),
     ForbiddenError,
   )
 })

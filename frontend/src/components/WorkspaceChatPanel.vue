@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-} from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChatAPI } from '../api/chat'
 import { ListAPI } from '../api/list'
@@ -21,10 +14,7 @@ import {
 import { realtime } from '../services/realtime'
 import { parseWorkspaceMessage } from '../services/realtime/protocol'
 import type { Card, WorkspaceMessage } from '../types'
-import {
-  findDroppedCard,
-  getBoardCardDropId,
-} from '../utils/chatCardDrop'
+import { findDroppedCard, getBoardCardDropId } from '../utils/chatCardDrop'
 import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
 
 interface CardOption extends Card {
@@ -66,21 +56,14 @@ const BACKGROUND_RETRY_DELAY_MS = 250
 const selectedCard = computed(
   () => cards.value.find((card) => card.id === selectedCardId.value) ?? null,
 )
-const cardTitles = computed(
-  () => new Map(cards.value.map((card) => [card.id, card.title])),
-)
-const acceptsCardDrop = computed(
-  () => getBoardCardDropId(messengerState.cardDrag) !== null,
-)
+const cardTitles = computed(() => new Map(cards.value.map((card) => [card.id, card.title])))
+const acceptsCardDrop = computed(() => getBoardCardDropId(messengerState.cardDrag) !== null)
 
 function mergeMessages(incoming: readonly WorkspaceMessage[]): void {
   const byId = new Map(messages.value.map((message) => [message.id, message]))
   incoming.forEach((message) => byId.set(message.id, message))
   messages.value = [...byId.values()]
-    .sort(
-      (left, right) =>
-        Date.parse(left.created_at) - Date.parse(right.created_at),
-    )
+    .sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at))
     .slice(-100)
   void nextTick(() => {
     if (messageList.value) {
@@ -104,23 +87,13 @@ async function loadMessages(
   error.value = ''
   try {
     const loaded = await ChatAPI.list(workspaceId)
-    if (
-      generation === loadGeneration &&
-      workspaceId === props.workspaceId
-    ) {
+    if (generation === loadGeneration && workspaceId === props.workspaceId) {
       mergeMessages(loaded)
     }
   } catch (caught) {
     if (generation !== loadGeneration) return
-    error.value =
-      caught instanceof Error
-        ? caught.message
-        : '채팅 메시지를 불러오지 못했습니다.'
-    if (
-      background &&
-      retriesRemaining > 0 &&
-      workspaceId === props.workspaceId
-    ) {
+    error.value = caught instanceof Error ? caught.message : '채팅 메시지를 불러오지 못했습니다.'
+    if (background && retriesRemaining > 0 && workspaceId === props.workspaceId) {
       retryTimer = setTimeout(() => {
         retryTimer = null
         void loadMessages(true, retriesRemaining - 1)
@@ -141,17 +114,11 @@ async function loadCards(): Promise<CardOption[] | null> {
     const loadedCards = lists.flatMap((list) =>
       list.cards.map((card) => ({ ...card, listName: list.name })),
     )
-    if (
-      generation !== cardLoadGeneration ||
-      workspaceId !== props.workspaceId
-    ) {
+    if (generation !== cardLoadGeneration || workspaceId !== props.workspaceId) {
       return null
     }
     cards.value = loadedCards
-    if (
-      selectedCardId.value &&
-      !cards.value.some((card) => card.id === selectedCardId.value)
-    ) {
+    if (selectedCardId.value && !cards.value.some((card) => card.id === selectedCardId.value)) {
       selectedCardId.value = null
     }
     return loadedCards
@@ -185,8 +152,7 @@ async function sendMessage(): Promise<void> {
     sent = true
   } catch (caught) {
     if (workspaceId !== props.workspaceId) return
-    error.value =
-      caught instanceof Error ? caught.message : '메시지를 보내지 못했습니다.'
+    error.value = caught instanceof Error ? caught.message : '메시지를 보내지 못했습니다.'
   } finally {
     if (workspaceId === props.workspaceId) sending.value = false
   }
@@ -269,9 +235,7 @@ async function attachCard(cardId: string): Promise<void> {
     const refreshedCards = await loadCards()
     if (workspaceId !== props.workspaceId) return
 
-    const card = refreshedCards
-      ? findDroppedCard(refreshedCards, cardId)
-      : null
+    const card = refreshedCards ? findDroppedCard(refreshedCards, cardId) : null
     if (!card) {
       cardLinkError.value = refreshedCards
         ? '이 워크스페이스에서 더 이상 사용할 수 없는 카드입니다.'
@@ -305,9 +269,7 @@ function isPointInsidePanel(clientX: number, clientY: number): boolean {
   )
 }
 
-function handleFallbackCardPointerMove(
-  event: MouseEvent | PointerEvent,
-): void {
+function handleFallbackCardPointerMove(event: MouseEvent | PointerEvent): void {
   const cardId = getBoardCardDropId(messengerState.cardDrag)
   if (!cardId) return
   const inside = isPointInsidePanel(event.clientX, event.clientY)
@@ -319,9 +281,7 @@ function handleFallbackCardPointerMove(
   }
 }
 
-function handleFallbackCardPointerUp(
-  event: MouseEvent | PointerEvent,
-): void {
+function handleFallbackCardPointerUp(event: MouseEvent | PointerEvent): void {
   const cardId = getBoardCardDropId(messengerState.cardDrag)
   if (!cardId) return
   const inside = isPointInsidePanel(event.clientX, event.clientY)
@@ -348,14 +308,11 @@ function formatMessageTime(value: string): string {
   })
 }
 
-const removeMessageListener = realtime.on(
-  'workspace.message_created',
-  (value) => {
-    const message = parseWorkspaceMessage(value)
-    if (!message || message.workspace_id !== props.workspaceId) return
-    mergeMessages([message])
-  },
-)
+const removeMessageListener = realtime.on('workspace.message_created', (value) => {
+  const message = parseWorkspaceMessage(value)
+  if (!message || message.workspace_id !== props.workspaceId) return
+  mergeMessages([message])
+})
 
 watch(
   () => props.workspaceId,
@@ -459,13 +416,8 @@ onUnmounted(() => {
 
     <div class="workspace-chat-messages-region">
       <div ref="messageList" class="workspace-chat-messages" aria-live="polite">
-        <p v-if="loading" class="workspace-chat-state">
-          메시지를 불러오는 중…
-        </p>
-        <p
-          v-else-if="!error && messages.length === 0"
-          class="workspace-chat-state"
-        >
+        <p v-if="loading" class="workspace-chat-state">메시지를 불러오는 중…</p>
+        <p v-else-if="!error && messages.length === 0" class="workspace-chat-state">
           아직 메시지가 없습니다.
         </p>
         <article
@@ -473,8 +425,7 @@ onUnmounted(() => {
           :key="message.id"
           class="workspace-chat-message"
           :class="{
-            'workspace-chat-message--mine':
-              message.author.user_id === authState.user?.id,
+            'workspace-chat-message--mine': message.author.user_id === authState.user?.id,
           }"
         >
           <img
@@ -503,12 +454,9 @@ onUnmounted(() => {
             >
               ▣ {{ cardTitles.get(message.card_id) }}
             </button>
-            <span
-              v-else
-              class="workspace-chat-card-link workspace-chat-card-link-error"
-            >
+            <span v-else class="workspace-chat-card-link workspace-chat-card-link-error">
               ▣ 카드 삭제됨
-          </span>
+            </span>
           </div>
         </article>
       </div>
@@ -519,22 +467,12 @@ onUnmounted(() => {
     </p>
 
     <form class="workspace-chat-composer" @submit.prevent="sendMessage">
-      <p
-        v-if="cardLinkError"
-        class="workspace-chat-card-link-error"
-        role="alert"
-      >
+      <p v-if="cardLinkError" class="workspace-chat-card-link-error" role="alert">
         {{ cardLinkError }}
       </p>
       <div v-if="selectedCard" class="workspace-chat-selected-card">
         <span>▣ {{ selectedCard.title }}</span>
-        <button
-          type="button"
-          aria-label="카드 연결 해제"
-          @click="selectedCardId = null"
-        >
-          ×
-        </button>
+        <button type="button" aria-label="카드 연결 해제" @click="selectedCardId = null">×</button>
         <small>이 메시지는 카드 댓글에도 기록됩니다.</small>
       </div>
       <div class="workspace-chat-input-drop-region">
@@ -580,12 +518,7 @@ onUnmounted(() => {
             <p v-if="cards.length === 0">
               {{ cardsLoading ? '카드를 불러오는 중…' : '연결할 카드가 없습니다.' }}
             </p>
-            <button
-              v-for="card in cards"
-              :key="card.id"
-              type="button"
-              @click="chooseCard(card.id)"
-            >
+            <button v-for="card in cards" :key="card.id" type="button" @click="chooseCard(card.id)">
               <span>{{ card.title }}</span>
               <small>{{ card.listName }}</small>
             </button>

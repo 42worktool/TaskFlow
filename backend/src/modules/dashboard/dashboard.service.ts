@@ -5,20 +5,10 @@ import { requireWorkspaceReadAccess } from '../../lib/workspace-permissions'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-const TARGET_TYPES: ActivityTargetType[] = [
-  'WORKSPACE',
-  'MEMBER',
-  'LIST',
-  'CARD',
-  'COMMENT',
-]
+const TARGET_TYPES: ActivityTargetType[] = ['WORKSPACE', 'MEMBER', 'LIST', 'CARD', 'COMMENT']
 
 function startOfUtcDay(value: Date): Date {
-  return new Date(Date.UTC(
-    value.getUTCFullYear(),
-    value.getUTCMonth(),
-    value.getUTCDate(),
-  ))
+  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()))
 }
 
 function addUtcDays(value: Date, days: number): Date {
@@ -98,14 +88,8 @@ export async function getWorkspaceDashboard(input: {
     }),
   ])
 
-  const activityByDate = new Map<
-    string,
-    { transactions: Set<string>; logCount: number }
-  >()
-  const flowByDate = new Map<
-    string,
-    { created: number; completed: number; reopened: number }
-  >()
+  const activityByDate = new Map<string, { transactions: Set<string>; logCount: number }>()
+  const flowByDate = new Map<string, { created: number; completed: number; reopened: number }>()
   const breakdown = new Map<ActivityTargetType, number>(
     TARGET_TYPES.map((targetType) => [targetType, 0]),
   )
@@ -169,14 +153,8 @@ export async function getWorkspaceDashboard(input: {
     card_count: list.cards.length,
     completed_card_count: list.cards.filter((card) => card.is_completed).length,
   }))
-  const currentTotal = listSummaries.reduce(
-    (total, list) => total + list.card_count,
-    0,
-  )
-  const currentDone = listSummaries.reduce(
-    (total, list) => total + list.completed_card_count,
-    0,
-  )
+  const currentTotal = listSummaries.reduce((total, list) => total + list.card_count, 0)
+  const currentDone = listSummaries.reduce((total, list) => total + list.completed_card_count, 0)
 
   return {
     generated_at: generatedAt.toISOString(),
@@ -218,9 +196,7 @@ export async function getWorkspaceDashboard(input: {
       count: breakdown.get(targetType) ?? 0,
     })),
     recent_activity: recentLogs.map((log) => {
-      const actor = log.actor_user_id
-        ? actorById.get(log.actor_user_id)
-        : undefined
+      const actor = log.actor_user_id ? actorById.get(log.actor_user_id) : undefined
       return {
         event_type: log.event_type,
         target_type: log.target_type,

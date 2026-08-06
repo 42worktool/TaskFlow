@@ -237,12 +237,7 @@ export interface DashboardListStatus {
   completed_card_count: number
 }
 
-export type DashboardTargetType =
-  | 'WORKSPACE'
-  | 'MEMBER'
-  | 'LIST'
-  | 'CARD'
-  | 'COMMENT'
+export type DashboardTargetType = 'WORKSPACE' | 'MEMBER' | 'LIST' | 'CARD' | 'COMMENT'
 
 export interface DashboardActivityBreakdown {
   target_type: DashboardTargetType

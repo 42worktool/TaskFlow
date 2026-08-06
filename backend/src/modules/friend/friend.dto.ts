@@ -1,9 +1,6 @@
 import type { FriendRequest, Friendship } from '@prisma/client'
 import { z } from 'zod'
-import {
-  userSummarySelect,
-  type SelectedUserSummary,
-} from '../../lib/user-summary'
+import { userSummarySelect, type SelectedUserSummary } from '../../lib/user-summary'
 
 export const friendshipInclude = {
   user_low: { select: userSummarySelect },
@@ -52,9 +49,7 @@ export function toFriendDto(
   online: boolean,
 ): FriendDto {
   const friend =
-    friendship.user_low_id === currentUserId
-      ? friendship.user_high
-      : friendship.user_low
+    friendship.user_low_id === currentUserId ? friendship.user_high : friendship.user_low
 
   return {
     id: friend.id,
@@ -69,10 +64,7 @@ export function toFriendRequestDto(
   request: FriendRequestWithUsers,
   currentUserId: string,
 ): FriendRequestDto {
-  const otherUser =
-    request.user_low_id === currentUserId
-      ? request.user_high
-      : request.user_low
+  const otherUser = request.user_low_id === currentUserId ? request.user_high : request.user_low
 
   return {
     id: otherUser.id,

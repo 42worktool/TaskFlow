@@ -5,17 +5,10 @@ import { createWorkspaceMessageSchema } from './workspace-message.validation'
 const CARD_ID = '00000000-0000-4000-8000-000000000001'
 
 test('workspace message validation trims content and enforces the prototype limit', () => {
-  assert.deepEqual(
-    createWorkspaceMessageSchema.parse({ content: ' hello ' }),
-    { content: 'hello' },
-  )
+  assert.deepEqual(createWorkspaceMessageSchema.parse({ content: ' hello ' }), { content: 'hello' })
   assert.throws(() => createWorkspaceMessageSchema.parse({ content: '   ' }))
-  assert.throws(() =>
-    createWorkspaceMessageSchema.parse({ content: 'x'.repeat(1001) }),
-  )
-  assert.throws(() =>
-    createWorkspaceMessageSchema.parse({ content: 'hello', extra: true }),
-  )
+  assert.throws(() => createWorkspaceMessageSchema.parse({ content: 'x'.repeat(1001) }))
+  assert.throws(() => createWorkspaceMessageSchema.parse({ content: 'hello', extra: true }))
 })
 
 test('workspace message validation accepts an optional selected card', () => {

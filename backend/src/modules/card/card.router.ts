@@ -5,7 +5,11 @@ import { Router } from 'express'
 import * as ctrl from './card.controller'
 import * as labelCtrl from '../label/label.controller'
 import { uuidParam } from '../../middleware/validation'
-import { ATTACHMENT_MIME_ALLOWLIST, attachmentUpload, requireMagicBytesMatch } from '../../lib/upload'
+import {
+  ATTACHMENT_MIME_ALLOWLIST,
+  attachmentUpload,
+  requireMagicBytesMatch,
+} from '../../lib/upload'
 
 export const cardRouter = Router()
 cardRouter.param('attachment_id', uuidParam)

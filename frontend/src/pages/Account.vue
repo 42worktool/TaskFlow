@@ -77,9 +77,7 @@ async function removeAvatarPhoto() {
 }
 
 async function removeAccount() {
-  const confirmed = window.confirm(
-    '계정과 연결된 로그인 정보가 모두 삭제됩니다. 계속하시겠습니까?',
-  )
+  const confirmed = window.confirm('계정과 연결된 로그인 정보가 모두 삭제됩니다. 계속하시겠습니까?')
   if (!confirmed) return
 
   error.value = ''
@@ -90,7 +88,6 @@ async function removeAccount() {
     error.value = caught instanceof Error ? caught.message : '계정을 삭제하지 못했습니다.'
   }
 }
-
 </script>
 
 <template>

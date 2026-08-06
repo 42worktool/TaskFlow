@@ -30,10 +30,7 @@ const cardResults = computed(() => {
     return list.cards
       .filter((card) => {
         const description = card.description ?? ''
-        return (
-          card.title.toLowerCase().includes(q) ||
-          description.toLowerCase().includes(q)
-        )
+        return card.title.toLowerCase().includes(q) || description.toLowerCase().includes(q)
       })
       .map((card) => ({ card, list, workspace }))
   })
@@ -136,7 +133,6 @@ const hasResults = computed(() => workspaceResults.value.length > 0 || cardResul
 
       <div v-else class="empty-state">검색 결과가 없습니다.</div>
     </main>
-
   </div>
 </template>
 

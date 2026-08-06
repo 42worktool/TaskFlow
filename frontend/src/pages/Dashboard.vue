@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onUnmounted,
-  ref,
-  watch,
-} from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { DashboardAPI } from '../api/dashboard'
 import { realtime } from '../services/realtime'
@@ -18,11 +12,7 @@ import type {
   DashboardTargetType,
   WorkspaceDashboard,
 } from '../types'
-import {
-  buildContributionCells,
-  contributionLevel,
-  formatDashboardDate,
-} from '../utils/dashboard'
+import { buildContributionCells, contributionLevel, formatDashboardDate } from '../utils/dashboard'
 
 const props = withDefaults(
   defineProps<{
@@ -54,10 +44,7 @@ const contributionCells = computed(() =>
   buildContributionCells(dashboard.value?.daily_activity ?? []),
 )
 const contributionMaximum = computed(() =>
-  Math.max(
-    0,
-    ...(dashboard.value?.daily_activity.map((day) => day.count) ?? []),
-  ),
+  Math.max(0, ...(dashboard.value?.daily_activity.map((day) => day.count) ?? [])),
 )
 const contributionSummary = computed(() => {
   const days = dashboard.value?.daily_activity ?? []
@@ -75,24 +62,16 @@ const dateRange = computed(() => {
 const flowMaximum = computed(() =>
   Math.max(
     1,
-    ...(dashboard.value?.daily_flow.flatMap((day) => [
-      day.created,
-      day.completed,
-      day.reopened,
-    ]) ?? []),
+    ...(dashboard.value?.daily_flow.flatMap((day) => [day.created, day.completed, day.reopened]) ??
+      []),
   ),
 )
 const breakdownMaximum = computed(() =>
-  Math.max(
-    1,
-    ...(dashboard.value?.activity_breakdown.map((item) => item.count) ?? []),
-  ),
+  Math.max(1, ...(dashboard.value?.activity_breakdown.map((item) => item.count) ?? [])),
 )
 const hasFlowActivity = computed(() =>
   Boolean(
-    dashboard.value?.daily_flow.some(
-      (day) => day.created + day.completed + day.reopened > 0,
-    ),
+    dashboard.value?.daily_flow.some((day) => day.created + day.completed + day.reopened > 0),
   ),
 )
 const flowLabels = computed(() => {
@@ -168,9 +147,7 @@ function formatGeneratedAt(value: string): string {
   }).format(new Date(value))
 }
 
-function flowPoints(
-  key: 'created' | 'completed' | 'reopened',
-): string {
+function flowPoints(key: 'created' | 'completed' | 'reopened'): string {
   const days = dashboard.value?.daily_flow ?? []
   if (days.length === 0) return ''
 
@@ -180,20 +157,14 @@ function flowPoints(
   const height = 170
   return days
     .map((day, index) => {
-      const x =
-        left + (index / Math.max(1, days.length - 1)) * width
-      const y =
-        top + height - (day[key] / flowMaximum.value) * height
+      const x = left + (index / Math.max(1, days.length - 1)) * width
+      const y = top + height - (day[key] / flowMaximum.value) * height
       return `${x.toFixed(1)},${y.toFixed(1)}`
     })
     .join(' ')
 }
 
-function contributionLabel(
-  date: string,
-  count: number,
-  logCount: number,
-): string {
+function contributionLabel(date: string, count: number, logCount: number): string {
   return `${formatDashboardDate(date)}: 활동 ${formatCount(count)}회${
     logCount !== count ? ` · 로그 ${formatCount(logCount)}건` : ''
   }`
@@ -234,10 +205,7 @@ async function loadDashboard(background = false): Promise<void> {
     }
   } catch (reason) {
     if (generation !== loadGeneration || id !== workspaceId.value) return
-    const message =
-      reason instanceof Error
-        ? reason.message
-        : '대시보드를 불러오지 못했습니다.'
+    const message = reason instanceof Error ? reason.message : '대시보드를 불러오지 못했습니다.'
     if (dashboard.value && background) {
       console.warn('[dashboard] background refresh failed', message)
     } else {
@@ -259,14 +227,11 @@ function scheduleRefresh(): void {
   }, 120)
 }
 
-const removeWorkspaceChangeListener = realtime.on(
-  'workspace.changed',
-  (value) => {
-    const event = parseWorkspaceChangedEvent(value)
-    if (!event || event.workspace_id !== workspaceId.value) return
-    scheduleRefresh()
-  },
-)
+const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) => {
+  const event = parseWorkspaceChangedEvent(value)
+  if (!event || event.workspace_id !== workspaceId.value) return
+  scheduleRefresh()
+})
 
 watch(
   [workspaceId, periodDays],
@@ -299,19 +264,13 @@ onUnmounted(() => {
       <div>
         <p class="dashboard-eyebrow">WORKSPACE ANALYTICS</p>
         <h1>활동 대시보드</h1>
-        <p>
-          활동 로그를 기준으로 이슈 흐름과 현재 진행 상태를 확인합니다.
-        </p>
+        <p>활동 로그를 기준으로 이슈 흐름과 현재 진행 상태를 확인합니다.</p>
       </div>
       <div class="dashboard-header__actions">
         <label class="dashboard-period-picker">
           <span>기간</span>
           <select v-model.number="periodDays">
-            <option
-              v-for="option in PERIOD_OPTIONS"
-              :key="option.value"
-              :value="option.value"
-            >
+            <option v-for="option in PERIOD_OPTIONS" :key="option.value" :value="option.value">
               {{ option.label }}
             </option>
           </select>
@@ -334,11 +293,7 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <section
-      v-if="loading && !dashboard"
-      class="dashboard-state"
-      role="status"
-    >
+    <section v-if="loading && !dashboard" class="dashboard-state" role="status">
       <span class="dashboard-state__spinner" aria-hidden="true"></span>
       활동 데이터를 집계하는 중입니다.
     </section>
@@ -363,9 +318,7 @@ onUnmounted(() => {
         <article class="dashboard-kpi dashboard-kpi--green">
           <span>완료 처리</span>
           <strong>{{ formatCount(dashboard.summary.completed_in_period) }}</strong>
-          <small>
-            재오픈 {{ formatCount(dashboard.summary.reopened_in_period) }}회
-          </small>
+          <small> 재오픈 {{ formatCount(dashboard.summary.reopened_in_period) }}회 </small>
         </article>
         <article class="dashboard-kpi dashboard-kpi--amber">
           <span>현재 미완료</span>
@@ -380,11 +333,7 @@ onUnmounted(() => {
         <article class="dashboard-kpi dashboard-kpi--teal">
           <span>완료율</span>
           <strong>
-            {{
-              dashboard.summary.has_cards
-                ? `${dashboard.summary.completion_rate}%`
-                : '—'
-            }}
+            {{ dashboard.summary.has_cards ? `${dashboard.summary.completion_rate}%` : '—' }}
           </strong>
           <small>전체 {{ formatCount(dashboard.summary.current_total) }}개</small>
         </article>
@@ -418,11 +367,7 @@ onUnmounted(() => {
               <span>금</span>
               <span></span>
             </div>
-            <div
-              class="dashboard-heatmap"
-              role="img"
-              :aria-label="contributionSummary"
-            >
+            <div class="dashboard-heatmap" role="img" :aria-label="contributionSummary">
               <span
                 v-for="cell in contributionCells"
                 :key="cell.key"
@@ -437,9 +382,7 @@ onUnmounted(() => {
                 ]"
                 aria-hidden="true"
                 :title="
-                  cell.date
-                    ? contributionLabel(cell.date, cell.count, cell.logCount)
-                    : undefined
+                  cell.date ? contributionLabel(cell.date, cell.count, cell.logCount) : undefined
                 "
               ></span>
             </div>
@@ -457,11 +400,7 @@ onUnmounted(() => {
         <div class="dashboard-heatmap__dates" aria-hidden="true">
           <span>{{ formatDashboardFullDate(dashboard.daily_activity[0]?.date ?? '') }}</span>
           <span>
-            {{
-              formatDashboardFullDate(
-                dashboard.daily_activity.at(-1)?.date ?? '',
-              )
-            }}
+            {{ formatDashboardFullDate(dashboard.daily_activity.at(-1)?.date ?? '') }}
           </span>
         </div>
       </section>
@@ -542,11 +481,7 @@ onUnmounted(() => {
             >
               <div>
                 <strong>
-                  {{
-                    dashboard.summary.has_cards
-                      ? `${dashboard.summary.completion_rate}%`
-                      : '—'
-                  }}
+                  {{ dashboard.summary.has_cards ? `${dashboard.summary.completion_rate}%` : '—' }}
                 </strong>
                 <span>완료율</span>
               </div>
@@ -577,9 +512,7 @@ onUnmounted(() => {
               <h2>리스트별 진행 현황</h2>
             </div>
           </div>
-          <p v-if="dashboard.lists.length === 0" class="dashboard-empty">
-            아직 리스트가 없습니다.
-          </p>
+          <p v-if="dashboard.lists.length === 0" class="dashboard-empty">아직 리스트가 없습니다.</p>
           <ul v-else class="dashboard-bars">
             <li v-for="list in dashboard.lists" :key="list.list_id">
               <div class="dashboard-bars__label">
@@ -594,9 +527,7 @@ onUnmounted(() => {
                   class="dashboard-bars__fill--done"
                   :style="{
                     width: `${
-                      list.card_count
-                        ? (list.completed_card_count / list.card_count) * 100
-                        : 0
+                      list.card_count ? (list.completed_card_count / list.card_count) * 100 : 0
                     }%`,
                   }"
                 ></span>
@@ -614,10 +545,7 @@ onUnmounted(() => {
             <p>최근 {{ dashboard.period_days }}일 로그 기준</p>
           </div>
           <ul class="dashboard-bars dashboard-bars--breakdown">
-            <li
-              v-for="item in dashboard.activity_breakdown"
-              :key="item.target_type"
-            >
+            <li v-for="item in dashboard.activity_breakdown" :key="item.target_type">
               <div class="dashboard-bars__label">
                 <span>{{ targetLabels[item.target_type] }}</span>
                 <strong>{{ formatCount(item.count) }}</strong>
@@ -645,10 +573,7 @@ onUnmounted(() => {
             <span>최신 {{ dashboard.recent_activity.length }}건</span>
           </div>
         </div>
-        <p
-          v-if="dashboard.recent_activity.length === 0"
-          class="dashboard-empty"
-        >
+        <p v-if="dashboard.recent_activity.length === 0" class="dashboard-empty">
           선택한 기간에 표시할 활동이 없습니다.
         </p>
         <ol v-else class="dashboard-activity-log">

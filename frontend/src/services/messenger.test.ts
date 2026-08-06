@@ -192,9 +192,7 @@ describe('messenger state', () => {
     notifyInboxChanged()
     notifyBoardChanged()
 
-    expect(messengerState.inboxDestinations).toEqual([
-      { id: 'list-1', name: 'Todo' },
-    ])
+    expect(messengerState.inboxDestinations).toEqual([{ id: 'list-1', name: 'Todo' }])
     expect(messengerState.inboxRefreshToken).toBe(inboxToken + 1)
     expect(messengerState.boardRefreshToken).toBe(boardToken + 1)
   })
@@ -217,9 +215,7 @@ describe('messenger state', () => {
   it('tracks external hover by owner and clears only the matching hover', () => {
     startCardDrag('card-1', 'board')
 
-    expect(
-      setExternalCardDropHover('card-1', 'chat', 'chat-panel'),
-    ).toBe(true)
+    expect(setExternalCardDropHover('card-1', 'chat', 'chat-panel')).toBe(true)
     expect(isExternalCardDropClaimed('card-1')).toBe(true)
 
     clearExternalCardDropHover('card-1', 'toolbox-chat')
@@ -261,17 +257,11 @@ describe('messenger state', () => {
 
   it('does not claim inbox or mismatched card drags as external drops', () => {
     startCardDrag('card-1', 'inbox')
-    expect(
-      setExternalCardDropHover('card-1', 'chat', 'chat-panel'),
-    ).toBe(false)
-    expect(
-      claimExternalCardDrop('card-1', 'inbox', 'toolbox-inbox'),
-    ).toBe(false)
+    expect(setExternalCardDropHover('card-1', 'chat', 'chat-panel')).toBe(false)
+    expect(claimExternalCardDrop('card-1', 'inbox', 'toolbox-inbox')).toBe(false)
 
     startCardDrag('card-1', 'board')
-    expect(
-      claimExternalCardDrop('card-2', 'chat', 'toolbox-chat'),
-    ).toBe(false)
+    expect(claimExternalCardDrop('card-2', 'chat', 'toolbox-chat')).toBe(false)
     expect(messengerState.externalCardDrop).toBeNull()
   })
 
@@ -311,12 +301,8 @@ describe('floating messenger geometry', () => {
     const size = { width: 420, height: 640 }
     const viewport = { width: 1200, height: 900 }
 
-    expect(
-      clampFloatingPosition({ x: -100, y: -50 }, size, viewport),
-    ).toEqual({ x: 8, y: 8 })
-    expect(
-      clampFloatingPosition({ x: 1100, y: 800 }, size, viewport),
-    ).toEqual({ x: 772, y: 252 })
+    expect(clampFloatingPosition({ x: -100, y: -50 }, size, viewport)).toEqual({ x: 8, y: 8 })
+    expect(clampFloatingPosition({ x: 1100, y: 800 }, size, viewport)).toEqual({ x: 772, y: 252 })
   })
 
   it('keeps an oversized element anchored to the viewport margin', () => {
@@ -330,11 +316,7 @@ describe('floating messenger geometry', () => {
   })
 
   it('distinguishes a click from a pointer drag', () => {
-    expect(exceedsDragThreshold({ x: 10, y: 10 }, { x: 14, y: 13 })).toBe(
-      false,
-    )
-    expect(exceedsDragThreshold({ x: 10, y: 10 }, { x: 16, y: 10 })).toBe(
-      true,
-    )
+    expect(exceedsDragThreshold({ x: 10, y: 10 }, { x: 14, y: 13 })).toBe(false)
+    expect(exceedsDragThreshold({ x: 10, y: 10 }, { x: 16, y: 10 })).toBe(true)
   })
 })

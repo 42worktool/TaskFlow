@@ -1,8 +1,5 @@
 import type { Attachment, Card, CardLabel, Comment, Label } from '@prisma/client'
-import {
-  toUserSummary,
-  type SelectedUserSummary,
-} from '../../lib/user-summary'
+import { toUserSummary, type SelectedUserSummary } from '../../lib/user-summary'
 
 interface BoardCardLabel extends Pick<CardLabel, 'label_id'> {
   label: Pick<Label, 'id' | 'label_name' | 'label_color'>

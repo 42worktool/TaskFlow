@@ -41,8 +41,5 @@ test('access token verification keeps missing principal errors explicit', async 
     expiresIn: config.accessTokenTtlSeconds,
   })
 
-  assert.throws(
-    () => verifyAccessToken(token),
-    /Access token subject is missing/,
-  )
+  assert.throws(() => verifyAccessToken(token), /Access token subject is missing/)
 })

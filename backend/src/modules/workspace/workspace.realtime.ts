@@ -35,10 +35,7 @@ export const workspacePresenceEventSchema = z
 export type WorkspaceChangeEvent = z.infer<typeof workspaceChangeEventSchema>
 export type WorkspacePresenceEvent = z.infer<typeof workspacePresenceEventSchema>
 
-type WorkspaceChangeInput = Omit<
-  WorkspaceChangeEvent,
-  'event_id' | 'occurred_at'
->
+type WorkspaceChangeInput = Omit<WorkspaceChangeEvent, 'event_id' | 'occurred_at'>
 
 // This prototype runs one API process, so small in-memory revisions are enough
 // to close the authorization-query -> channel-join race without adding a
@@ -63,16 +60,10 @@ function advanceRevision(revisions: Map<string, number>, key: string): void {
   revisions.set(key, currentRevision(revisions, key) + 1)
 }
 
-function captureWorkspaceAccess(
-  workspaceId: string,
-  userId: string,
-): WorkspaceAccessSnapshot {
+function captureWorkspaceAccess(workspaceId: string, userId: string): WorkspaceAccessSnapshot {
   return {
     workspace: currentRevision(workspaceAccessRevisions, workspaceId),
-    member: currentRevision(
-      memberAccessRevisions,
-      memberAccessKey(workspaceId, userId),
-    ),
+    member: currentRevision(memberAccessRevisions, memberAccessKey(workspaceId, userId)),
   }
 }
 
@@ -82,20 +73,11 @@ function workspaceAccessIsCurrent(
   snapshot: WorkspaceAccessSnapshot,
 ): boolean {
   const current = captureWorkspaceAccess(workspaceId, userId)
-  return (
-    current.workspace === snapshot.workspace &&
-    current.member === snapshot.member
-  )
+  return current.workspace === snapshot.workspace && current.member === snapshot.member
 }
 
-export function revokeWorkspaceMemberAccess(
-  workspaceId: string,
-  userId: string,
-): void {
-  advanceRevision(
-    memberAccessRevisions,
-    memberAccessKey(workspaceId, userId),
-  )
+export function revokeWorkspaceMemberAccess(workspaceId: string, userId: string): void {
+  advanceRevision(memberAccessRevisions, memberAccessKey(workspaceId, userId))
 }
 
 export function revokeWorkspaceAccess(workspaceId: string): void {
@@ -113,9 +95,7 @@ function reportPublishFailure(event: string, error: unknown): void {
   )
 }
 
-export function publishWorkspaceChange(
-  input: WorkspaceChangeInput,
-): WorkspaceChangeEvent | null {
+export function publishWorkspaceChange(input: WorkspaceChangeInput): WorkspaceChangeEvent | null {
   let event: WorkspaceChangeEvent
   try {
     event = workspaceChangeEventSchema.parse({
@@ -168,10 +148,7 @@ export function startWorkspaceRealtime(): () => void {
     'workspace.subscribe',
     workspaceSubscriptionSchema,
     async (context, { workspace_id }) => {
-      const accessSnapshot = captureWorkspaceAccess(
-        workspace_id,
-        context.userId,
-      )
+      const accessSnapshot = captureWorkspaceAccess(workspace_id, context.userId)
       const authorizedWorkspace = await prisma.workspace.findFirst({
         where: {
           id: workspace_id,
@@ -191,13 +168,7 @@ export function startWorkspaceRealtime(): () => void {
           'Active workspace membership is required',
         )
       }
-      if (
-        !workspaceAccessIsCurrent(
-          workspace_id,
-          context.userId,
-          accessSnapshot,
-        )
-      ) {
+      if (!workspaceAccessIsCurrent(workspace_id, context.userId, accessSnapshot)) {
         throw new RealtimeError(
           'WORKSPACE_SUBSCRIPTION_CHANGED',
           'Workspace access changed while subscribing',
@@ -210,10 +181,7 @@ export function startWorkspaceRealtime(): () => void {
       // Build the acknowledgement from a fresh post-join query. If access is
       // revoked while that query is in flight, the revision check also makes
       // the handler leave instead of acknowledging a stale subscription.
-      const finalAccessSnapshot = captureWorkspaceAccess(
-        workspace_id,
-        context.userId,
-      )
+      const finalAccessSnapshot = captureWorkspaceAccess(workspace_id, context.userId)
       const workspace = await prisma.workspace.findFirst({
         where: {
           id: workspace_id,
@@ -240,13 +208,7 @@ export function startWorkspaceRealtime(): () => void {
           'Active workspace membership is required',
         )
       }
-      if (
-        !workspaceAccessIsCurrent(
-          workspace_id,
-          context.userId,
-          finalAccessSnapshot,
-        )
-      ) {
+      if (!workspaceAccessIsCurrent(workspace_id, context.userId, finalAccessSnapshot)) {
         context.leave(workspaceChannel(workspace_id))
         throw new RealtimeError(
           'WORKSPACE_SUBSCRIPTION_CHANGED',
@@ -257,9 +219,7 @@ export function startWorkspaceRealtime(): () => void {
 
       return {
         workspace_id,
-        online_user_ids: workspace.members
-          .map((member) => member.user_id)
-          .filter(isUserOnline),
+        online_user_ids: workspace.members.map((member) => member.user_id).filter(isUserOnline),
       }
     },
   )

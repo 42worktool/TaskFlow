@@ -110,19 +110,12 @@ test('dashboard aggregates padded UTC activity, flow, and current list state', a
       {
         id: 'todo-list',
         name: 'Todo',
-        cards: [
-          { is_completed: true },
-          { is_completed: false },
-        ],
+        cards: [{ is_completed: true }, { is_completed: false }],
       },
       {
         id: 'done-list',
         name: 'Done',
-        cards: [
-          { is_completed: true },
-          { is_completed: true },
-          { is_completed: false },
-        ],
+        cards: [{ is_completed: true }, { is_completed: true }, { is_completed: false }],
       },
     ]
   })
@@ -310,9 +303,7 @@ test('dashboard applies a seven-day window and caps the newest activity feed at 
         target_type: 'CARD',
         target_id: `card-${descendingIndex}`,
         transaction_id: BigInt(descendingIndex + 1),
-        created_at: new Date(
-          `2026-07-30T00:00:${String(descendingIndex).padStart(2, '0')}.000Z`,
-        ),
+        created_at: new Date(`2026-07-30T00:00:${String(descendingIndex).padStart(2, '0')}.000Z`),
       }
     }),
   )
@@ -334,5 +325,8 @@ test('dashboard applies a seven-day window and caps the newest activity feed at 
   assert.equal(result.recent_activity.length, 50)
   assert.equal(result.recent_activity[0].target_id, 'card-51')
   assert.equal(result.recent_activity.at(-1)?.target_id, 'card-2')
-  assert.equal(result.recent_activity.every((activity) => activity.actor === null), true)
+  assert.equal(
+    result.recent_activity.every((activity) => activity.actor === null),
+    true,
+  )
 })

@@ -2,9 +2,11 @@ import type { Card, CardLabel, Label, List } from '@prisma/client'
 import { toCardDto } from '../card/card.dto'
 
 export type BoardCard = Card & {
-  card_labels: Array<CardLabel & {
-    label: Pick<Label, 'id' | 'label_name' | 'label_color'>
-  }>
+  card_labels: Array<
+    CardLabel & {
+      label: Pick<Label, 'id' | 'label_name' | 'label_color'>
+    }
+  >
 }
 
 export function toListDto(list: List) {

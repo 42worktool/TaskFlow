@@ -31,11 +31,7 @@ class FakeRedis {
 }
 
 function isRateLimitError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    error.code === 'MAIL_RATE_LIMITED'
-  )
+  return error instanceof Error && 'code' in error && error.code === 'MAIL_RATE_LIMITED'
 }
 
 test('mail rate limit restricts a sender across recipient addresses', async () => {
@@ -93,8 +89,5 @@ test('mail rate limit gives new counters a one-hour expiration', async () => {
   })
 
   assert.equal(redis.expirations.get('mail:ratelimit:sender:sender'), 3600)
-  assert.equal(
-    redis.expirations.get('mail:ratelimit:recipient@example.com'),
-    3600,
-  )
+  assert.equal(redis.expirations.get('mail:ratelimit:recipient@example.com'), 3600)
 })

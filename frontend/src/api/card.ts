@@ -3,8 +3,7 @@ import { apiRequest } from '../services/auth'
 import { downloadFile, fetchBlob, uploadFile } from '../services/fileTransfer'
 
 export const CardAPI = {
-  get: (cardId: string) =>
-    apiRequest<CardDetail>(`/api/cards/${cardId}`),
+  get: (cardId: string) => apiRequest<CardDetail>(`/api/cards/${cardId}`),
 
   create: (listId: string, data: { title: string; description?: string | null }) =>
     apiRequest<Card>(`/api/lists/${listId}/cards`, {
@@ -12,19 +11,13 @@ export const CardAPI = {
       json: data,
     }),
 
-  update: (
-    cardId: string,
-    data: { title?: string; description?: string | null },
-  ) =>
+  update: (cardId: string, data: { title?: string; description?: string | null }) =>
     apiRequest<Card>(`/api/cards/${cardId}`, {
       method: 'PUT',
       json: data,
     }),
 
-  updateDates: (
-    cardId: string,
-    data: { start_at?: string | null; deadline?: string | null },
-  ) =>
+  updateDates: (cardId: string, data: { start_at?: string | null; deadline?: string | null }) =>
     apiRequest<Card>(`/api/cards/${cardId}/dates`, {
       method: 'PATCH',
       json: data,
@@ -36,7 +29,10 @@ export const CardAPI = {
       json: { is_completed: isCompleted },
     }),
 
-  reorder: (cardId: string, neighbor: { before_card_id?: string | null; after_card_id?: string | null }) =>
+  reorder: (
+    cardId: string,
+    neighbor: { before_card_id?: string | null; after_card_id?: string | null },
+  ) =>
     apiRequest<Card>(`/api/cards/${cardId}/order`, {
       method: 'PUT',
       json: neighbor,

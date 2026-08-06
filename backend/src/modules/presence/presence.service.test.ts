@@ -44,9 +44,7 @@ function stubMethod(
   })
 }
 
-function connection(
-  connectionId: string,
-): RealtimeConnectionInfo {
+function connection(connectionId: string): RealtimeConnectionInfo {
   return {
     connectionId,
     userId: USER_ID,
@@ -68,12 +66,9 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
     import('./presence.state'),
   ])
 
-  let authenticated:
-    | RealtimeConnectionLifecycleListener<RealtimeConnectionInfo>
-    | undefined
+  let authenticated: RealtimeConnectionLifecycleListener<RealtimeConnectionInfo> | undefined
   let disconnected:
-    | RealtimeConnectionLifecycleListener<RealtimeConnectionDisconnectedInfo>
-    | undefined
+    RealtimeConnectionLifecycleListener<RealtimeConnectionDisconnectedInfo> | undefined
 
   stubMethod(t, realtime, 'onConnectionAuthenticated', (listener) => {
     authenticated = listener
@@ -87,10 +82,12 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
       disconnected = undefined
     }
   })
-  const friendships = [{
-    user_low_id: USER_ID,
-    user_high_id: FRIEND_ID,
-  }]
+  const friendships = [
+    {
+      user_low_id: USER_ID,
+      user_high_id: FRIEND_ID,
+    },
+  ]
   let delayNextFriendQuery = false
   let resolveDelayedFriendQuery: (() => void) | undefined
   stubMethod(t, prisma.friendship, 'findMany', () => {
@@ -100,9 +97,7 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
       resolveDelayedFriendQuery = () => resolve(friendships)
     })
   })
-  stubMethod(t, prisma.workspaceMember, 'findMany', async () => [
-    { workspace_id: WORKSPACE_ID },
-  ])
+  stubMethod(t, prisma.workspaceMember, 'findMany', async () => [{ workspace_id: WORKSPACE_ID }])
 
   const deliveries: unknown[][] = []
   stubMethod(t, realtime, 'sendToUser', (...args) => {
@@ -124,11 +119,7 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
   await settleAsyncWork()
   assert.equal(presenceState.isUserOnline(USER_ID), true)
   assert.deepEqual(deliveries, [
-    [
-      FRIEND_ID,
-      'friend.presence_changed',
-      { user_id: USER_ID, online: true },
-    ],
+    [FRIEND_ID, 'friend.presence_changed', { user_id: USER_ID, online: true }],
   ])
   assert.deepEqual(publications, [
     [
@@ -202,9 +193,7 @@ test('presence tracks transitions without blocking disconnect or shutdown', asyn
   await stop()
   assert.equal(presenceState.isUserOnline(USER_ID), false)
   assert.equal(
-    warnings.some((warning) =>
-      warning.includes('[presence] notification drain exceeded 20ms'),
-    ),
+    warnings.some((warning) => warning.includes('[presence] notification drain exceeded 20ms')),
     true,
   )
 })

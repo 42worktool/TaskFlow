@@ -24,10 +24,7 @@ const loadError = ref('')
 const editing = ref<Workspace | null>(null)
 const menuOpen = ref<string | null>(null)
 const partitionedWorkspaces = computed(() =>
-  partitionWorkspacesByOwnership(
-    memberWorkspaces.value,
-    authState.user?.id,
-  ),
+  partitionWorkspacesByOwnership(memberWorkspaces.value, authState.user?.id),
 )
 const workspaceSections = computed(() => [
   {
@@ -56,9 +53,7 @@ async function refreshList() {
     memberWorkspaces.value = data.my
   } catch (caught) {
     loadError.value =
-      caught instanceof Error
-        ? caught.message
-        : '프로젝트 목록을 불러오지 못했습니다.'
+      caught instanceof Error ? caught.message : '프로젝트 목록을 불러오지 못했습니다.'
   } finally {
     loading.value = false
   }
@@ -86,10 +81,7 @@ function closeInbox() {
 }
 
 function canEditWorkspace(ws: Workspace): boolean {
-  return hasWorkspaceRole(
-    workspaceRoleFor(ws, authState.user?.id),
-    'ADMIN',
-  )
+  return hasWorkspaceRole(workspaceRoleFor(ws, authState.user?.id), 'ADMIN')
 }
 
 function canDeleteWorkspace(ws: Workspace): boolean {
@@ -122,9 +114,7 @@ async function removeWorkspace(ws: Workspace) {
   if (!confirm(`"${ws.name}" 프로젝트를 삭제하시겠습니까?`)) return
   try {
     await WorkspaceAPI.remove(ws.id)
-    memberWorkspaces.value = memberWorkspaces.value.filter(
-      (workspace) => workspace.id !== ws.id,
-    )
+    memberWorkspaces.value = memberWorkspaces.value.filter((workspace) => workspace.id !== ws.id)
   } catch {
     alert('삭제에 실패했습니다.')
   }
@@ -134,11 +124,7 @@ onMounted(refreshList)
 </script>
 
 <template>
-  <div
-    class="home-shell"
-    :class="{ 'home-shell--inbox-open': inboxOpen }"
-    @click="menuOpen = null"
-  >
+  <div class="home-shell" :class="{ 'home-shell--inbox-open': inboxOpen }" @click="menuOpen = null">
     <!-- Header -->
     <AppHeader />
 
@@ -162,99 +148,89 @@ onMounted(refreshList)
           프로젝트를 불러오는 중…
         </div>
         <template v-else>
-        <section
-          v-for="section in workspaceSections"
-          :key="section.key"
-          class="project-section"
-        >
-          <div class="project-section-heading">
-            <div>
-              <h2 class="section-title">{{ section.title }}</h2>
-              <p class="section-desc">{{ section.description }}</p>
+          <section v-for="section in workspaceSections" :key="section.key" class="project-section">
+            <div class="project-section-heading">
+              <div>
+                <h2 class="section-title">{{ section.title }}</h2>
+                <p class="section-desc">{{ section.description }}</p>
+              </div>
+              <span class="project-section-count">{{ section.workspaces.length }}</span>
             </div>
-            <span class="project-section-count">{{ section.workspaces.length }}</span>
-          </div>
-          <div class="project-grid">
-            <div
-              v-for="ws in section.workspaces"
-              :key="ws.id"
-              class="project-card-wrapper"
-            >
-              <RouterLink
-                :to="`/workspaces/${ws.id}/board`"
-                class="project-card"
-              >
-                <div class="card-color-bar" :style="{ background: workspaceColor(ws.id) }" />
-                <div class="card-body">
-                  <h3 class="card-name">{{ ws.name }}</h3>
-                  <div class="card-badges">
-                    <span
-                      class="card-badge"
-                      :class="ws.is_public ? 'card-badge--public' : 'card-badge--private'"
-                    >{{ ws.is_public ? '공개' : '비공개' }}</span>
-                    <span class="card-badge card-badge--role">
-                      {{ workspaceRoleLabel(ws) }}
-                    </span>
-                  </div>
-                  <div class="card-footer">
-                    <span class="card-members">멤버 {{ ws.members.length }}명</span>
-                    <div class="card-footer-actions">
-                      <button
-                        v-if="hasWorkspaceMenu(ws)"
-                        class="card-menu-btn"
-                        type="button"
-                        :aria-label="`${ws.name} 프로젝트 메뉴`"
-                        :aria-expanded="menuOpen === ws.id"
-                        @click.stop.prevent="toggleMenu(ws.id)"
+            <div class="project-grid">
+              <div v-for="ws in section.workspaces" :key="ws.id" class="project-card-wrapper">
+                <RouterLink :to="`/workspaces/${ws.id}/board`" class="project-card">
+                  <div class="card-color-bar" :style="{ background: workspaceColor(ws.id) }" />
+                  <div class="card-body">
+                    <h3 class="card-name">{{ ws.name }}</h3>
+                    <div class="card-badges">
+                      <span
+                        class="card-badge"
+                        :class="ws.is_public ? 'card-badge--public' : 'card-badge--private'"
+                        >{{ ws.is_public ? '공개' : '비공개' }}</span
                       >
-                        ⋯
-                      </button>
+                      <span class="card-badge card-badge--role">
+                        {{ workspaceRoleLabel(ws) }}
+                      </span>
+                    </div>
+                    <div class="card-footer">
+                      <span class="card-members">멤버 {{ ws.members.length }}명</span>
+                      <div class="card-footer-actions">
+                        <button
+                          v-if="hasWorkspaceMenu(ws)"
+                          class="card-menu-btn"
+                          type="button"
+                          :aria-label="`${ws.name} 프로젝트 메뉴`"
+                          :aria-expanded="menuOpen === ws.id"
+                          @click.stop.prevent="toggleMenu(ws.id)"
+                        >
+                          ⋯
+                        </button>
+                      </div>
                     </div>
                   </div>
+                </RouterLink>
+                <div
+                  v-if="hasWorkspaceMenu(ws) && menuOpen === ws.id"
+                  class="card-menu-dropdown"
+                  @click.stop
+                >
+                  <button
+                    v-if="canEditWorkspace(ws)"
+                    class="card-menu-item"
+                    type="button"
+                    @click="startEdit(ws)"
+                  >
+                    수정
+                  </button>
+                  <button
+                    v-if="canDeleteWorkspace(ws)"
+                    class="card-menu-item card-menu-item--danger"
+                    type="button"
+                    @click="removeWorkspace(ws)"
+                  >
+                    삭제
+                  </button>
                 </div>
-              </RouterLink>
-              <div
-                v-if="hasWorkspaceMenu(ws) && menuOpen === ws.id"
-                class="card-menu-dropdown"
-                @click.stop
+              </div>
+              <button
+                v-if="section.editable"
+                class="project-card project-card--new"
+                type="button"
+                @click="showCreate = true"
               >
-                <button
-                  v-if="canEditWorkspace(ws)"
-                  class="card-menu-item"
-                  type="button"
-                  @click="startEdit(ws)"
-                >
-                  수정
-                </button>
-                <button
-                  v-if="canDeleteWorkspace(ws)"
-                  class="card-menu-item card-menu-item--danger"
-                  type="button"
-                  @click="removeWorkspace(ws)"
-                >
-                  삭제
-                </button>
-              </div>
+                <div class="new-card-inner">
+                  <span class="new-icon">+</span>
+                  <span class="new-label">새 프로젝트 추가</span>
+                </div>
+              </button>
             </div>
-            <button
-              v-if="section.editable"
-              class="project-card project-card--new"
-              type="button"
-              @click="showCreate = true"
+            <p
+              v-if="!section.editable && section.workspaces.length === 0"
+              class="project-section-empty"
             >
-              <div class="new-card-inner">
-                <span class="new-icon">+</span>
-                <span class="new-label">새 프로젝트 추가</span>
-              </div>
-            </button>
-          </div>
-          <p
-            v-if="!section.editable && section.workspaces.length === 0"
-            class="project-section-empty"
-          >
-            {{ section.emptyMessage }}
-          </p>
-        </section>
+              {{ section.emptyMessage }}
+            </p>
+          </section>
         </template>
       </main>
     </div>
@@ -265,11 +241,7 @@ onMounted(refreshList)
       @close-inbox="closeInbox"
     />
 
-    <WorkspaceFormModal
-      v-if="showCreate"
-      @close="showCreate = false"
-      @saved="onSaved"
-    />
+    <WorkspaceFormModal v-if="showCreate" @close="showCreate = false" @saved="onSaved" />
     <WorkspaceFormModal
       v-if="editing"
       :workspace="editing"

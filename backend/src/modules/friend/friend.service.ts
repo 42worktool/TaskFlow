@@ -28,11 +28,7 @@ class AlreadyFriendsError extends AppError {
 
 class FriendRequestAlreadyReceivedError extends AppError {
   constructor() {
-    super(
-      'FRIEND_REQUEST_ALREADY_RECEIVED',
-      409,
-      'this user has already sent you a friend request',
-    )
+    super('FRIEND_REQUEST_ALREADY_RECEIVED', 409, 'this user has already sent you a friend request')
   }
 }
 
@@ -62,11 +58,7 @@ function publishFriendRequestAccepted(
   friendship: FriendshipWithUsers,
 ): void {
   try {
-    const dto = toFriendDto(
-      friendship,
-      requesterUserId,
-      isUserOnline(acceptorUserId),
-    )
+    const dto = toFriendDto(friendship, requesterUserId, isUserOnline(acceptorUserId))
     realtime.sendToUser(requesterUserId, 'friend.request_accepted', dto)
   } catch (error) {
     console.warn(
@@ -76,10 +68,7 @@ function publishFriendRequestAccepted(
   }
 }
 
-function publishFriendRequestDeleted(
-  recipientUserId: string,
-  actorUserId: string,
-): void {
+function publishFriendRequestDeleted(recipientUserId: string, actorUserId: string): void {
   try {
     const event = friendUserIdEventSchema.parse({
       user_id: actorUserId,
@@ -109,10 +98,7 @@ function publishFriendRemoved(recipientUserId: string, actorUserId: string): voi
 export async function listFriends(input: { userId: string }) {
   const friendships = await prisma.friendship.findMany({
     where: {
-      OR: [
-        { user_low_id: input.userId },
-        { user_high_id: input.userId },
-      ],
+      OR: [{ user_low_id: input.userId }, { user_high_id: input.userId }],
     },
     include: friendshipInclude,
     orderBy: { created_at: 'desc' },
@@ -120,21 +106,14 @@ export async function listFriends(input: { userId: string }) {
 
   return friendships.map((friendship) => {
     const friendUserId = otherUserId(friendship, input.userId)
-    return toFriendDto(
-      friendship,
-      input.userId,
-      isUserOnline(friendUserId),
-    )
+    return toFriendDto(friendship, input.userId, isUserOnline(friendUserId))
   })
 }
 
 export async function listFriendRequests(input: { userId: string }) {
   const requests = await prisma.friendRequest.findMany({
     where: {
-      OR: [
-        { user_low_id: input.userId },
-        { user_high_id: input.userId },
-      ],
+      OR: [{ user_low_id: input.userId }, { user_high_id: input.userId }],
     },
     include: friendRequestInclude,
     orderBy: { created_at: 'desc' },
@@ -198,10 +177,7 @@ export async function sendFriendRequest(input: { userId: string; email: string }
   return toFriendRequestDto(outcome.request, input.userId)
 }
 
-export async function acceptFriendRequest(input: {
-  userId: string
-  requesterUserId: string
-}) {
+export async function acceptFriendRequest(input: { userId: string; requesterUserId: string }) {
   const pair = canonicalFriendPair(input.userId, input.requesterUserId)
   const friendship = await prisma.$transaction(async (tx) => {
     const deleted = await tx.friendRequest.deleteMany({
@@ -223,11 +199,7 @@ export async function acceptFriendRequest(input: {
   })
 
   publishFriendRequestAccepted(input.requesterUserId, input.userId, friendship)
-  return toFriendDto(
-    friendship,
-    input.userId,
-    isUserOnline(input.requesterUserId),
-  )
+  return toFriendDto(friendship, input.userId, isUserOnline(input.requesterUserId))
 }
 
 export async function deleteFriendRequest(input: {
@@ -240,10 +212,7 @@ export async function deleteFriendRequest(input: {
   publishFriendRequestDeleted(input.otherUserId, input.userId)
 }
 
-export async function removeFriend(input: {
-  userId: string
-  friendUserId: string
-}): Promise<void> {
+export async function removeFriend(input: { userId: string; friendUserId: string }): Promise<void> {
   const pair = canonicalFriendPair(input.userId, input.friendUserId)
   const result = await prisma.friendship.deleteMany({ where: pair })
   if (result.count === 0) throw new FriendNotFoundError()

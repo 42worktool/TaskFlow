@@ -3,12 +3,8 @@ import { findDroppedCard, getBoardCardDropId } from './chatCardDrop'
 
 describe('chat card drop', () => {
   it('accepts only a board card drag', () => {
-    expect(
-      getBoardCardDropId({ cardId: 'card-1', source: 'board' }),
-    ).toBe('card-1')
-    expect(
-      getBoardCardDropId({ cardId: 'card-1', source: 'inbox' }),
-    ).toBeNull()
+    expect(getBoardCardDropId({ cardId: 'card-1', source: 'board' })).toBe('card-1')
+    expect(getBoardCardDropId({ cardId: 'card-1', source: 'inbox' })).toBeNull()
     expect(getBoardCardDropId(null)).toBeNull()
   })
 

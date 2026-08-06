@@ -58,8 +58,7 @@
 
 @media (max-width: 760px) {
   .content-area {
-    --workspace-toolbox-space:
-      calc(62px + env(safe-area-inset-bottom, 0px));
+    --workspace-toolbox-space: calc(62px + env(safe-area-inset-bottom, 0px));
     padding-right: 0;
     transition: none;
   }

@@ -13,7 +13,5 @@ test('dashboard query accepts only supported periods and defaults to 30 days', (
   for (const period of ['0', '14', '366', 'all']) {
     assert.throws(() => dashboardQuerySchema.parse({ period }))
   }
-  assert.throws(() =>
-    dashboardQuerySchema.parse({ period: '30', unexpected: true }),
-  )
+  assert.throws(() => dashboardQuerySchema.parse({ period: '30', unexpected: true }))
 })

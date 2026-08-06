@@ -17,9 +17,7 @@ describe('DashboardAPI', () => {
 
     await DashboardAPI.get('workspace-1', 90)
 
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/api/workspaces/workspace-1/dashboard?period=90',
-    )
+    expect(apiRequest).toHaveBeenCalledWith('/api/workspaces/workspace-1/dashboard?period=90')
   })
 
   it('defaults the dashboard period to 30 days', async () => {
@@ -27,8 +25,6 @@ describe('DashboardAPI', () => {
 
     await DashboardAPI.get('workspace-1')
 
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/api/workspaces/workspace-1/dashboard?period=30',
-    )
+    expect(apiRequest).toHaveBeenCalledWith('/api/workspaces/workspace-1/dashboard?period=30')
   })
 })

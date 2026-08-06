@@ -67,9 +67,7 @@ const showAddList = ref(false)
 const newListName = ref('')
 let isSubmittingList = false
 
-async function fetchLists(
-  options: { reset?: boolean } = {},
-): Promise<void> {
+async function fetchLists(options: { reset?: boolean } = {}): Promise<void> {
   const reset = options.reset ?? true
   const generation = ++listLoadGeneration
   const workspaceId = String(route.params.workspaceId ?? '')
@@ -92,8 +90,7 @@ async function fetchLists(
     }
   } catch (e) {
     if (generation === listLoadGeneration) {
-      const message =
-        e instanceof Error ? e.message : '보드를 불러오지 못했습니다.'
+      const message = e instanceof Error ? e.message : '보드를 불러오지 못했습니다.'
       if (showLoading) error.value = message
       else console.warn('[board] background refresh failed', message)
       if (!reset && fullRefreshRetriesRemaining > 0) {
@@ -126,8 +123,7 @@ async function refreshLists(listIds: readonly string[]): Promise<void> {
   const refreshed = results
     .filter(
       (result): result is PromiseFulfilledResult<ListWithCards> =>
-        result.status === 'fulfilled' &&
-        result.value.workspace_id === workspaceId,
+        result.status === 'fulfilled' && result.value.workspace_id === workspaceId,
     )
     .map((result) => result.value)
   const refreshedById = new Map(refreshed.map((list) => [list.id, list]))
@@ -146,9 +142,7 @@ function scheduleInvalidationFlush(): void {
     dragDepth > 0 ||
     refreshRunning ||
     refreshTimer ||
-    (!fullRefreshPending &&
-      pendingListIds.size === 0 &&
-      pendingDeletedListIds.size === 0)
+    (!fullRefreshPending && pendingListIds.size === 0 && pendingDeletedListIds.size === 0)
   ) {
     return
   }
@@ -203,11 +197,7 @@ function stopBoardAutoScroll(): void {
 function continueBoardAutoScroll(): void {
   autoScrollFrame = null
   const element = boardColumns.value?.$el
-  if (
-    !element ||
-    dragPointerX === null ||
-    messengerState.cardDrag?.source !== 'inbox'
-  ) {
+  if (!element || dragPointerX === null || messengerState.cardDrag?.source !== 'inbox') {
     return
   }
 
@@ -260,10 +250,7 @@ watch(
 )
 
 watch(
-  [
-    () => props.canEditBoard,
-    () => lists.value.map((list) => ({ id: list.id, name: list.name })),
-  ],
+  [() => props.canEditBoard, () => lists.value.map((list) => ({ id: list.id, name: list.name }))],
   ([canEditBoard, destinations]) => {
     setInboxDestinations(canEditBoard ? destinations : [])
   },
@@ -296,11 +283,8 @@ watch(
     const requestedCardId = typeof cardId === 'string' ? cardId : null
     const belongsToBoard =
       requestedCardId !== null &&
-      lists.value.some((list) =>
-        list.cards.some((card) => card.id === requestedCardId),
-      )
-    selectedCardId.value =
-      canViewCardDetails && belongsToBoard ? requestedCardId : null
+      lists.value.some((list) => list.cards.some((card) => card.id === requestedCardId))
+    selectedCardId.value = canViewCardDetails && belongsToBoard ? requestedCardId : null
   },
   { immediate: true },
 )
@@ -346,10 +330,7 @@ function persistCardChange(
   listId: string,
   event: DraggableChange<Card>,
 ): void {
-  if (
-    !props.canEditBoard ||
-    workspaceId !== String(route.params.workspaceId ?? '')
-  ) {
+  if (!props.canEditBoard || workspaceId !== String(route.params.workspaceId ?? '')) {
     return
   }
   const list = lists.value.find((l) => l.id === listId)
@@ -397,10 +378,7 @@ function persistCardChange(
       () => queueFullRefresh(),
       () => queueFullRefresh(),
     )
-  } else if (
-    event.removed &&
-    isExternalCardDropClaimed(event.removed.element.id)
-  ) {
+  } else if (event.removed && isExternalCardDropClaimed(event.removed.element.id)) {
     // Sortable can remove a fallback-dragged card from its local source model
     // before the external target settles. Reconcile without persisting a move.
     queueFullRefresh()
@@ -439,25 +417,17 @@ async function onDeleteCard(cardId: string) {
 }
 
 async function onToggleCardCompletion(card: Card) {
-  if (
-    !props.canEditBoard ||
-    completingCardIds.value.has(card.id)
-  ) {
+  if (!props.canEditBoard || completingCardIds.value.has(card.id)) {
     return
   }
 
   actionError.value = ''
   completingCardIds.value = new Set(completingCardIds.value).add(card.id)
   try {
-    const saved = await CardAPI.updateCompletion(
-      card.id,
-      !card.is_completed,
-    )
+    const saved = await CardAPI.updateCompletion(card.id, !card.is_completed)
     lists.value = lists.value.map((list) => ({
       ...list,
-      cards: list.cards.map((item) =>
-        item.id === saved.id ? saved : item,
-      ),
+      cards: list.cards.map((item) => (item.id === saved.id ? saved : item)),
     }))
     queueFullRefresh()
   } catch (caught) {
@@ -484,11 +454,7 @@ function onBoardCardDragEnd(): void {
   try {
     const drag = messengerState.cardDrag
     const drop = messengerState.externalCardDrop
-    if (
-      drag?.source === 'board' &&
-      drop?.cardId === drag.cardId &&
-      !drop.committed
-    ) {
+    if (drag?.source === 'board' && drop?.cardId === drag.cardId && !drop.committed) {
       if (
         drop.target === 'chat' &&
         (drop.owner === 'chat-panel' || drop.owner === 'toolbox-chat')
@@ -497,11 +463,7 @@ function onBoardCardDragEnd(): void {
       } else if (
         drop.target === 'inbox' &&
         drop.owner === 'toolbox-inbox' &&
-        claimExternalCardDrop(
-          drag.cardId,
-          'inbox',
-          'toolbox-inbox',
-        )
+        claimExternalCardDrop(drag.cardId, 'inbox', 'toolbox-inbox')
       ) {
         void InboxAPI.moveToInbox(drag.cardId).then(
           () => {
@@ -510,9 +472,7 @@ function onBoardCardDragEnd(): void {
           },
           (caught: unknown) => {
             actionError.value =
-              caught instanceof Error
-                ? caught.message
-                : '카드를 인박스로 옮기지 못했습니다.'
+              caught instanceof Error ? caught.message : '카드를 인박스로 옮기지 못했습니다.'
             notifyBoardChanged()
           },
         )
@@ -570,63 +530,47 @@ async function onDeleteList(listId: string) {
   }
 }
 
-const removeWorkspaceChangeListener = realtime.on(
-  'workspace.changed',
-  (value) => {
-    const event = parseWorkspaceChangedEvent(value)
-    const currentWorkspaceId = String(route.params.workspaceId ?? '')
-    if (!event || event.workspace_id !== currentWorkspaceId) return
+const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) => {
+  const event = parseWorkspaceChangedEvent(value)
+  const currentWorkspaceId = String(route.params.workspaceId ?? '')
+  if (!event || event.workspace_id !== currentWorkspaceId) return
 
-    if (loading.value) {
-      if (
-        event.entity === 'card' &&
-        selectedCardId.value === event.entity_id
-      ) {
-        cardDetailRefreshToken.value += 1
-      }
-      queueFullRefresh()
-      return
-    }
-
-    if (event.entity === 'list') {
-      if (event.action === 'deleted') {
-        const deletedList = lists.value.find(
-          (list) => list.id === event.entity_id,
-        )
-        if (
-          selectedCardId.value &&
-          deletedList?.cards.some(
-            (card) => card.id === selectedCardId.value,
-          )
-        ) {
-          closeCard()
-        }
-        pendingDeletedListIds.add(event.entity_id)
-        pendingListIds.delete(event.entity_id)
-      } else {
-        const ids =
-          event.list_ids.length > 0
-            ? event.list_ids
-            : [event.entity_id]
-        ids.forEach((id) => pendingListIds.add(id))
-      }
-      scheduleInvalidationFlush()
-      return
-    }
-
-    if (event.entity !== 'card') return
-    if (
-      event.action === 'deleted' &&
-      selectedCardId.value === event.entity_id
-    ) {
-      closeCard()
-    } else if (selectedCardId.value === event.entity_id) {
+  if (loading.value) {
+    if (event.entity === 'card' && selectedCardId.value === event.entity_id) {
       cardDetailRefreshToken.value += 1
     }
-    event.list_ids.forEach((id) => pendingListIds.add(id))
+    queueFullRefresh()
+    return
+  }
+
+  if (event.entity === 'list') {
+    if (event.action === 'deleted') {
+      const deletedList = lists.value.find((list) => list.id === event.entity_id)
+      if (
+        selectedCardId.value &&
+        deletedList?.cards.some((card) => card.id === selectedCardId.value)
+      ) {
+        closeCard()
+      }
+      pendingDeletedListIds.add(event.entity_id)
+      pendingListIds.delete(event.entity_id)
+    } else {
+      const ids = event.list_ids.length > 0 ? event.list_ids : [event.entity_id]
+      ids.forEach((id) => pendingListIds.add(id))
+    }
     scheduleInvalidationFlush()
-  },
-)
+    return
+  }
+
+  if (event.entity !== 'card') return
+  if (event.action === 'deleted' && selectedCardId.value === event.entity_id) {
+    closeCard()
+  } else if (selectedCardId.value === event.entity_id) {
+    cardDetailRefreshToken.value += 1
+  }
+  event.list_ids.forEach((id) => pendingListIds.add(id))
+  scheduleInvalidationFlush()
+})
 
 onMounted(() => {
   window.addEventListener('dragover', handleCardDragPointer)
@@ -652,25 +596,12 @@ onUnmounted(() => {
 
 <template>
   <div class="board-page">
-    <p
-      v-if="actionError"
-      class="board-action-error"
-      role="alert"
-    >
+    <p v-if="actionError" class="board-action-error" role="alert">
       <span>{{ actionError }}</span>
-      <button
-        type="button"
-        aria-label="알림 닫기"
-        @click="actionError = ''"
-      >
-        ×
-      </button>
+      <button type="button" aria-label="알림 닫기" @click="actionError = ''">×</button>
     </p>
     <div v-if="loading" class="board-status">불러오는 중...</div>
-    <div
-      v-else-if="error"
-      class="board-status board-status--error"
-    >
+    <div v-else-if="error" class="board-status board-status--error">
       {{ error }}
     </div>
     <draggable
@@ -703,9 +634,7 @@ onUnmounted(() => {
         />
       </template>
       <template #footer>
-        <div v-if="loading" class="board-inline-status">
-          보드를 불러오는 중…
-        </div>
+        <div v-if="loading" class="board-inline-status">보드를 불러오는 중…</div>
         <div v-else-if="error" class="board-inline-status board-status--error">
           {{ error }}
         </div>
@@ -721,11 +650,7 @@ onUnmounted(() => {
               @keyup.esc="cancelAddList"
               @blur="submitAddList"
             />
-            <button
-              type="submit"
-              class="add-list-submit-btn"
-              :disabled="!newListName.trim()"
-            >
+            <button type="submit" class="add-list-submit-btn" :disabled="!newListName.trim()">
               추가
             </button>
           </form>

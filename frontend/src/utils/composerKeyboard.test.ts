@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createComposerEnterSubmitter } from './composerKeyboard'
 
-function keyboardEvent(
-  overrides: Partial<Pick<KeyboardEvent, 'isComposing' | 'keyCode'>> = {},
-) {
+function keyboardEvent(overrides: Partial<Pick<KeyboardEvent, 'isComposing' | 'keyCode'>> = {}) {
   return {
     isComposing: false,
     keyCode: 13,
@@ -42,10 +40,7 @@ describe('createComposerEnterSubmitter', () => {
     const deferred: Array<() => void> = []
     const event = keyboardEvent({ keyCode: 229 })
     const submit = vi.fn()
-    const submitter = createComposerEnterSubmitter(
-      submit,
-      (callback) => deferred.push(callback),
-    )
+    const submitter = createComposerEnterSubmitter(submit, (callback) => deferred.push(callback))
 
     submitter.handleEnter(event)
     submitter.handleCompositionEnd()
@@ -72,10 +67,7 @@ describe('createComposerEnterSubmitter', () => {
   it('does not double-submit if another Enter arrives before the deferred send', () => {
     const deferred: Array<() => void> = []
     const submit = vi.fn()
-    const submitter = createComposerEnterSubmitter(
-      submit,
-      (callback) => deferred.push(callback),
-    )
+    const submitter = createComposerEnterSubmitter(submit, (callback) => deferred.push(callback))
 
     submitter.handleEnter(keyboardEvent({ isComposing: true }))
     submitter.handleCompositionEnd()
@@ -90,10 +82,7 @@ describe('createComposerEnterSubmitter', () => {
   it('cancels a deferred send when the conversation changes', () => {
     const deferred: Array<() => void> = []
     const submit = vi.fn()
-    const submitter = createComposerEnterSubmitter(
-      submit,
-      (callback) => deferred.push(callback),
-    )
+    const submitter = createComposerEnterSubmitter(submit, (callback) => deferred.push(callback))
 
     submitter.handleEnter(keyboardEvent({ isComposing: true }))
     submitter.handleCompositionEnd()

@@ -111,10 +111,7 @@ function createOriginPlaceholder(item: HTMLElement): void {
   originPlaceholder = placeholder
 }
 
-function startCardDrag(event: {
-  oldIndex?: number | null
-  item?: HTMLElement
-}) {
+function startCardDrag(event: { oldIndex?: number | null; item?: HTMLElement }) {
   const index = event.oldIndex
   if (index === null || index === undefined) return
   const card = props.list.cards[index]
@@ -128,9 +125,7 @@ function finishCardDrag(): void {
   emit('card-drag-end')
 }
 
-function canMoveCard(event: {
-  draggedContext?: { element?: Card }
-}): boolean {
+function canMoveCard(event: { draggedContext?: { element?: Card } }): boolean {
   const cardId = event.draggedContext?.element?.id
   return !cardId || !isExternalCardDropClaimed(cardId)
 }
@@ -143,10 +138,7 @@ const vFocus = {
 </script>
 
 <template>
-  <section
-    class="task-list"
-    :class="{ 'task-list--readonly': !canEdit }"
-  >
+  <section class="task-list" :class="{ 'task-list--readonly': !canEdit }">
     <div class="list-header">
       <input
         v-if="renaming"
@@ -160,10 +152,7 @@ const vFocus = {
       />
       <span v-else class="list-name" @click="startRename">{{ list.name }}</span>
       <div class="list-header-actions">
-        <span
-          class="list-count"
-          :style="{ background: badgeColors[list.name] ?? '#6b7280' }"
-        >
+        <span class="list-count" :style="{ background: badgeColors[list.name] ?? '#6b7280' }">
           {{ list.cards.length }}
         </span>
         <button
@@ -213,11 +202,7 @@ const vFocus = {
       </template>
     </draggable>
 
-    <form
-      v-if="canEdit && showAddCard"
-      class="add-card-form"
-      @submit.prevent="submitAddCard"
-    >
+    <form v-if="canEdit && showAddCard" class="add-card-form" @submit.prevent="submitAddCard">
       <input
         v-model="newCardTitle"
         type="text"
@@ -228,20 +213,11 @@ const vFocus = {
         @keyup.esc="cancelAddCard"
         @blur="submitAddCard"
       />
-      <button
-        type="submit"
-        class="add-card-submit-btn"
-        :disabled="!newCardTitle.trim()"
-      >
+      <button type="submit" class="add-card-submit-btn" :disabled="!newCardTitle.trim()">
         추가
       </button>
     </form>
-    <button
-      v-else-if="canEdit"
-      class="add-card-btn"
-      type="button"
-      @click="showAddCard = true"
-    >
+    <button v-else-if="canEdit" class="add-card-btn" type="button" @click="showAddCard = true">
       + 카드 추가
     </button>
   </section>

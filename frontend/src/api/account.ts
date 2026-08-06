@@ -1,4 +1,9 @@
-import { apiRequest, authState, invalidateAuthenticatedSession, type AuthUser } from '../services/auth'
+import {
+  apiRequest,
+  authState,
+  invalidateAuthenticatedSession,
+  type AuthUser,
+} from '../services/auth'
 import { uploadFile } from '../services/fileTransfer'
 
 export const AccountAPI = {

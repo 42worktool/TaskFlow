@@ -20,7 +20,6 @@ export const listReorderSchema = z
     before_list_id: uuidSchema.nullable().optional(),
     after_list_id: uuidSchema.nullable().optional(),
   })
-  .refine(
-    (value) => value.before_list_id !== undefined || value.after_list_id !== undefined,
-    { message: 'either before_list_id or after_list_id is required' },
-  )
+  .refine((value) => value.before_list_id !== undefined || value.after_list_id !== undefined, {
+    message: 'either before_list_id or after_list_id is required',
+  })

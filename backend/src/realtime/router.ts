@@ -1,5 +1,5 @@
-import { ZodType } from 'zod';
-import { eventNameSchema, isRealtimeControlEvent } from './protocol';
+import { ZodType } from 'zod'
+import { eventNameSchema, isRealtimeControlEvent } from './protocol'
 
 export class RealtimeError extends Error {
   constructor(
@@ -7,51 +7,51 @@ export class RealtimeError extends Error {
     message: string,
     readonly retryable = false,
   ) {
-    super(message);
-    this.name = 'RealtimeError';
+    super(message)
+    this.name = 'RealtimeError'
   }
 }
 
 export interface RealtimeHandlerContext {
-  readonly connectionId: string;
-  readonly userId: string;
-  send(event: string, data?: unknown): void;
-  join(channel: string): void;
-  leave(channel: string): void;
-  publish(channel: string, event: string, data?: unknown): void;
+  readonly connectionId: string
+  readonly userId: string
+  send(event: string, data?: unknown): void
+  join(channel: string): void
+  leave(channel: string): void
+  publish(channel: string, event: string, data?: unknown): void
 }
 
 export type RealtimeHandler<T> = (
   context: RealtimeHandlerContext,
   data: T,
-) => unknown | Promise<unknown>;
+) => unknown | Promise<unknown>
 
 interface RegisteredHandler<T = unknown> {
-  schema: ZodType<T>;
-  handle: RealtimeHandler<T>;
+  schema: ZodType<T>
+  handle: RealtimeHandler<T>
 }
 
 export class RealtimeRouter {
-  private readonly handlers = new Map<string, RegisteredHandler>();
+  private readonly handlers = new Map<string, RegisteredHandler>()
 
   register<T>(event: string, schema: ZodType<T>, handler: RealtimeHandler<T>): () => void {
     if (!eventNameSchema.safeParse(event).success) {
-      throw new Error(`Invalid realtime event name "${event}"`);
+      throw new Error(`Invalid realtime event name "${event}"`)
     }
     if (isRealtimeControlEvent(event)) {
-      throw new Error(`Realtime control event "${event}" is reserved by the protocol`);
+      throw new Error(`Realtime control event "${event}" is reserved by the protocol`)
     }
     if (this.handlers.has(event)) {
-      throw new Error(`A realtime handler is already registered for "${event}"`);
+      throw new Error(`A realtime handler is already registered for "${event}"`)
     }
 
-    const registeredHandler = { schema, handle: handler } as RegisteredHandler;
-    this.handlers.set(event, registeredHandler);
+    const registeredHandler = { schema, handle: handler } as RegisteredHandler
+    this.handlers.set(event, registeredHandler)
     return () => {
       if (this.handlers.get(event) === registeredHandler) {
-        this.handlers.delete(event);
+        this.handlers.delete(event)
       }
-    };
+    }
   }
 
   async dispatch(
@@ -59,16 +59,16 @@ export class RealtimeRouter {
     rawData: unknown,
     context: RealtimeHandlerContext,
   ): Promise<unknown> {
-    const handler = this.handlers.get(event);
+    const handler = this.handlers.get(event)
     if (!handler) {
-      throw new RealtimeError('UNKNOWN_EVENT', `No handler is registered for "${event}"`);
+      throw new RealtimeError('UNKNOWN_EVENT', `No handler is registered for "${event}"`)
     }
 
-    const parsed = handler.schema.safeParse(rawData);
+    const parsed = handler.schema.safeParse(rawData)
     if (!parsed.success) {
-      throw new RealtimeError('INVALID_EVENT_DATA', 'The event data is invalid');
+      throw new RealtimeError('INVALID_EVENT_DATA', 'The event data is invalid')
     }
 
-    return handler.handle(context, parsed.data);
+    return handler.handle(context, parsed.data)
   }
 }

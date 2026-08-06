@@ -28,7 +28,9 @@ const componentId = useId()
 const titleId = `workspace-labels-title-${componentId}`
 const panelId = `workspace-labels-panel-${componentId}`
 
-const sortedLabels = computed(() => [...labels.value].sort((a, b) => a.created_at.localeCompare(b.created_at)))
+const sortedLabels = computed(() =>
+  [...labels.value].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+)
 
 async function loadLabels(): Promise<void> {
   if (!props.workspaceId) return
@@ -72,7 +74,9 @@ function getLabelTextColor(hex: string): string {
   const normalized = hex.replace('#', '')
   if (!/^[\da-f]{6}$/i.test(normalized)) return '#111827'
 
-  const channels = [0, 2, 4].map((index) => Number.parseInt(normalized.slice(index, index + 2), 16) / 255)
+  const channels = [0, 2, 4].map(
+    (index) => Number.parseInt(normalized.slice(index, index + 2), 16) / 255,
+  )
   const luminance = channels.reduce((total, channel, index) => {
     const linear = channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4
     return total + linear * [0.2126, 0.7152, 0.0722][index]
@@ -102,7 +106,7 @@ async function saveEditing(): Promise<void> {
       label_name: labelName,
       label_color: editingColor.value,
     })
-    labels.value = labels.value.map((label) => label.id === updated.id ? updated : label)
+    labels.value = labels.value.map((label) => (label.id === updated.id ? updated : label))
     cancelEditing()
     emit('changed')
   } catch (caught) {
@@ -151,10 +155,13 @@ function toggle(): void {
   if (open.value) void loadLabels()
 }
 
-watch(() => props.workspaceId, () => {
-  labels.value = []
-  if (open.value) void loadLabels()
-})
+watch(
+  () => props.workspaceId,
+  () => {
+    labels.value = []
+    if (open.value) void loadLabels()
+  },
+)
 
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointer)
@@ -195,7 +202,14 @@ onUnmounted(() => {
           <h2 :id="titleId">라벨</h2>
           <p>카드에 사용할 라벨을 관리하세요.</p>
         </div>
-        <button type="button" class="workspace-labels-close" aria-label="라벨 창 닫기" @click="close">×</button>
+        <button
+          type="button"
+          class="workspace-labels-close"
+          aria-label="라벨 창 닫기"
+          @click="close"
+        >
+          ×
+        </button>
       </header>
 
       <p v-if="error" class="workspace-labels-error" role="alert">{{ error }}</p>
@@ -203,24 +217,55 @@ onUnmounted(() => {
       <ul v-else class="workspace-labels-list">
         <li v-for="label in sortedLabels" :key="label.id" class="workspace-labels-item">
           <template v-if="editingId === label.id">
-            <input v-model="editingName" type="text" maxlength="50" aria-label="라벨 이름" :disabled="saving" @keydown.enter="saveEditing" />
+            <input
+              v-model="editingName"
+              type="text"
+              maxlength="50"
+              aria-label="라벨 이름"
+              :disabled="saving"
+              @keydown.enter="saveEditing"
+            />
             <input v-model="editingColor" type="color" aria-label="라벨 색상" :disabled="saving" />
-            <button type="button" :disabled="saving || !editingName.trim()" @click="saveEditing">저장</button>
+            <button type="button" :disabled="saving || !editingName.trim()" @click="saveEditing">
+              저장
+            </button>
             <button type="button" :disabled="saving" @click="cancelEditing">취소</button>
           </template>
           <template v-else>
-            <span class="workspace-label-chip" :style="{ backgroundColor: label.label_color, color: getLabelTextColor(label.label_color) }">{{ label.label_name }}</span>
-            <button v-if="canManage" type="button" :disabled="saving" @click="startEditing(label)">수정</button>
-            <button v-if="canManage" type="button" :disabled="saving" @click="deleteLabel(label)">삭제</button>
+            <span
+              class="workspace-label-chip"
+              :style="{
+                backgroundColor: label.label_color,
+                color: getLabelTextColor(label.label_color),
+              }"
+              >{{ label.label_name }}</span
+            >
+            <button v-if="canManage" type="button" :disabled="saving" @click="startEditing(label)">
+              수정
+            </button>
+            <button v-if="canManage" type="button" :disabled="saving" @click="deleteLabel(label)">
+              삭제
+            </button>
           </template>
         </li>
-        <li v-if="sortedLabels.length === 0" class="workspace-labels-empty">아직 라벨이 없습니다.</li>
+        <li v-if="sortedLabels.length === 0" class="workspace-labels-empty">
+          아직 라벨이 없습니다.
+        </li>
       </ul>
 
       <form v-if="canManage" class="workspace-labels-create" @submit.prevent="createLabel">
-        <input v-model="name" type="text" maxlength="50" placeholder="새 라벨 이름" aria-label="새 라벨 이름" :disabled="saving" />
+        <input
+          v-model="name"
+          type="text"
+          maxlength="50"
+          placeholder="새 라벨 이름"
+          aria-label="새 라벨 이름"
+          :disabled="saving"
+        />
         <input v-model="color" type="color" aria-label="새 라벨 색상" :disabled="saving" />
-        <button type="submit" :disabled="saving || !name.trim()">{{ saving ? '저장 중…' : '추가' }}</button>
+        <button type="submit" :disabled="saving || !name.trim()">
+          {{ saving ? '저장 중…' : '추가' }}
+        </button>
       </form>
     </section>
   </div>
