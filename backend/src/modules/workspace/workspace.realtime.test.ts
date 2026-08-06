@@ -250,10 +250,7 @@ test('a committed workspace deletion prevents an older authorization query from 
     if ((args as any).select?.id) return authorization
     return {
       id: DELETION_WORKSPACE_ID,
-      members: [
-        { user_id: ONLINE_USER_ID, role: 'OWNER' },
-        { user_id: USER_ID, role: 'MEMBER' },
-      ],
+      members: [{ user_id: ONLINE_USER_ID, role: 'OWNER' }],
     }
   })
   stubMethod(t, prisma.workspace, 'update', async () => ({}))
@@ -270,7 +267,7 @@ test('a committed workspace deletion prevents an older authorization query from 
   const subscription = subscribe(
     {
       connectionId: 'deletion-race',
-      userId: USER_ID,
+      userId: ONLINE_USER_ID,
       send: () => undefined,
       join: (channel: string) => joins.push(channel),
       leave: () => undefined,

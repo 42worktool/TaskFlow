@@ -39,6 +39,12 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   FRIEND_REQUEST_ALREADY_RECEIVED:
     '상대방이 먼저 보낸 요청이 있습니다. 받은 요청에서 수락해 주세요.',
   FRIEND_REQUEST_NOT_FOUND: '친구 요청을 찾을 수 없습니다. 목록을 새로고침해 주세요.',
+  WORKSPACE_ROLE_HIERARCHY: '자신보다 낮은 역할의 구성원만 관리할 수 있습니다.',
+  WORKSPACE_OWNERSHIP_TRANSFER_REQUIRED:
+    '다른 구성원에게 소유권을 위임한 뒤 워크스페이스에서 나갈 수 있습니다.',
+  WORKSPACE_HAS_OTHER_MEMBERS:
+    '다른 구성원이 남아 있는 워크스페이스는 삭제할 수 없습니다. 소유권을 위임하거나 구성원을 먼저 정리해 주세요.',
+  OWNED_WORKSPACES_REMAIN: '소유한 워크스페이스를 모두 위임하거나 삭제한 뒤 계정을 삭제해 주세요.',
   UNSUPPORTED_FILE_TYPE: '지원하지 않는 파일 형식입니다.',
   PAYLOAD_TOO_LARGE: '파일 용량이 너무 큽니다.',
   INVALID_FILE_NAME: '파일 이름이 올바르지 않습니다.',

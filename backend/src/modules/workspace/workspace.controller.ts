@@ -90,6 +90,23 @@ export const changeMemberRole: RequestHandler = async (req, res) => {
   res.status(200).json(workspace)
 }
 
+export const transferOwnership: RequestHandler = async (req, res) => {
+  const workspace = await svc.transferWorkspaceOwnership({
+    userId: authenticatedUserId(req),
+    workspaceId: req.params.workspaceId as string,
+    targetUserId: req.params.userId as string,
+  })
+  res.status(200).json(workspace)
+}
+
+export const leave: RequestHandler = async (req, res) => {
+  await svc.leaveWorkspace({
+    userId: authenticatedUserId(req),
+    workspaceId: req.params.workspaceId as string,
+  })
+  res.status(204).send()
+}
+
 export const removeMember: RequestHandler = async (req, res) => {
   await svc.removeMember({
     userId: authenticatedUserId(req),

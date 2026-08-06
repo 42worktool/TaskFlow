@@ -331,7 +331,8 @@ export const openApiDocument = {
       delete: {
         tags: ['Account'],
         summary: '현재 계정 삭제',
-        description: '사용자, OAuth 연결 및 모든 Refresh Token 세션을 영구 삭제합니다.',
+        description:
+          '소유한 워크스페이스가 없을 때 사용자, OAuth 연결 및 모든 Refresh Token 세션을 영구 삭제합니다.',
         operationId: 'deleteCurrentAccount',
         security: [{ bearerAuth: [] }],
         responses: {
@@ -339,6 +340,7 @@ export const openApiDocument = {
           '401': errorResponse('Access Token 누락, 만료 또는 검증 실패'),
           '403': errorResponse('Origin 불일치'),
           '404': errorResponse('사용자가 더 이상 존재하지 않음'),
+          '409': errorResponse('소유한 워크스페이스가 남아 있음'),
         },
       },
     },

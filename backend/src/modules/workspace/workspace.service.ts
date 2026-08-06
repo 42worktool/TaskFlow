@@ -7,13 +7,14 @@
 // ============================================================
 import { prisma } from '../../db'
 import { config } from '../../config'
-import { AppError, ForbiddenError, NotFoundError } from '../../errors'
+import { AppError, NotFoundError } from '../../errors'
 import type { Prisma, WorkspaceMember, Role } from '@prisma/client'
 import { createdBy, restoredBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import {
   requireMinimumWorkspaceRole,
   requireWorkspaceReadAccess,
   requireWorkspaceRole,
+  workspaceRoleOutranks,
 } from '../../lib/workspace-permissions'
 import { checkMailRateLimit } from '../../lib/mail-rate-limiter'
 import { enqueue } from '../../lib/mail-queue'
@@ -39,7 +40,33 @@ class InviteTokenError extends AppError {
   }
 }
 
-const workspaceInviteLock = new KeyedLock()
+class WorkspaceRoleHierarchyError extends AppError {
+  constructor() {
+    super('WORKSPACE_ROLE_HIERARCHY', 403, 'you can manage and assign only roles below your own')
+  }
+}
+
+class WorkspaceOwnershipTransferRequiredError extends AppError {
+  constructor() {
+    super(
+      'WORKSPACE_OWNERSHIP_TRANSFER_REQUIRED',
+      409,
+      'transfer ownership before leaving this workspace',
+    )
+  }
+}
+
+class WorkspaceHasOtherMembersError extends AppError {
+  constructor() {
+    super(
+      'WORKSPACE_HAS_OTHER_MEMBERS',
+      409,
+      'remove the other members or transfer ownership instead of deleting this workspace',
+    )
+  }
+}
+
+const workspaceMutationLock = new KeyedLock()
 
 async function requireManagedWorkspace(
   tx: Prisma.TransactionClient,
@@ -58,10 +85,47 @@ async function requireManagedWorkspace(
   return workspace
 }
 
-function requireRoleChangeAllowed(targetMembership: WorkspaceMember, newRole: Role): void {
-  if (targetMembership.role === 'OWNER' || newRole === 'OWNER') {
-    throw new ForbiddenError()
+function requireRoleChangeAllowed(
+  callerRole: Role,
+  targetMembership: WorkspaceMember,
+  newRole: Role,
+): void {
+  if (
+    !workspaceRoleOutranks(callerRole, targetMembership.role) ||
+    !workspaceRoleOutranks(callerRole, newRole)
+  ) {
+    throw new WorkspaceRoleHierarchyError()
   }
+}
+
+function finalizeWorkspaceDeletion(workspaceId: string, actorUserId: string): void {
+  revokeWorkspaceAccess(workspaceId)
+  publishWorkspaceChange({
+    workspace_id: workspaceId,
+    entity: 'workspace',
+    action: 'deleted',
+    entity_id: workspaceId,
+    list_ids: [],
+    actor_user_id: actorUserId,
+  })
+  realtime.clearChannel(workspaceChannel(workspaceId))
+}
+
+function finalizeMemberRemoval(
+  workspaceId: string,
+  targetUserId: string,
+  actorUserId: string,
+): void {
+  revokeWorkspaceMemberAccess(workspaceId, targetUserId)
+  publishWorkspaceChange({
+    workspace_id: workspaceId,
+    entity: 'member',
+    action: 'deleted',
+    entity_id: targetUserId,
+    list_ids: [],
+    actor_user_id: actorUserId,
+  })
+  realtime.leaveUserChannel(targetUserId, workspaceChannel(workspaceId))
 }
 
 // ============================================================
@@ -364,9 +428,12 @@ export async function updateWorkspace(input: {
  * hidden by active-workspace filters. Requires OWNER.
  */
 export async function deleteWorkspace(input: { userId: string; workspaceId: string }) {
-  await workspaceInviteLock.run(input.workspaceId, async () => {
+  await workspaceMutationLock.run(input.workspaceId, async () => {
     await prisma.$transaction(async (tx) => {
-      await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'OWNER')
+      const workspace = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'OWNER')
+      if (workspace.members.some((member) => member.user_id !== input.userId)) {
+        throw new WorkspaceHasOtherMembersError()
+      }
 
       await tx.workspace.update({
         where: { id: input.workspaceId },
@@ -377,16 +444,110 @@ export async function deleteWorkspace(input: { userId: string; workspaceId: stri
     await workspaceInvitationStore.discardWorkspace(input.workspaceId)
   })
 
-  revokeWorkspaceAccess(input.workspaceId)
+  finalizeWorkspaceDeletion(input.workspaceId, input.userId)
+}
+
+/**
+ * Transfer the single OWNER position to an active member. The previous owner
+ * stays in the workspace as ADMIN and may leave through the normal flow.
+ */
+export async function transferWorkspaceOwnership(input: {
+  userId: string
+  workspaceId: string
+  targetUserId: string
+}) {
+  const workspace = await workspaceMutationLock.run(input.workspaceId, () =>
+    prisma.$transaction(async (tx) => {
+      const ws = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'OWNER')
+      const targetMembership = ws.members.find((member) => member.user_id === input.targetUserId)
+      if (!targetMembership) throw new NotFoundError()
+      if (targetMembership.user_id === input.userId || targetMembership.role === 'OWNER') {
+        throw new WorkspaceRoleHierarchyError()
+      }
+
+      await tx.workspaceMember.update({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: input.workspaceId,
+            user_id: input.userId,
+          },
+        },
+        data: { role: 'ADMIN', ...updatedBy(input.userId) },
+      })
+      await tx.workspaceMember.update({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: input.workspaceId,
+            user_id: input.targetUserId,
+          },
+        },
+        data: { role: 'OWNER', ...updatedBy(input.userId) },
+      })
+
+      const updated = await tx.workspace.findFirst({
+        where: { id: input.workspaceId, deleted_at: null },
+        include: workspaceInclude,
+      })
+      return toWorkspaceDto(updated!, { includeMemberEmail: true })
+    }),
+  )
+
   publishWorkspaceChange({
     workspace_id: input.workspaceId,
-    entity: 'workspace',
-    action: 'deleted',
-    entity_id: input.workspaceId,
+    entity: 'member',
+    action: 'updated',
+    entity_id: input.targetUserId,
     list_ids: [],
     actor_user_id: input.userId,
   })
-  realtime.clearChannel(workspaceChannel(input.workspaceId))
+  return workspace
+}
+
+/**
+ * Leave a workspace. A sole OWNER leaves by deleting the now-empty workspace;
+ * an OWNER with other active members must transfer ownership first.
+ */
+export async function leaveWorkspace(input: {
+  userId: string
+  workspaceId: string
+}): Promise<void> {
+  let deletedWorkspace = false
+
+  await workspaceMutationLock.run(input.workspaceId, async () => {
+    await prisma.$transaction(async (tx) => {
+      const ws = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'VIEWER')
+      const membership = ws.members.find((member) => member.user_id === input.userId)!
+
+      if (membership.role === 'OWNER') {
+        if (ws.members.length > 1) throw new WorkspaceOwnershipTransferRequiredError()
+        await tx.workspace.update({
+          where: { id: input.workspaceId },
+          data: softDeletedBy(input.userId),
+        })
+        deletedWorkspace = true
+        return
+      }
+
+      await tx.workspaceMember.update({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: input.workspaceId,
+            user_id: input.userId,
+          },
+        },
+        data: softDeletedBy(input.userId),
+      })
+    })
+
+    if (deletedWorkspace) await workspaceInvitationStore.discardWorkspace(input.workspaceId)
+  })
+
+  if (deletedWorkspace) {
+    finalizeWorkspaceDeletion(input.workspaceId, input.userId)
+    return
+  }
+
+  finalizeMemberRemoval(input.workspaceId, input.userId, input.userId)
 }
 
 /**
@@ -400,34 +561,37 @@ export async function changeMemberRole(input: {
   targetUserId: string
   role: Role
 }) {
-  const workspace = await prisma.$transaction(async (tx) => {
-    const ws = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
+  const workspace = await workspaceMutationLock.run(input.workspaceId, () =>
+    prisma.$transaction(async (tx) => {
+      const ws = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
 
-    const targetMembership = ws.members.find((member) => member.user_id === input.targetUserId)
-    if (!targetMembership) throw new NotFoundError()
+      const targetMembership = ws.members.find((member) => member.user_id === input.targetUserId)
+      if (!targetMembership) throw new NotFoundError()
+      const callerMembership = ws.members.find((member) => member.user_id === input.userId)!
 
-    requireRoleChangeAllowed(targetMembership, input.role)
+      requireRoleChangeAllowed(callerMembership.role, targetMembership, input.role)
 
-    await tx.workspaceMember.update({
-      where: {
-        workspace_id_user_id: {
-          workspace_id: input.workspaceId,
-          user_id: input.targetUserId,
+      await tx.workspaceMember.update({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: input.workspaceId,
+            user_id: input.targetUserId,
+          },
         },
-      },
-      data: {
-        role: input.role,
-        ...updatedBy(input.userId),
-      },
-    })
+        data: {
+          role: input.role,
+          ...updatedBy(input.userId),
+        },
+      })
 
-    const updated = await tx.workspace.findFirst({
-      where: { id: input.workspaceId, deleted_at: null },
-      include: workspaceInclude,
-    })
+      const updated = await tx.workspace.findFirst({
+        where: { id: input.workspaceId, deleted_at: null },
+        include: workspaceInclude,
+      })
 
-    return toWorkspaceDto(updated!, { includeMemberEmail: true })
-  })
+      return toWorkspaceDto(updated!, { includeMemberEmail: true })
+    }),
+  )
 
   publishWorkspaceChange({
     workspace_id: input.workspaceId,
@@ -442,44 +606,38 @@ export async function changeMemberRole(input: {
 
 /**
  * Remove a member from the workspace. Caller must be ADMIN+.
- * ADMIN and OWNER memberships cannot be removed.
+ * A caller can remove only members whose role is strictly lower than theirs.
  */
 export async function removeMember(input: {
   userId: string
   workspaceId: string
   targetUserId: string
 }) {
-  await prisma.$transaction(async (tx) => {
-    const ws = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
+  await workspaceMutationLock.run(input.workspaceId, () =>
+    prisma.$transaction(async (tx) => {
+      const ws = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
 
-    const targetMembership = ws.members.find((member) => member.user_id === input.targetUserId)
-    if (!targetMembership) throw new NotFoundError()
+      const targetMembership = ws.members.find((member) => member.user_id === input.targetUserId)
+      if (!targetMembership) throw new NotFoundError()
+      const callerMembership = ws.members.find((member) => member.user_id === input.userId)!
 
-    if (targetMembership.role === 'ADMIN' || targetMembership.role === 'OWNER') {
-      throw new ForbiddenError()
-    }
+      if (!workspaceRoleOutranks(callerMembership.role, targetMembership.role)) {
+        throw new WorkspaceRoleHierarchyError()
+      }
 
-    await tx.workspaceMember.update({
-      where: {
-        workspace_id_user_id: {
-          workspace_id: input.workspaceId,
-          user_id: input.targetUserId,
+      await tx.workspaceMember.update({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: input.workspaceId,
+            user_id: input.targetUserId,
+          },
         },
-      },
-      data: softDeletedBy(input.userId),
-    })
-  })
+        data: softDeletedBy(input.userId),
+      })
+    }),
+  )
 
-  revokeWorkspaceMemberAccess(input.workspaceId, input.targetUserId)
-  publishWorkspaceChange({
-    workspace_id: input.workspaceId,
-    entity: 'member',
-    action: 'deleted',
-    entity_id: input.targetUserId,
-    list_ids: [],
-    actor_user_id: input.userId,
-  })
-  realtime.leaveUserChannel(input.targetUserId, workspaceChannel(input.workspaceId))
+  finalizeMemberRemoval(input.workspaceId, input.targetUserId, input.userId)
 }
 
 export async function inviteWorkspaceMember(input: {
@@ -490,12 +648,15 @@ export async function inviteWorkspaceMember(input: {
 }): Promise<void> {
   const email = normalizeEmail(input.email)
 
-  await workspaceInviteLock.run(input.workspaceId, async () => {
+  await workspaceMutationLock.run(input.workspaceId, async () => {
     const workspace = await getWorkspace({
       userId: input.userId,
       workspaceId: input.workspaceId,
     })
-    await requireWorkspaceRole(input.workspaceId, input.userId, 'ADMIN')
+    const callerRole = await requireWorkspaceRole(input.workspaceId, input.userId, 'ADMIN')
+    if (!workspaceRoleOutranks(callerRole, input.role)) {
+      throw new WorkspaceRoleHierarchyError()
+    }
     await checkMailRateLimit({
       senderUserId: input.userId,
       recipientEmail: email,

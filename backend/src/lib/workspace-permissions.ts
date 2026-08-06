@@ -20,6 +20,10 @@ export function hasMinimumWorkspaceRole(role: Role, minimumRole: Role): boolean 
   return ROLE_RANK[role] >= ROLE_RANK[minimumRole]
 }
 
+export function workspaceRoleOutranks(role: Role, targetRole: Role): boolean {
+  return ROLE_RANK[role] > ROLE_RANK[targetRole]
+}
+
 export function requireMinimumWorkspaceRole(role: Role | null, minimumRole: Role): Role {
   if (!role || !hasMinimumWorkspaceRole(role, minimumRole)) {
     throw new ForbiddenError()
