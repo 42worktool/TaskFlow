@@ -72,12 +72,9 @@ describe('workspace permissions', () => {
     [null, 'MEMBER', false],
     ['OWNER', 'OWNER', false],
     ['ADMIN', 'OWNER', false],
-  ] as const)(
-    'allows %s to manage a %s role: %s',
-    (callerRole, targetRole, expected) => {
-      expect(canChangeWorkspaceMemberRole(callerRole, targetRole)).toBe(expected)
-    },
-  )
+  ] as const)('allows %s to manage a %s role: %s', (callerRole, targetRole, expected) => {
+    expect(canChangeWorkspaceMemberRole(callerRole, targetRole)).toBe(expected)
+  })
 
   it('separates owned projects from non-owner memberships', () => {
     const owned = workspace
@@ -85,25 +82,16 @@ describe('workspace permissions', () => {
       ...workspace,
       id: 'workspace-2',
       members: workspace.members.map((member) =>
-        member.user_id === 'owner-1'
-          ? { ...member, role: 'ADMIN' as const }
-          : member,
+        member.user_id === 'owner-1' ? { ...member, role: 'ADMIN' as const } : member,
       ),
     }
     const publicOnly: Workspace = {
       ...workspace,
       id: 'workspace-3',
-      members: workspace.members.filter(
-        (member) => member.user_id !== 'owner-1',
-      ),
+      members: workspace.members.filter((member) => member.user_id !== 'owner-1'),
     }
 
-    expect(
-      partitionWorkspacesByOwnership(
-        [participating, publicOnly, owned],
-        'owner-1',
-      ),
-    ).toEqual({
+    expect(partitionWorkspacesByOwnership([participating, publicOnly, owned], 'owner-1')).toEqual({
       owned: [owned],
       participating: [participating],
     })

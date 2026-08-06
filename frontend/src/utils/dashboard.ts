@@ -23,16 +23,13 @@ export function buildContributionCells(
   if (days.length === 0) return []
 
   const leading = parseUtcDate(days[0].date).getUTCDay()
-  const cells: ContributionCell[] = Array.from(
-    { length: leading },
-    (_, index) => ({
-      key: `leading-${index}`,
-      date: null,
-      count: 0,
-      logCount: 0,
-      placeholder: true,
-    }),
-  )
+  const cells: ContributionCell[] = Array.from({ length: leading }, (_, index) => ({
+    key: `leading-${index}`,
+    date: null,
+    count: 0,
+    logCount: 0,
+    placeholder: true,
+  }))
 
   days.forEach((day) => {
     cells.push({

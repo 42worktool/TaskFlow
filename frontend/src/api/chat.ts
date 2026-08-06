@@ -5,11 +5,7 @@ export const ChatAPI = {
   list: (workspaceId: string) =>
     apiRequest<WorkspaceMessage[]>(`/api/workspaces/${workspaceId}/messages`),
 
-  send: (
-    workspaceId: string,
-    content: string,
-    cardId?: string | null,
-  ) =>
+  send: (workspaceId: string, content: string, cardId?: string | null) =>
     apiRequest<WorkspaceMessage>(`/api/workspaces/${workspaceId}/messages`, {
       method: 'POST',
       json: {

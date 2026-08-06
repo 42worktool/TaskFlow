@@ -100,9 +100,7 @@ describe('CardAPI', () => {
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(created)
 
-    await expect(
-      CardAPI.createComment('card-1', 'Direct comment'),
-    ).resolves.toEqual(created)
+    await expect(CardAPI.createComment('card-1', 'Direct comment')).resolves.toEqual(created)
     expect(apiRequest).toHaveBeenCalledWith('/api/cards/card-1/comments', {
       method: 'POST',
       json: { comment_str: 'Direct comment' },
@@ -124,9 +122,7 @@ describe('CardAPI', () => {
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(updated)
 
-    await expect(
-      CardAPI.updateComment('comment-1', 'Updated comment'),
-    ).resolves.toEqual(updated)
+    await expect(CardAPI.updateComment('comment-1', 'Updated comment')).resolves.toEqual(updated)
     expect(apiRequest).toHaveBeenCalledWith('/api/comments/comment-1', {
       method: 'PATCH',
       json: { comment_str: 'Updated comment' },
@@ -151,16 +147,11 @@ describe('CardAPI', () => {
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(completed)
 
-    await expect(
-      CardAPI.updateCompletion('card-1', true),
-    ).resolves.toEqual(completed)
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/api/cards/card-1/completion',
-      {
-        method: 'PATCH',
-        json: { is_completed: true },
-      },
-    )
+    await expect(CardAPI.updateCompletion('card-1', true)).resolves.toEqual(completed)
+    expect(apiRequest).toHaveBeenCalledWith('/api/cards/card-1/completion', {
+      method: 'PATCH',
+      json: { is_completed: true },
+    })
   })
 
   it('uploads an attachment through the generic file-transfer helper', async () => {
@@ -177,14 +168,8 @@ describe('CardAPI', () => {
     const file = new File(['content'], 'notes.pdf', { type: 'application/pdf' })
     const onProgress = vi.fn()
 
-    await expect(
-      CardAPI.uploadAttachment('card-1', file, onProgress),
-    ).resolves.toEqual(attachment)
-    expect(uploadFile).toHaveBeenCalledWith(
-      '/api/cards/card-1/attachments',
-      file,
-      onProgress,
-    )
+    await expect(CardAPI.uploadAttachment('card-1', file, onProgress)).resolves.toEqual(attachment)
+    expect(uploadFile).toHaveBeenCalledWith('/api/cards/card-1/attachments', file, onProgress)
   })
 
   it('removes an attachment', async () => {
@@ -192,10 +177,9 @@ describe('CardAPI', () => {
 
     await CardAPI.removeAttachment('attachment-1')
 
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/api/cards/attachments/attachment-1',
-      { method: 'DELETE' },
-    )
+    expect(apiRequest).toHaveBeenCalledWith('/api/cards/attachments/attachment-1', {
+      method: 'DELETE',
+    })
   })
 
   it('downloads an attachment through the generic file-transfer helper', async () => {
@@ -214,8 +198,6 @@ describe('CardAPI', () => {
     vi.mocked(fetchBlob).mockResolvedValueOnce(blob)
 
     await expect(CardAPI.fetchAttachmentBlob('attachment-1')).resolves.toBe(blob)
-    expect(fetchBlob).toHaveBeenCalledWith(
-      '/api/cards/attachments/attachment-1/download',
-    )
+    expect(fetchBlob).toHaveBeenCalledWith('/api/cards/attachments/attachment-1/download')
   })
 })

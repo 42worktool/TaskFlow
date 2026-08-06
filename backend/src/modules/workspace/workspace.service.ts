@@ -58,14 +58,8 @@ async function requireManagedWorkspace(
   return workspace
 }
 
-function requireRoleChangeAllowed(
-  targetMembership: WorkspaceMember,
-  newRole: Role,
-): void {
-  if (
-    targetMembership.role === 'OWNER' ||
-    newRole === 'OWNER'
-  ) {
+function requireRoleChangeAllowed(targetMembership: WorkspaceMember, newRole: Role): void {
+  if (targetMembership.role === 'OWNER' || newRole === 'OWNER') {
     throw new ForbiddenError()
   }
 }
@@ -102,12 +96,8 @@ export async function listWorkspaces(input: { userId: string }) {
   ])
 
   return {
-    my: my.map((workspace) =>
-      toWorkspaceDto(workspace, { includeMemberEmail: true }),
-    ),
-    public: public_.map((workspace) =>
-      toWorkspaceDto(workspace, { includeMemberEmail: false }),
-    ),
+    my: my.map((workspace) => toWorkspaceDto(workspace, { includeMemberEmail: true })),
+    public: public_.map((workspace) => toWorkspaceDto(workspace, { includeMemberEmail: false })),
   }
 }
 
@@ -217,7 +207,10 @@ function announceMemberJoined(
  * lockMembershipPair), the workspace row is known to already exist by the
  * time this runs, so a plain row lock — not an advisory one — is enough.
  */
-async function lockWorkspaceRow(tx: Prisma.TransactionClient, workspaceId: string): Promise<boolean> {
+async function lockWorkspaceRow(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+): Promise<boolean> {
   const rows = await tx.$queryRaw<{ id: string }[]>`
     SELECT "id" FROM "Workspaces"
     WHERE "id" = ${workspaceId}::uuid AND "deleted_at" IS NULL
@@ -310,11 +303,7 @@ export async function getWorkspace(input: { userId: string; workspaceId: string 
 /**
  * Create a workspace and register the creator as OWNER in a single transaction.
  */
-export async function createWorkspace(input: {
-  userId: string
-  name: string
-  isPublic: boolean
-}) {
+export async function createWorkspace(input: { userId: string; name: string; isPublic: boolean }) {
   const workspace = await prisma.workspace.create({
     data: {
       name: input.name,
@@ -337,14 +326,12 @@ export async function createWorkspace(input: {
 /**
  * Partial update (name / is_public). Requires ADMIN or above.
  */
-export async function updateWorkspace(
-  input: {
-    userId: string
-    workspaceId: string
-    name?: string
-    isPublic?: boolean
-  },
-) {
+export async function updateWorkspace(input: {
+  userId: string
+  workspaceId: string
+  name?: string
+  isPublic?: boolean
+}) {
   const workspace = await prisma.$transaction(async (tx) => {
     await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
 
@@ -407,31 +394,19 @@ export async function deleteWorkspace(input: { userId: string; workspaceId: stri
  * OWNER membership is intentionally immutable here: ownership transfer is a
  * separate workflow, not an ordinary member-role update.
  */
-export async function changeMemberRole(
-  input: {
-    userId: string
-    workspaceId: string
-    targetUserId: string
-    role: Role
-  },
-) {
+export async function changeMemberRole(input: {
+  userId: string
+  workspaceId: string
+  targetUserId: string
+  role: Role
+}) {
   const workspace = await prisma.$transaction(async (tx) => {
-    const ws = await requireManagedWorkspace(
-      tx,
-      input.workspaceId,
-      input.userId,
-      'ADMIN',
-    )
+    const ws = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
 
-    const targetMembership = ws.members.find(
-      (member) => member.user_id === input.targetUserId,
-    )
+    const targetMembership = ws.members.find((member) => member.user_id === input.targetUserId)
     if (!targetMembership) throw new NotFoundError()
 
-    requireRoleChangeAllowed(
-      targetMembership,
-      input.role,
-    )
+    requireRoleChangeAllowed(targetMembership, input.role)
 
     await tx.workspaceMember.update({
       where: {
@@ -475,22 +450,12 @@ export async function removeMember(input: {
   targetUserId: string
 }) {
   await prisma.$transaction(async (tx) => {
-    const ws = await requireManagedWorkspace(
-      tx,
-      input.workspaceId,
-      input.userId,
-      'ADMIN',
-    )
+    const ws = await requireManagedWorkspace(tx, input.workspaceId, input.userId, 'ADMIN')
 
-    const targetMembership = ws.members.find(
-      (member) => member.user_id === input.targetUserId,
-    )
+    const targetMembership = ws.members.find((member) => member.user_id === input.targetUserId)
     if (!targetMembership) throw new NotFoundError()
 
-    if (
-      targetMembership.role === 'ADMIN' ||
-      targetMembership.role === 'OWNER'
-    ) {
+    if (targetMembership.role === 'ADMIN' || targetMembership.role === 'OWNER') {
       throw new ForbiddenError()
     }
 
@@ -514,10 +479,7 @@ export async function removeMember(input: {
     list_ids: [],
     actor_user_id: input.userId,
   })
-  realtime.leaveUserChannel(
-    input.targetUserId,
-    workspaceChannel(input.workspaceId),
-  )
+  realtime.leaveUserChannel(input.targetUserId, workspaceChannel(input.workspaceId))
 }
 
 export async function inviteWorkspaceMember(input: {

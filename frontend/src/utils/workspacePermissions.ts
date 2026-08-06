@@ -12,15 +12,10 @@ export function workspaceRoleFor(
   userId: string | undefined,
 ): WorkspaceRole | null {
   if (!userId) return null
-  return (
-    workspace.members.find((member) => member.user_id === userId)?.role ?? null
-  )
+  return workspace.members.find((member) => member.user_id === userId)?.role ?? null
 }
 
-export function hasWorkspaceRole(
-  role: WorkspaceRole | null,
-  minimum: WorkspaceRole,
-): boolean {
+export function hasWorkspaceRole(role: WorkspaceRole | null, minimum: WorkspaceRole): boolean {
   return role !== null && ROLE_RANK[role] >= ROLE_RANK[minimum]
 }
 

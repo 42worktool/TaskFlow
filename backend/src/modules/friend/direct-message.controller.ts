@@ -1,9 +1,6 @@
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
-import {
-  createDirectMessage,
-  listDirectMessages,
-} from './direct-message.service'
+import { createDirectMessage, listDirectMessages } from './direct-message.service'
 import { createDirectMessageSchema } from './direct-message.validation'
 
 interface FriendUserParams {

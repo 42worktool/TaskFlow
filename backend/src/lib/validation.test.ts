@@ -1,17 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  normalizedEmailSchema,
-  normalizeEmail,
-  uuidSchema,
-} from './validation'
+import { normalizedEmailSchema, normalizeEmail, uuidSchema } from './validation'
 
 test('shared email validation normalizes valid addresses', () => {
   assert.equal(normalizeEmail('  User@Example.COM '), 'user@example.com')
-  assert.equal(
-    normalizedEmailSchema.parse('  User@Example.COM '),
-    'user@example.com',
-  )
+  assert.equal(normalizedEmailSchema.parse('  User@Example.COM '), 'user@example.com')
   assert.throws(() => normalizedEmailSchema.parse('not-an-email'))
 })
 

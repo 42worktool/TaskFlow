@@ -9,10 +9,7 @@ import { prisma } from '../../db'
 import { NotFoundError } from '../../errors'
 import { createdBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
-import {
-  requireWorkspaceReadAccess,
-  requireWorkspaceRole,
-} from '../../lib/workspace-permissions'
+import { requireWorkspaceReadAccess, requireWorkspaceRole } from '../../lib/workspace-permissions'
 import { toBoardListDto, toListDto } from './list.dto'
 import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 
@@ -98,11 +95,7 @@ export async function getList(input: { userId: string; listId: string }) {
 /**
  * Create a list at the end of the workspace's board. Requires MEMBER+.
  */
-export async function createList(input: {
-  userId: string
-  workspaceId: string
-  name: string
-}) {
+export async function createList(input: { userId: string; workspaceId: string; name: string }) {
   await requireWorkspaceRole(input.workspaceId, input.userId, 'MEMBER')
 
   const agg = await prisma.list.aggregate({
@@ -133,11 +126,7 @@ export async function createList(input: {
 /**
  * Update a list's name. Requires MEMBER+.
  */
-export async function updateList(input: {
-  userId: string
-  listId: string
-  name: string
-}) {
+export async function updateList(input: { userId: string; listId: string; name: string }) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
   await requireWorkspaceRole(list.workspace_id, input.userId, 'MEMBER')
@@ -217,14 +206,12 @@ export async function deleteList(input: { userId: string; listId: string }): Pro
  * Reorder a list among its workspace siblings using neighbor ids.
  * Requires MEMBER+.
  */
-export async function reorderList(
-  input: {
-    userId: string
-    listId: string
-    beforeListId?: string | null
-    afterListId?: string | null
-  },
-) {
+export async function reorderList(input: {
+  userId: string
+  listId: string
+  beforeListId?: string | null
+  afterListId?: string | null
+}) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
   if (!list) throw new NotFoundError()
   await requireWorkspaceRole(list.workspace_id, input.userId, 'MEMBER')
@@ -234,11 +221,7 @@ export async function reorderList(
     orderBy: { sequence: 'asc' },
   })
 
-  const newSequence = computeSequence(
-    siblings,
-    input.beforeListId,
-    input.afterListId,
-  )
+  const newSequence = computeSequence(siblings, input.beforeListId, input.afterListId)
   const updated = await prisma.list.update({
     where: { id: input.listId },
     data: { sequence: newSequence, ...updatedBy(input.userId) },

@@ -24,15 +24,8 @@ import {
   parseWorkspaceChangedEvent,
   parseWorkspaceMemberPresenceEvent,
 } from '../services/realtime/protocol'
-import type {
-  Card,
-  Workspace,
-  WorkspaceSubscriptionResult,
-} from '../types'
-import {
-  hasWorkspaceRole,
-  workspaceRoleFor,
-} from '../utils/workspacePermissions'
+import type { Card, Workspace, WorkspaceSubscriptionResult } from '../types'
+import { hasWorkspaceRole, workspaceRoleFor } from '../utils/workspacePermissions'
 
 const route = useRoute()
 const router = useRouter()
@@ -42,17 +35,11 @@ const loadError = ref('')
 const onlineUserIds = ref<Set<string>>(new Set())
 const workspaceSyncVersion = ref(0)
 const currentRole = computed(() =>
-  workspace.value
-    ? workspaceRoleFor(workspace.value, authState.user?.id)
-    : null,
+  workspace.value ? workspaceRoleFor(workspace.value, authState.user?.id) : null,
 )
 const canViewCardDetails = computed(() => currentRole.value !== null)
-const canEditBoard = computed(() =>
-  hasWorkspaceRole(currentRole.value, 'MEMBER'),
-)
-const canManageMembers = computed(() =>
-  hasWorkspaceRole(currentRole.value, 'ADMIN'),
-)
+const canEditBoard = computed(() => hasWorkspaceRole(currentRole.value, 'MEMBER'))
+const canManageMembers = computed(() => hasWorkspaceRole(currentRole.value, 'ADMIN'))
 
 const showShareModal = ref(false)
 const inboxOpen = ref(false)
@@ -61,10 +48,7 @@ const CARD_DRAG_PAGE_CLASS = 'is-card-dragging'
 const CARD_DRAG_END_GRACE_MS = 250
 let cardDragEndFallback: ReturnType<typeof setTimeout> | null = null
 const inboxAcceptingBoardCard = computed(
-  () =>
-    inboxOpen.value &&
-    canEditBoard.value &&
-    messengerState.cardDrag?.source === 'board',
+  () => inboxOpen.value && canEditBoard.value && messengerState.cardDrag?.source === 'board',
 )
 
 function setCardDragPageState(active: boolean): void {
@@ -119,19 +103,11 @@ function onInboxDropSettled(): void {
 function clearExternalDropOverWorkspace(event: DragEvent): void {
   const drag = messengerState.cardDrag
   const drop = messengerState.externalCardDrop
-  if (
-    drag?.source !== 'board' ||
-    !drop ||
-    drop.committed ||
-    drop.cardId !== drag.cardId
-  ) {
+  if (drag?.source !== 'board' || !drop || drop.committed || drop.cardId !== drag.cardId) {
     return
   }
   const target = event.target
-  if (
-    target instanceof Element &&
-    target.closest('[data-card-drop-target]')
-  ) {
+  if (target instanceof Element && target.closest('[data-card-drop-target]')) {
     return
   }
   clearExternalCardDropHover(drag.cardId, drop.owner)
@@ -148,10 +124,7 @@ let presenceSequence = 0
 let activeSubscriptionWorkspaceId: string | null = null
 let messengerContextWorkspaceId: string | null = null
 let removeSubscriptionRecovery: (() => void) | null = null
-const livePresence = new Map<
-  string,
-  { online: boolean; sequence: number }
->()
+const livePresence = new Map<string, { online: boolean; sequence: number }>()
 
 async function loadWorkspace(id: string, reset: boolean): Promise<void> {
   const generation = ++workspaceLoadGeneration
@@ -173,10 +146,7 @@ async function loadWorkspace(id: string, reset: boolean): Promise<void> {
       loadError.value = ''
       return
     } catch (caught) {
-      if (
-        generation !== workspaceLoadGeneration ||
-        id !== workspaceId.value
-      ) {
+      if (generation !== workspaceLoadGeneration || id !== workspaceId.value) {
         return
       }
       if (attempt + 1 < attempts) {
@@ -186,9 +156,7 @@ async function loadWorkspace(id: string, reset: boolean): Promise<void> {
         continue
       }
       const message =
-        caught instanceof Error
-          ? caught.message
-          : '워크스페이스를 불러오지 못했습니다.'
+        caught instanceof Error ? caught.message : '워크스페이스를 불러오지 못했습니다.'
       if (reset || !workspace.value) {
         loadError.value = message
       } else {
@@ -198,10 +166,7 @@ async function loadWorkspace(id: string, reset: boolean): Promise<void> {
   }
 }
 
-function applyPresenceSnapshot(
-  onlineIds: readonly string[],
-  sequenceAtStart: number,
-): void {
+function applyPresenceSnapshot(onlineIds: readonly string[], sequenceAtStart: number): void {
   const next = new Set(onlineIds)
   for (const [userId, presence] of livePresence) {
     if (presence.sequence <= sequenceAtStart) continue
@@ -216,11 +181,7 @@ async function subscribeWorkspace(id: string): Promise<void> {
   let result: WorkspaceSubscriptionResult | null = null
 
   for (let attempt = 0; attempt < SUBSCRIPTION_ATTEMPTS; attempt += 1) {
-    if (
-      activeSubscriptionWorkspaceId !== id ||
-      workspaceId.value !== id ||
-      !realtime.isConnected
-    ) {
+    if (activeSubscriptionWorkspaceId !== id || workspaceId.value !== id || !realtime.isConnected) {
       return
     }
 
@@ -238,19 +199,13 @@ async function subscribeWorkspace(id: string): Promise<void> {
       ) {
         try {
           const loaded = await WorkspaceAPI.get(id)
-          if (
-            activeSubscriptionWorkspaceId === id &&
-            workspaceId.value === id
-          ) {
+          if (activeSubscriptionWorkspaceId === id && workspaceId.value === id) {
             workspace.value = loaded
             loadError.value = ''
             workspaceSyncVersion.value += 1
           }
         } catch {
-          if (
-            activeSubscriptionWorkspaceId === id &&
-            workspaceId.value === id
-          ) {
+          if (activeSubscriptionWorkspaceId === id && workspaceId.value === id) {
             workspace.value = null
             stopWorkspaceSubscription()
             void router.replace('/workspaces')
@@ -270,14 +225,9 @@ async function subscribeWorkspace(id: string): Promise<void> {
   }
   if (!result) return
 
-  if (
-    activeSubscriptionWorkspaceId !== id ||
-    workspaceId.value !== id
-  ) {
+  if (activeSubscriptionWorkspaceId !== id || workspaceId.value !== id) {
     if (realtime.isConnected) {
-      void realtime
-        .request('workspace.unsubscribe', { workspace_id: id })
-        .catch(() => undefined)
+      void realtime.request('workspace.unsubscribe', { workspace_id: id }).catch(() => undefined)
     }
     return
   }
@@ -310,52 +260,44 @@ function startWorkspaceSubscription(id: string): void {
   if (activeSubscriptionWorkspaceId === id) return
   stopWorkspaceSubscription()
   activeSubscriptionWorkspaceId = id
-  removeSubscriptionRecovery = realtime.registerSubscriptionRecovery(
-    `workspace:${id}`,
-    () => subscribeWorkspace(id),
+  removeSubscriptionRecovery = realtime.registerSubscriptionRecovery(`workspace:${id}`, () =>
+    subscribeWorkspace(id),
   )
 }
 
-const removeWorkspaceChangeListener = realtime.on(
-  'workspace.changed',
-  (value) => {
-    const event = parseWorkspaceChangedEvent(value)
-    if (!event || event.workspace_id !== workspaceId.value) return
+const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) => {
+  const event = parseWorkspaceChangedEvent(value)
+  if (!event || event.workspace_id !== workspaceId.value) return
 
-    if (event.entity === 'workspace' && event.action === 'deleted') {
-      stopWorkspaceSubscription()
-      void router.replace('/workspaces')
-      return
-    }
-    if (
-      event.entity === 'member' &&
-      event.action === 'deleted' &&
-      event.entity_id === authState.user?.id
-    ) {
-      stopWorkspaceSubscription()
-      void router.replace('/workspaces')
-      return
-    }
-    if (event.entity !== 'workspace' && event.entity !== 'member') return
+  if (event.entity === 'workspace' && event.action === 'deleted') {
+    stopWorkspaceSubscription()
+    void router.replace('/workspaces')
+    return
+  }
+  if (
+    event.entity === 'member' &&
+    event.action === 'deleted' &&
+    event.entity_id === authState.user?.id
+  ) {
+    stopWorkspaceSubscription()
+    void router.replace('/workspaces')
+    return
+  }
+  if (event.entity !== 'workspace' && event.entity !== 'member') return
 
-    const id = event.workspace_id
-    void (async () => {
-      await loadWorkspace(id, false)
-      if (
-        event.entity === 'member' &&
-        activeSubscriptionWorkspaceId === id &&
-        realtime.isConnected
-      ) {
-        await subscribeWorkspace(id)
-      }
-    })().catch((caught: unknown) => {
-      console.warn(
-        '[workspace] realtime reconciliation failed',
-        caught instanceof Error ? caught.message : caught,
-      )
-    })
-  },
-)
+  const id = event.workspace_id
+  void (async () => {
+    await loadWorkspace(id, false)
+    if (event.entity === 'member' && activeSubscriptionWorkspaceId === id && realtime.isConnected) {
+      await subscribeWorkspace(id)
+    }
+  })().catch((caught: unknown) => {
+    console.warn(
+      '[workspace] realtime reconciliation failed',
+      caught instanceof Error ? caught.message : caught,
+    )
+  })
+})
 
 const removeWorkspacePresenceListener = realtime.on(
   'workspace.member_presence_changed',
@@ -386,13 +328,10 @@ watch(
   { immediate: true },
 )
 
-watch(
-  [workspaceId, currentRole],
-  ([id, role]) => {
-    if (id && role) startWorkspaceSubscription(id)
-    else stopWorkspaceSubscription()
-  },
-)
+watch([workspaceId, currentRole], ([id, role]) => {
+  if (id && role) startWorkspaceSubscription(id)
+  else stopWorkspaceSubscription()
+})
 
 watch(
   [workspace, currentRole, workspaceSyncVersion],
@@ -456,11 +395,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    v-if="workspace"
-    class="app-shell"
-    @dragover.capture="clearExternalDropOverWorkspace"
-  >
+  <div v-if="workspace" class="app-shell" @dragover.capture="clearExternalDropOverWorkspace">
     <AppHeader :workspace-name="workspace.name">
       <template #workspace-actions>
         <WorkspaceMembersMenu
@@ -481,10 +416,8 @@ onUnmounted(() => {
       class="content-area"
       :class="{
         'content-area--inbox-open': inboxOpen,
-        'content-area--messenger-open':
-          messengerState.open && !compactViewport,
-        'content-area--messenger-directory-collapsed':
-          messengerState.directoryCollapsed,
+        'content-area--messenger-open': messengerState.open && !compactViewport,
+        'content-area--messenger-directory-collapsed': messengerState.directoryCollapsed,
       }"
     >
       <aside

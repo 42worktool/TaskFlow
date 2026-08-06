@@ -29,18 +29,11 @@ describe('cardOccursOnDate', () => {
   it('uses either a start or deadline as a single calendar day', () => {
     const date = new Date(2026, 6, 29)
 
-    expect(
-      cardOccursOnDate(card({ start_at: localIso(2026, 6, 29) }), date),
-    ).toBe(true)
-    expect(
-      cardOccursOnDate(card({ deadline: localIso(2026, 6, 29) }), date),
-    ).toBe(true)
-    expect(
-      cardOccursOnDate(
-        card({ deadline: localIso(2026, 6, 29) }),
-        new Date(2026, 6, 30),
-      ),
-    ).toBe(false)
+    expect(cardOccursOnDate(card({ start_at: localIso(2026, 6, 29) }), date)).toBe(true)
+    expect(cardOccursOnDate(card({ deadline: localIso(2026, 6, 29) }), date)).toBe(true)
+    expect(cardOccursOnDate(card({ deadline: localIso(2026, 6, 29) }), new Date(2026, 6, 30))).toBe(
+      false,
+    )
   })
 
   it('includes every local day in a range crossing a month boundary', () => {
@@ -118,11 +111,7 @@ describe('buildCalendarWeeks', () => {
       deadline: localIso(2026, 6, 11),
     })
 
-    const week = buildCalendarWeeks(2026, 7, [
-      later,
-      overlapping,
-      first,
-    ])[1]
+    const week = buildCalendarWeeks(2026, 7, [later, overlapping, first])[1]
     const lanes = Object.fromEntries(
       week.segments.map((segment) => [segment.card.id, segment.lane]),
     )

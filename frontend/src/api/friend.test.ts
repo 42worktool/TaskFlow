@@ -25,25 +25,16 @@ describe('FriendAPI', () => {
   })
 
   it('loads and sends direct messages with an accepted friend', async () => {
-    vi.mocked(apiRequest)
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce({ id: 'message-1' })
+    vi.mocked(apiRequest).mockResolvedValueOnce([]).mockResolvedValueOnce({ id: 'message-1' })
 
     await FriendAPI.listMessages('user-2')
     await FriendAPI.sendMessage('user-2', '안녕하세요')
 
-    expect(apiRequest).toHaveBeenNthCalledWith(
-      1,
-      '/api/friends/user-2/messages',
-    )
-    expect(apiRequest).toHaveBeenNthCalledWith(
-      2,
-      '/api/friends/user-2/messages',
-      {
-        method: 'POST',
-        json: { content: '안녕하세요' },
-      },
-    )
+    expect(apiRequest).toHaveBeenNthCalledWith(1, '/api/friends/user-2/messages')
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/friends/user-2/messages', {
+      method: 'POST',
+      json: { content: '안녕하세요' },
+    })
   })
 
   it('waits for an in-flight mutation before a reopened drawer reads', async () => {
@@ -52,9 +43,7 @@ describe('FriendAPI', () => {
       finishAccept = resolve
     })
     const request = vi.mocked(apiRequest)
-    request
-      .mockReturnValueOnce(acceptance as never)
-      .mockResolvedValueOnce([] as never)
+    request.mockReturnValueOnce(acceptance as never).mockResolvedValueOnce([] as never)
 
     const acceptPromise = FriendAPI.acceptRequest('user-2')
     const listPromise = FriendAPI.list()
@@ -84,23 +73,17 @@ describe('FriendAPI', () => {
   })
 
   it('accepts, rejects or cancels pending requests', async () => {
-    vi.mocked(apiRequest)
-      .mockResolvedValueOnce({ id: 'user-2' })
-      .mockResolvedValueOnce(undefined)
+    vi.mocked(apiRequest).mockResolvedValueOnce({ id: 'user-2' }).mockResolvedValueOnce(undefined)
 
     await FriendAPI.acceptRequest('user-2')
     await FriendAPI.deleteRequest('user-2')
 
-    expect(apiRequest).toHaveBeenNthCalledWith(
-      1,
-      '/api/friends/requests/user-2/accept',
-      { method: 'POST' },
-    )
-    expect(apiRequest).toHaveBeenNthCalledWith(
-      2,
-      '/api/friends/requests/user-2',
-      { method: 'DELETE' },
-    )
+    expect(apiRequest).toHaveBeenNthCalledWith(1, '/api/friends/requests/user-2/accept', {
+      method: 'POST',
+    })
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/friends/requests/user-2', {
+      method: 'DELETE',
+    })
   })
 
   it('removes an accepted friend without touching pending requests', async () => {

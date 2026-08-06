@@ -71,15 +71,7 @@ async function submit() {
         <div class="modal-actions">
           <button class="btn btn--secondary" type="button" @click="emit('close')">취소</button>
           <button class="btn btn--primary" type="submit" :disabled="loading || !name.trim()">
-            {{
-              loading
-                ? editing
-                  ? '저장 중…'
-                  : '생성 중…'
-                : editing
-                  ? '저장'
-                  : '만들기'
-            }}
+            {{ loading ? (editing ? '저장 중…' : '생성 중…') : editing ? '저장' : '만들기' }}
           </button>
         </div>
       </form>

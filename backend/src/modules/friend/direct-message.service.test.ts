@@ -12,8 +12,7 @@ function setRequiredEnvironment(): void {
     JWT_ACCESS_SECRET: 'test-secret-that-is-at-least-32-characters',
     GOOGLE_CLIENT_ID: 'test-client',
     GOOGLE_CLIENT_SECRET: 'test-secret',
-    GOOGLE_REDIRECT_URI:
-      'http://localhost:3000/api/auth/oauth/callback/google',
+    GOOGLE_REDIRECT_URI: 'http://localhost:3000/api/auth/oauth/callback/google',
     REDIS_URL: 'redis://localhost:6379',
     SMTP_HOST: 'localhost',
     SMTP_USER: 'test',
@@ -45,8 +44,7 @@ function user(id: string) {
   return {
     id,
     name: id === USER_ID ? 'Alice' : 'Bob',
-    profile_image_url:
-      id === FRIEND_USER_ID ? 'https://example.com/bob.png' : null,
+    profile_image_url: id === FRIEND_USER_ID ? 'https://example.com/bob.png' : null,
   }
 }
 
@@ -86,20 +84,8 @@ test('direct messages require friendship, return history, and notify both users'
     stubMethod(t, prisma.directMessage, 'findMany', async (args) => {
       messageQuery = args
       return [
-        message(
-          SECOND_MESSAGE_ID,
-          FRIEND_USER_ID,
-          USER_ID,
-          'second',
-          '2026-07-30T00:00:02.000Z',
-        ),
-        message(
-          FIRST_MESSAGE_ID,
-          USER_ID,
-          FRIEND_USER_ID,
-          'first',
-          '2026-07-30T00:00:01.000Z',
-        ),
+        message(SECOND_MESSAGE_ID, FRIEND_USER_ID, USER_ID, 'second', '2026-07-30T00:00:02.000Z'),
+        message(FIRST_MESSAGE_ID, USER_ID, FRIEND_USER_ID, 'first', '2026-07-30T00:00:01.000Z'),
       ]
     })
 
@@ -129,10 +115,7 @@ test('direct messages require friendship, return history, and notify both users'
         },
       ],
     })
-    assert.deepEqual(messageQuery.orderBy, [
-      { created_at: 'desc' },
-      { id: 'desc' },
-    ])
+    assert.deepEqual(messageQuery.orderBy, [{ created_at: 'desc' }, { id: 'desc' }])
     assert.equal(messageQuery.take, 100)
     assert.deepEqual(
       result.map((item) => item.id),
@@ -160,13 +143,7 @@ test('direct messages require friendship, return history, and notify both users'
     stubMethod(t, prisma.directMessage, 'create', async (args) => {
       operationOrder.push('create')
       create = args
-      return message(
-        FIRST_MESSAGE_ID,
-        USER_ID,
-        FRIEND_USER_ID,
-        'hello',
-        '2026-07-30T00:00:01.000Z',
-      )
+      return message(FIRST_MESSAGE_ID, USER_ID, FRIEND_USER_ID, 'hello', '2026-07-30T00:00:01.000Z')
     })
     const deliveries: unknown[][] = []
     stubMethod(t, realtime, 'sendToUser', (...args) => {
@@ -208,13 +185,7 @@ test('direct messages require friendship, return history, and notify both users'
     })
     stubMethod(t, prisma.directMessage, 'create', async () => {
       writes += 1
-      return message(
-        FIRST_MESSAGE_ID,
-        USER_ID,
-        FRIEND_USER_ID,
-        'hello',
-        '2026-07-30T00:00:01.000Z',
-      )
+      return message(FIRST_MESSAGE_ID, USER_ID, FRIEND_USER_ID, 'hello', '2026-07-30T00:00:01.000Z')
     })
     stubMethod(t, realtime, 'sendToUser', () => {
       deliveries += 1

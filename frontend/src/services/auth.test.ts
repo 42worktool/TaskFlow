@@ -76,10 +76,7 @@ describe('auth session generation', () => {
     expect(reloadedModule.authState.accessToken).toBeNull()
     expect(reloadedModule.authState.initialized).toBe(true)
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/auth/logout',
-      expect.any(Object),
-    )
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/logout', expect.any(Object))
   })
 
   it('allows a successful login after an explicit logout', async () => {
@@ -117,10 +114,7 @@ describe('auth session generation', () => {
 
     expect(reloadedModule.authState.user).toEqual(session.user)
     expect(reloadedModule.authState.accessToken).toBe(session.access_token)
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/auth/refresh',
-      expect.any(Object),
-    )
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/refresh', expect.any(Object))
   })
 
   it('does not let a late refresh response restore a logged-out session', async () => {
@@ -175,16 +169,10 @@ describe('auth session generation', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const {
-      authState,
-      getAccessToken,
-      loginWithPassword,
-    } = await import('./auth')
+    const { authState, getAccessToken, loginWithPassword } = await import('./auth')
     await loginWithPassword('user@example.com', 'password')
 
-    await expect(getAccessToken(true)).rejects.toThrow(
-      '인증 세션을 갱신하지 못했습니다.',
-    )
+    await expect(getAccessToken(true)).rejects.toThrow('인증 세션을 갱신하지 못했습니다.')
     expect(authState.accessToken).toBe(session.access_token)
     expect(authState.user).toEqual(session.user)
   })
@@ -211,19 +199,11 @@ describe('auth session generation', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const {
-      authFetch,
-      authState,
-      loginWithPassword,
-      logout,
-    } = await import('./auth')
+    const { authFetch, authState, loginWithPassword, logout } = await import('./auth')
     await loginWithPassword('user@example.com', 'password')
     const pendingRequest = authFetch('/api/protected')
     await vi.waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/protected',
-        expect.any(Object),
-      ),
+      expect(fetchMock).toHaveBeenCalledWith('/api/protected', expect.any(Object)),
     )
 
     await logout()
@@ -232,22 +212,17 @@ describe('auth session generation', () => {
     await expect(pendingRequest).resolves.toMatchObject({ status: 401 })
     expect(authState.accessToken).toBeNull()
     expect(
-      fetchMock.mock.calls.filter(([input]) =>
-        String(input) === '/api/auth/refresh'),
+      fetchMock.mock.calls.filter(([input]) => String(input) === '/api/auth/refresh'),
     ).toHaveLength(0)
   })
 
   it('lets the latest login attempt win regardless of response order', async () => {
     const firstResponse = deferred<Response>()
     const secondResponse = deferred<Response>()
-    const fetchMock = vi.fn(
-      (_input: RequestInfo | URL, init?: RequestInit) => {
-        const body = JSON.parse(String(init?.body)) as { email: string }
-        return body.email === 'first@example.com'
-          ? firstResponse.promise
-          : secondResponse.promise
-      },
-    )
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { email: string }
+      return body.email === 'first@example.com' ? firstResponse.promise : secondResponse.promise
+    })
     vi.stubGlobal('fetch', fetchMock)
 
     const { authState, loginWithPassword } = await import('./auth')
@@ -301,9 +276,7 @@ describe('auth session generation', () => {
     const { apiRequest, authState } = await import('./auth')
     authState.initialized = true
 
-    await expect(
-      apiRequest('/api/friends/requests', { method: 'POST' }),
-    ).rejects.toMatchObject({
+    await expect(apiRequest('/api/friends/requests', { method: 'POST' })).rejects.toMatchObject({
       message: '이미 친구인 사용자입니다.',
       cause: 'ALREADY_FRIENDS',
     })

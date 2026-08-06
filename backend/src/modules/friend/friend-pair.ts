@@ -11,21 +11,13 @@ class CannotFriendSelfError extends AppError {
   }
 }
 
-export function canonicalFriendPair(
-  userId: string,
-  friendUserId: string,
-): FriendPair {
+export function canonicalFriendPair(userId: string, friendUserId: string): FriendPair {
   if (userId === friendUserId) throw new CannotFriendSelfError()
   return userId < friendUserId
     ? { user_low_id: userId, user_high_id: friendUserId }
     : { user_low_id: friendUserId, user_high_id: userId }
 }
 
-export function otherUserId(
-  pair: FriendPair,
-  currentUserId: string,
-): string {
-  return pair.user_low_id === currentUserId
-    ? pair.user_high_id
-    : pair.user_low_id
+export function otherUserId(pair: FriendPair, currentUserId: string): string {
+  return pair.user_low_id === currentUserId ? pair.user_high_id : pair.user_low_id
 }

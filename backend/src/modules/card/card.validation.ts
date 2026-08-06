@@ -20,10 +20,9 @@ export const cardNeighborSchema = z
     before_card_id: uuidSchema.nullable().optional(),
     after_card_id: uuidSchema.nullable().optional(),
   })
-  .refine(
-    (value) => value.before_card_id !== undefined || value.after_card_id !== undefined,
-    { message: 'either before_card_id or after_card_id is required' },
-  )
+  .refine((value) => value.before_card_id !== undefined || value.after_card_id !== undefined, {
+    message: 'either before_card_id or after_card_id is required',
+  })
 
 export const moveCardSchema = z.object({
   list_id: uuidSchema,

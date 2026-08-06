@@ -32,12 +32,8 @@ describe('friend presence protocol', () => {
   })
 
   it('rejects malformed presence data', () => {
-    expect(
-      parseFriendPresenceEvent({ user_id: 'user-1', online: true }),
-    ).toBeNull()
-    expect(
-      parseFriendPresenceEvent({ user_id: '', online: false }),
-    ).toBeNull()
+    expect(parseFriendPresenceEvent({ user_id: 'user-1', online: true })).toBeNull()
+    expect(parseFriendPresenceEvent({ user_id: '', online: false })).toBeNull()
   })
 })
 
@@ -66,9 +62,7 @@ describe('friend request lifecycle protocol', () => {
   it('rejects malformed friend request payloads', () => {
     expect(parseFriendRequest({ ...request, id: 'not-a-uuid' })).toBeNull()
     expect(parseFriendRequest({ ...request, name: '' })).toBeNull()
-    expect(
-      parseFriendRequest({ ...request, requested_at: 'not-a-date' }),
-    ).toBeNull()
+    expect(parseFriendRequest({ ...request, requested_at: 'not-a-date' })).toBeNull()
     expect(parseFriendUserIdEvent({ user_id: 'user-1' })).toBeNull()
   })
 
@@ -105,9 +99,7 @@ describe('direct message realtime protocol', () => {
 
   it('rejects malformed direct messages', () => {
     expect(parseDirectMessage({ ...message, content: '' })).toBeNull()
-    expect(
-      parseDirectMessage({ ...message, content: 'x'.repeat(1001) }),
-    ).toBeNull()
+    expect(parseDirectMessage({ ...message, content: 'x'.repeat(1001) })).toBeNull()
     expect(
       parseDirectMessage({
         ...message,
@@ -131,10 +123,7 @@ describe('workspace realtime protocol', () => {
       entity: 'card' as const,
       action: 'moved' as const,
       entity_id: ENTITY_ID,
-      list_ids: [
-        '00000000-0000-4000-8000-000000000006',
-        '00000000-0000-4000-8000-000000000007',
-      ],
+      list_ids: ['00000000-0000-4000-8000-000000000006', '00000000-0000-4000-8000-000000000007'],
       actor_user_id: USER_ID,
       occurred_at: OCCURRED_AT,
     }

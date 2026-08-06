@@ -26,9 +26,7 @@ type DirectMessageWithUsers = DirectMessage & {
 
 export type DirectMessageDto = z.infer<typeof directMessageDtoSchema>
 
-export function toDirectMessageDto(
-  message: DirectMessageWithUsers,
-): DirectMessageDto {
+export function toDirectMessageDto(message: DirectMessageWithUsers): DirectMessageDto {
   return directMessageDtoSchema.parse({
     id: message.id,
     content: message.content,

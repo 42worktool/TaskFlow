@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-} from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DirectMessagePanel from './DirectMessagePanel.vue'
 import FriendsPanel from './FriendsPanel.vue'
@@ -63,19 +56,13 @@ let directoryLoadGeneration = 0
 let returnFocus: HTMLElement | null = null
 
 const toolboxRoute = computed(
-  () =>
-    (route.path === '/workspaces' ||
-      route.path.startsWith('/workspaces/')),
+  () => route.path === '/workspaces' || route.path.startsWith('/workspaces/'),
 )
 const activeWorkspaceRoom = computed(() =>
-  messengerState.activeRoom?.kind === 'workspace'
-    ? messengerState.activeRoom.workspace
-    : null,
+  messengerState.activeRoom?.kind === 'workspace' ? messengerState.activeRoom.workspace : null,
 )
 const activeDirectFriend = computed(() =>
-  messengerState.activeRoom?.kind === 'dm'
-    ? messengerState.activeRoom.friend
-    : null,
+  messengerState.activeRoom?.kind === 'dm' ? messengerState.activeRoom.friend : null,
 )
 const activeRoomTitle = computed(() => {
   if (messengerState.pane === 'friends') return '친구 관리'
@@ -87,23 +74,16 @@ const activeRoomTitle = computed(() => {
   }
   return '대화 목록'
 })
-const totalUnreadLabel = computed(() =>
-  formatMessengerUnreadCount(totalMessengerUnreadCount.value),
-)
-const directoryVisible = computed(
-  () =>
-    compactViewport.value
-      ? messengerState.pane === 'directory'
-      : !messengerState.directoryCollapsed,
+const totalUnreadLabel = computed(() => formatMessengerUnreadCount(totalMessengerUnreadCount.value))
+const directoryVisible = computed(() =>
+  compactViewport.value ? messengerState.pane === 'directory' : !messengerState.directoryCollapsed,
 )
 const conversationVisible = computed(
   () => !compactViewport.value || messengerState.pane !== 'directory',
 )
 
 function paneFromQuery(value: unknown): MessengerPane | null {
-  return value === 'friends' || value === 'chat'
-    ? value
-    : null
+  return value === 'friends' || value === 'chat' ? value : null
 }
 
 function clearMessengerQuery(): void {
@@ -133,10 +113,7 @@ function clearChatDropOutsidePanel(event: DragEvent): void {
     return
   }
   const target = event.target
-  if (
-    target instanceof Element &&
-    target.closest('.workspace-chat-panel')
-  ) {
+  if (target instanceof Element && target.closest('.workspace-chat-panel')) {
     return
   }
   clearExternalCardDropHover(drag.cardId, 'chat-panel')
@@ -155,10 +132,7 @@ async function loadDirectory(): Promise<void> {
   directoryLoading.value = true
   directoryError.value = ''
   try {
-    const [friends, workspaces] = await Promise.all([
-      FriendAPI.list(),
-      WorkspaceAPI.list(),
-    ])
+    const [friends, workspaces] = await Promise.all([FriendAPI.list(), WorkspaceAPI.list()])
     if (generation !== directoryLoadGeneration) return
     directoryFriends.value = friends
     directoryWorkspaces.value = workspaces.my
@@ -169,9 +143,7 @@ async function loadDirectory(): Promise<void> {
 
     const activeRoom = messengerState.activeRoom
     if (activeRoom?.kind === 'dm') {
-      const currentFriend = friends.find(
-        (friend) => friend.id === activeRoom.friend.id,
-      )
+      const currentFriend = friends.find((friend) => friend.id === activeRoom.friend.id)
       if (!currentFriend) {
         messengerState.activeRoom = null
         showMessengerDirectory()
@@ -182,9 +154,7 @@ async function loadDirectory(): Promise<void> {
   } catch (caught) {
     if (generation !== directoryLoadGeneration) return
     directoryError.value =
-      caught instanceof Error
-        ? caught.message
-        : '대화 목록을 불러오지 못했습니다.'
+      caught instanceof Error ? caught.message : '대화 목록을 불러오지 못했습니다.'
   } finally {
     if (generation === directoryLoadGeneration) {
       directoryLoading.value = false
@@ -195,9 +165,7 @@ async function loadDirectory(): Promise<void> {
 function receiveFriendPresence(value: unknown): void {
   const event = parseFriendPresenceEvent(value)
   if (!event) return
-  const friend = directoryFriends.value.find(
-    (item) => item.id === event.user_id,
-  )
+  const friend = directoryFriends.value.find((item) => item.id === event.user_id)
   if (friend) friend.online = event.online
   if (
     messengerState.activeRoom?.kind === 'dm' &&
@@ -219,9 +187,7 @@ function receiveFriendRequestAccepted(value: unknown): void {
 function receiveFriendRemoved(value: unknown): void {
   const event = parseFriendUserIdEvent(value)
   if (!event) return
-  directoryFriends.value = directoryFriends.value.filter(
-    (item) => item.id !== event.user_id,
-  )
+  directoryFriends.value = directoryFriends.value.filter((item) => item.id !== event.user_id)
   markDirectConversationRead(event.user_id)
   if (
     messengerState.activeRoom?.kind === 'dm' &&
@@ -233,25 +199,16 @@ function receiveFriendRemoved(value: unknown): void {
 }
 
 function visibleMessengerRoom(): VisibleMessengerRoom | null {
-  if (
-    !messengerState.open ||
-    document.visibilityState !== 'visible'
-  ) {
+  if (!messengerState.open || document.visibilityState !== 'visible') {
     return null
   }
-  if (
-    messengerState.pane === 'chat' &&
-    messengerState.activeRoom?.kind === 'workspace'
-  ) {
+  if (messengerState.pane === 'chat' && messengerState.activeRoom?.kind === 'workspace') {
     return {
       kind: 'workspace',
       id: messengerState.activeRoom.workspace.id,
     }
   }
-  if (
-    messengerState.pane === 'dm' &&
-    messengerState.activeRoom?.kind === 'dm'
-  ) {
+  if (messengerState.pane === 'dm' && messengerState.activeRoom?.kind === 'dm') {
     return {
       kind: 'dm',
       id: messengerState.activeRoom.friend.id,
@@ -272,31 +229,19 @@ function markVisibleConversationRead(): void {
 function receiveWorkspaceMessage(value: unknown): void {
   const message = parseWorkspaceMessage(value)
   if (!message) return
-  receiveWorkspaceMessageUnread(
-    message,
-    authState.user?.id ?? null,
-    visibleMessengerRoom(),
-  )
+  receiveWorkspaceMessageUnread(message, authState.user?.id ?? null, visibleMessengerRoom())
 }
 
 function receiveDirectMessage(value: unknown): void {
   const message = parseDirectMessage(value)
   if (!message) return
-  receiveDirectMessageUnread(
-    message,
-    authState.user?.id ?? null,
-    visibleMessengerRoom(),
-  )
+  receiveDirectMessageUnread(message, authState.user?.id ?? null, visibleMessengerRoom())
 }
 
 function receiveWorkspaceActivity(value: unknown): void {
   const event = parseNotificationEvent(value)
   if (!event) return
-  receiveWorkspaceActivityUnread(
-    event,
-    authState.user?.id ?? null,
-    visibleMessengerRoom(),
-  )
+  receiveWorkspaceActivityUnread(event, authState.user?.id ?? null, visibleMessengerRoom())
 }
 
 async function selectWorkspaceRoom(workspace: Workspace): Promise<void> {
@@ -304,10 +249,7 @@ async function selectWorkspaceRoom(workspace: Workspace): Promise<void> {
   openWorkspaceConversation({
     id: workspace.id,
     name: workspace.name,
-    syncVersion:
-      routeWorkspace?.id === workspace.id
-        ? routeWorkspace.syncVersion
-        : 0,
+    syncVersion: routeWorkspace?.id === workspace.id ? routeWorkspace.syncVersion : 0,
   })
   const targetPath = `/workspaces/${workspace.id}/board`
   if (route.path === targetPath) return
@@ -315,9 +257,7 @@ async function selectWorkspaceRoom(workspace: Workspace): Promise<void> {
     await router.push(targetPath)
   } catch (caught) {
     directoryError.value =
-      caught instanceof Error
-        ? caught.message
-        : '워크스페이스를 열지 못했습니다.'
+      caught instanceof Error ? caught.message : '워크스페이스를 열지 못했습니다.'
     showMessengerDirectory()
   }
 }
@@ -342,25 +282,19 @@ let removeWorkspaceMessageListener: (() => void) | null = null
 let removeDirectMessageListener: (() => void) | null = null
 let removeWorkspaceActivityListener: (() => void) | null = null
 
-watch(
-  [() => messengerState.open, () => messengerState.pane],
-  async ([open], [previousOpen]) => {
-    if (open && !previousOpen) {
-      const focused = document.activeElement
-      returnFocus =
-        focused instanceof HTMLElement && focused !== document.body
-          ? focused
-          : null
-      void loadDirectory()
-      await nextTick()
-      closeButton.value?.focus()
-    } else if (!open && previousOpen) {
-      await nextTick()
-      returnFocus?.focus()
-      returnFocus = null
-    }
-  },
-)
+watch([() => messengerState.open, () => messengerState.pane], async ([open], [previousOpen]) => {
+  if (open && !previousOpen) {
+    const focused = document.activeElement
+    returnFocus = focused instanceof HTMLElement && focused !== document.body ? focused : null
+    void loadDirectory()
+    await nextTick()
+    closeButton.value?.focus()
+  } else if (!open && previousOpen) {
+    await nextTick()
+    returnFocus?.focus()
+    returnFocus = null
+  }
+})
 
 watch(
   [
@@ -371,8 +305,7 @@ watch(
   ],
   ([messengerQuery, legacyDrawer]) => {
     if (!authState.user) return
-    const requested =
-      paneFromQuery(messengerQuery) ?? paneFromQuery(legacyDrawer)
+    const requested = paneFromQuery(messengerQuery) ?? paneFromQuery(legacyDrawer)
     if (!requested) {
       clearMessengerQuery()
       return
@@ -401,30 +334,15 @@ watch(
 
 onMounted(() => {
   compactViewport.value = window.matchMedia('(max-width: 760px)').matches
-  removeFriendPresenceListener = realtime.on(
-    'friend.presence_changed',
-    receiveFriendPresence,
-  )
+  removeFriendPresenceListener = realtime.on('friend.presence_changed', receiveFriendPresence)
   removeFriendRequestAcceptedListener = realtime.on(
     'friend.request_accepted',
     receiveFriendRequestAccepted,
   )
-  removeFriendRemovedListener = realtime.on(
-    'friend.removed',
-    receiveFriendRemoved,
-  )
-  removeWorkspaceMessageListener = realtime.on(
-    'workspace.message_created',
-    receiveWorkspaceMessage,
-  )
-  removeDirectMessageListener = realtime.on(
-    'dm.message_created',
-    receiveDirectMessage,
-  )
-  removeWorkspaceActivityListener = realtime.on(
-    'notification.created',
-    receiveWorkspaceActivity,
-  )
+  removeFriendRemovedListener = realtime.on('friend.removed', receiveFriendRemoved)
+  removeWorkspaceMessageListener = realtime.on('workspace.message_created', receiveWorkspaceMessage)
+  removeDirectMessageListener = realtime.on('dm.message_created', receiveDirectMessage)
+  removeWorkspaceActivityListener = realtime.on('notification.created', receiveWorkspaceActivity)
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('resize', handleResize)
   document.addEventListener('visibilitychange', markVisibleConversationRead)
@@ -447,16 +365,9 @@ onUnmounted(() => {
 <template>
   <Teleport to="body">
     <template v-if="authState.user">
-      <span
-        class="messenger-unread-live"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
+      <span class="messenger-unread-live" role="status" aria-live="polite" aria-atomic="true">
         {{
-          totalMessengerUnreadCount
-            ? `읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`
-            : ''
+          totalMessengerUnreadCount ? `읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개` : ''
         }}
       </span>
       <aside
@@ -489,9 +400,7 @@ onUnmounted(() => {
               <span
                 v-if="totalMessengerUnreadCount"
                 class="messenger-header__unread-badge"
-                :aria-label="
-                  `읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`
-                "
+                :aria-label="`읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`"
               >
                 {{ totalUnreadLabel }}
               </span>
@@ -502,11 +411,7 @@ onUnmounted(() => {
             v-if="!compactViewport"
             class="messenger-directory-toggle"
             type="button"
-            :aria-label="
-              messengerState.directoryCollapsed
-                ? '대화 목록 펼치기'
-                : '대화 목록 접기'
-            "
+            :aria-label="messengerState.directoryCollapsed ? '대화 목록 펼치기' : '대화 목록 접기'"
             aria-controls="messenger-directory"
             :aria-expanded="!messengerState.directoryCollapsed"
             @click="toggleMessengerDirectory"
@@ -541,8 +446,7 @@ onUnmounted(() => {
               type="button"
               class="messenger-directory-action"
               :class="{
-                'messenger-directory-item--active':
-                  messengerState.pane === 'friends',
+                'messenger-directory-item--active': messengerState.pane === 'friends',
               }"
               @click="openFriendSettings"
             >
@@ -553,11 +457,7 @@ onUnmounted(() => {
               </span>
             </button>
 
-            <p
-              v-if="directoryError"
-              class="messenger-directory-error"
-              role="alert"
-            >
+            <p v-if="directoryError" class="messenger-directory-error" role="alert">
               {{ directoryError }}
             </p>
             <p v-if="directoryLoading" class="messenger-directory-state">
@@ -579,8 +479,7 @@ onUnmounted(() => {
                 class="messenger-directory-item"
                 :class="{
                   'messenger-directory-item--active':
-                    messengerState.pane === 'chat' &&
-                    activeWorkspaceRoom?.id === workspace.id,
+                    messengerState.pane === 'chat' && activeWorkspaceRoom?.id === workspace.id,
                 }"
                 @click="selectWorkspaceRoom(workspace)"
               >
@@ -591,17 +490,11 @@ onUnmounted(() => {
                     <span
                       v-if="workspaceUnreadCount(workspace.id)"
                       class="messenger-room-unread-badge"
-                      :aria-label="
-                        `읽지 않은 메시지 및 활동 ${
-                          workspaceUnreadCount(workspace.id)
-                        }개`
-                      "
+                      :aria-label="`읽지 않은 메시지 및 활동 ${workspaceUnreadCount(
+                        workspace.id,
+                      )}개`"
                     >
-                      {{
-                        formatMessengerUnreadCount(
-                          workspaceUnreadCount(workspace.id),
-                        )
-                      }}
+                      {{ formatMessengerUnreadCount(workspaceUnreadCount(workspace.id)) }}
                     </span>
                   </span>
                   <small>워크스페이스 대화방</small>
@@ -624,8 +517,7 @@ onUnmounted(() => {
                 class="messenger-directory-item"
                 :class="{
                   'messenger-directory-item--active':
-                    messengerState.pane === 'dm' &&
-                    activeDirectFriend?.id === friend.id,
+                    messengerState.pane === 'dm' && activeDirectFriend?.id === friend.id,
                 }"
                 @click="selectDirectRoom(friend)"
               >
@@ -645,17 +537,9 @@ onUnmounted(() => {
                     <span
                       v-if="directMessageUnreadCount(friend.id)"
                       class="messenger-room-unread-badge"
-                      :aria-label="
-                        `읽지 않은 메시지 ${
-                          directMessageUnreadCount(friend.id)
-                        }개`
-                      "
+                      :aria-label="`읽지 않은 메시지 ${directMessageUnreadCount(friend.id)}개`"
                     >
-                      {{
-                        formatMessengerUnreadCount(
-                          directMessageUnreadCount(friend.id),
-                        )
-                      }}
+                      {{ formatMessengerUnreadCount(directMessageUnreadCount(friend.id)) }}
                     </span>
                   </span>
                   <small
@@ -671,15 +555,8 @@ onUnmounted(() => {
             </section>
           </nav>
 
-          <main
-            v-show="conversationVisible"
-            class="messenger-content"
-            aria-live="polite"
-          >
-            <div
-              v-if="messengerState.pane === 'directory'"
-              class="messenger-welcome"
-            >
+          <main v-show="conversationVisible" class="messenger-content" aria-live="polite">
+            <div v-if="messengerState.pane === 'directory'" class="messenger-welcome">
               <span aria-hidden="true">💬</span>
               <h2>대화를 선택하세요</h2>
               <p>워크스페이스 대화방이나 친구를 선택하면 바로 이어집니다.</p>
@@ -690,9 +567,7 @@ onUnmounted(() => {
               @open-dm="selectDirectRoom"
             />
             <WorkspaceChatPanel
-              v-else-if="
-                messengerState.pane === 'chat' && activeWorkspaceRoom
-              "
+              v-else-if="messengerState.pane === 'chat' && activeWorkspaceRoom"
               :key="activeWorkspaceRoom.id"
               :workspace-id="activeWorkspaceRoom.id"
               :workspace-name="activeWorkspaceRoom.name"
@@ -703,16 +578,12 @@ onUnmounted(() => {
               :key="activeDirectFriend.id"
               :friend-id="activeDirectFriend.id"
               :friend-name="activeDirectFriend.name"
-              :friend-profile-image-url="
-                activeDirectFriend.profile_image_url
-              "
+              :friend-profile-image-url="activeDirectFriend.profile_image_url"
               :friend-online="activeDirectFriend.online"
             />
             <div v-else class="messenger-welcome">
               <p>이 대화를 열 수 없습니다. 목록에서 다시 선택해 주세요.</p>
-              <button type="button" @click="returnToDirectory">
-                대화 목록 보기
-              </button>
+              <button type="button" @click="returnToDirectory">대화 목록 보기</button>
             </div>
           </main>
         </div>

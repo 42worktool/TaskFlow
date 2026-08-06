@@ -1,9 +1,7 @@
 export function toDateInput(iso: string | null): string {
   if (!iso) return ''
   const date = new Date(iso)
-  const localDate = new Date(
-    date.getTime() - date.getTimezoneOffset() * 60_000,
-  )
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
   return localDate.toISOString().slice(0, 10)
 }
 

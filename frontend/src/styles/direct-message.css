@@ -235,8 +235,6 @@
   }
 
   .direct-message-composer {
-    padding:
-      9px 9px
-      calc(9px + env(safe-area-inset-bottom, 0px));
+    padding: 9px 9px calc(9px + env(safe-area-inset-bottom, 0px));
   }
 }

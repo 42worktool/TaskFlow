@@ -1,9 +1,6 @@
 const userConnections = new Map<string, Set<string>>()
 
-export function addPresenceConnection(
-  userId: string,
-  connectionId: string,
-): boolean {
+export function addPresenceConnection(userId: string, connectionId: string): boolean {
   const connections = userConnections.get(userId) ?? new Set<string>()
   const becameOnline = connections.size === 0
   connections.add(connectionId)
@@ -11,10 +8,7 @@ export function addPresenceConnection(
   return becameOnline
 }
 
-export function removePresenceConnection(
-  userId: string,
-  connectionId: string,
-): boolean {
+export function removePresenceConnection(userId: string, connectionId: string): boolean {
   const connections = userConnections.get(userId)
   if (!connections || !connections.delete(connectionId)) return false
   if (connections.size > 0) return false

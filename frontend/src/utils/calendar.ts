@@ -11,7 +11,7 @@ interface CardDateRange {
   end: number
 }
 
-export interface CalendarDay {
+interface CalendarDay {
   date: number | null
   day: number | null
 }
@@ -37,11 +37,7 @@ function cardDateRange(card: Card): CardDateRange | null {
   const firstDay = start ?? deadline
   const lastDay = deadline ?? start
 
-  if (
-    firstDay === null ||
-    lastDay === null ||
-    firstDay > lastDay
-  ) {
+  if (firstDay === null || lastDay === null || firstDay > lastDay) {
     return null
   }
   return { start: firstDay, end: lastDay }
@@ -55,12 +51,7 @@ export function cardOccursOnDate(card: Card, date: Date): boolean {
   const day = localDay(date)
   const range = cardDateRange(card)
 
-  return (
-    day !== null &&
-    range !== null &&
-    range.start <= day &&
-    day <= range.end
-  )
+  return day !== null && range !== null && range.start <= day && day <= range.end
 }
 
 /**
@@ -85,11 +76,7 @@ export function buildCalendarWeeks(
   })
   const ranges = cards
     .map((card) => ({ card, range: cardDateRange(card) }))
-    .filter(
-      (
-        value,
-      ): value is { card: Card; range: CardDateRange } => value.range !== null,
-    )
+    .filter((value): value is { card: Card; range: CardDateRange } => value.range !== null)
 
   const weeks: CalendarWeek[] = []
   for (let index = 0; index < allDays.length; index += 7) {
@@ -97,9 +84,7 @@ export function buildCalendarWeeks(
     const candidates = ranges
       .map(({ card, range }) => {
         const occupiedColumns = days.flatMap((day, column) =>
-          day.day !== null && range.start <= day.day && day.day <= range.end
-            ? [column]
-            : [],
+          day.day !== null && range.start <= day.day && day.day <= range.end ? [column] : [],
         )
         if (occupiedColumns.length === 0) return null
 

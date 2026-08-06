@@ -1,9 +1,6 @@
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
-import {
-  createWorkspaceMessage,
-  listWorkspaceMessages,
-} from './workspace-message.service'
+import { createWorkspaceMessage, listWorkspaceMessages } from './workspace-message.service'
 import { createWorkspaceMessageSchema } from './workspace-message.validation'
 
 export const list: RequestHandler = async (req, res) => {

@@ -37,10 +37,7 @@ const selectedCardId = ref<string | null>(null)
 let inboxLoadGeneration = 0
 
 const dragEnabled = computed(
-  () =>
-    props.allowDrag &&
-    props.destinationLists.length > 0 &&
-    busyCardId.value === null,
+  () => props.allowDrag && props.destinationLists.length > 0 && busyCardId.value === null,
 )
 
 async function loadInbox() {
@@ -52,8 +49,7 @@ async function loadInbox() {
     if (generation === inboxLoadGeneration) cards.value = loaded
   } catch (caught) {
     if (generation === inboxLoadGeneration) {
-      error.value =
-        caught instanceof Error ? caught.message : '인박스를 불러오지 못했습니다.'
+      error.value = caught instanceof Error ? caught.message : '인박스를 불러오지 못했습니다.'
     }
   } finally {
     if (generation === inboxLoadGeneration) loading.value = false
@@ -75,8 +71,7 @@ async function deleteCard(cardId: string) {
     await InboxAPI.remove(cardId)
     cards.value = cards.value.filter((card) => card.id !== cardId)
   } catch (caught) {
-    error.value =
-      caught instanceof Error ? caught.message : '인박스 카드를 삭제하지 못했습니다.'
+    error.value = caught instanceof Error ? caught.message : '인박스 카드를 삭제하지 못했습니다.'
   } finally {
     busyCardId.value = null
   }
@@ -115,13 +110,10 @@ async function handleCardChange(event: DraggableChange<Card>) {
   error.value = ''
   try {
     const moved = await InboxAPI.moveToInbox(card.id)
-    cards.value = cards.value.map((item) =>
-      item.id === card.id ? moved : item,
-    )
+    cards.value = cards.value.map((item) => (item.id === card.id ? moved : item))
   } catch (caught) {
     cards.value = cards.value.filter((item) => item.id !== card.id)
-    error.value =
-      caught instanceof Error ? caught.message : '카드를 인박스로 옮기지 못했습니다.'
+    error.value = caught instanceof Error ? caught.message : '카드를 인박스로 옮기지 못했습니다.'
   } finally {
     busyCardId.value = null
     emit('drop-settled')
@@ -140,9 +132,7 @@ function finishInboxDrag(event: { from?: Element; to?: Element }) {
 }
 
 function updateSavedCard(saved: Card): void {
-  cards.value = cards.value.map((card) =>
-    card.id === saved.id ? saved : card,
-  )
+  cards.value = cards.value.map((card) => (card.id === saved.id ? saved : card))
 }
 
 onMounted(() => {
@@ -165,10 +155,7 @@ onUnmounted(() => {
 
     <div class="inbox-panel-toolbar">
       <span class="card-count">카드 {{ cards.length }}개</span>
-      <span
-        v-if="allowDrag && destinationLists.length"
-        class="inbox-drag-hint"
-      >
+      <span v-if="allowDrag && destinationLists.length" class="inbox-drag-hint">
         카드를 보드 리스트로 드래그하세요
       </span>
     </div>
@@ -213,24 +200,11 @@ onUnmounted(() => {
         </li>
       </template>
       <template #footer>
-        <li
-          v-if="acceptingDrop"
-          class="inbox-drop-prompt"
-          aria-hidden="true"
-        >
+        <li v-if="acceptingDrop" class="inbox-drop-prompt" aria-hidden="true">
           여기에 놓아 인박스로 이동
         </li>
-        <li
-          v-else-if="loading"
-          class="inbox-panel-state"
-          role="status"
-        >
-          인박스를 불러오는 중…
-        </li>
-        <li
-          v-else-if="!error && cards.length === 0"
-          class="inbox-panel-state"
-        >
+        <li v-else-if="loading" class="inbox-panel-state" role="status">인박스를 불러오는 중…</li>
+        <li v-else-if="!error && cards.length === 0" class="inbox-panel-state">
           인박스가 비어 있습니다.
         </li>
       </template>

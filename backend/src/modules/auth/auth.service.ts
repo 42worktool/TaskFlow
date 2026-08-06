@@ -1,116 +1,103 @@
-import { createHash, randomBytes } from 'crypto';
-import { Prisma, User } from '@prisma/client';
-import { OAuth2Client } from 'google-auth-library';
-import { config } from '../../config';
-import { AppError } from '../../errors';
-import { prisma } from '../../db';
-import { signAccessToken } from '../../lib/access-token';
-import { getRedisClient } from '../../lib/redis';
-import { deleteUploadedFile } from '../../lib/upload';
-import {
-  normalizedEmailSchema,
-  normalizeEmail,
-} from '../../lib/validation';
-import {
-  hashPassword,
-  accountName,
-  safeEqual,
-  safeReturnTo,
-  verifyPassword,
-} from './auth.utils';
+import { createHash, randomBytes } from 'crypto'
+import { Prisma, User } from '@prisma/client'
+import { OAuth2Client } from 'google-auth-library'
+import { config } from '../../config'
+import { AppError } from '../../errors'
+import { prisma } from '../../db'
+import { signAccessToken } from '../../lib/access-token'
+import { getRedisClient } from '../../lib/redis'
+import { deleteUploadedFile } from '../../lib/upload'
+import { normalizedEmailSchema, normalizeEmail } from '../../lib/validation'
+import { hashPassword, accountName, safeEqual, safeReturnTo, verifyPassword } from './auth.utils'
 
 const googleClient = new OAuth2Client(
   config.googleClientId,
   config.googleClientSecret,
   config.googleRedirectUri,
-);
+)
 
-const OAUTH_STATE_PREFIX = 'oauth:state:';
-const REFRESH_SESSION_PREFIX = 'auth:refresh:';
-const USER_REFRESH_SESSIONS_PREFIX = 'auth:user-sessions:';
-const LOGIN_ATTEMPT_PREFIX = 'auth:login-attempts:';
-const LOGIN_ATTEMPT_LIMIT = 10;
-const LOGIN_ATTEMPT_WINDOW_SECONDS = 15 * 60;
+const OAUTH_STATE_PREFIX = 'oauth:state:'
+const REFRESH_SESSION_PREFIX = 'auth:refresh:'
+const USER_REFRESH_SESSIONS_PREFIX = 'auth:user-sessions:'
+const LOGIN_ATTEMPT_PREFIX = 'auth:login-attempts:'
+const LOGIN_ATTEMPT_LIMIT = 10
+const LOGIN_ATTEMPT_WINDOW_SECONDS = 15 * 60
 
 export interface UserPublic {
-  id: string;
-  email: string;
-  name: string;
-  profile_image_url: string | null;
-  created_at: string;
-  auth_provider: 'password' | 'google';
+  id: string
+  email: string
+  name: string
+  profile_image_url: string | null
+  created_at: string
+  auth_provider: 'password' | 'google'
 }
 
 interface OAuthStateRecord {
-  nonce: string;
-  returnTo: string;
+  nonce: string
+  returnTo: string
 }
 
 interface RefreshSessionRecord {
-  userId: string;
-  createdAt: string;
+  userId: string
+  createdAt: string
 }
 
 function registrationEmail(value: unknown): string {
-  const result = normalizedEmailSchema.safeParse(value);
+  const result = normalizedEmailSchema.safeParse(value)
   if (!result.success) {
-    throw new AppError('INVALID_EMAIL', 400, 'A valid email address is required');
+    throw new AppError('INVALID_EMAIL', 400, 'A valid email address is required')
   }
-  return result.data;
+  return result.data
 }
 
 function registrationPassword(value: unknown): string {
   if (typeof value !== 'string' || value.length < 8 || value.length > 128) {
-    throw new AppError(
-      'INVALID_PASSWORD',
-      400,
-      'Password must be between 8 and 128 characters',
-    );
+    throw new AppError('INVALID_PASSWORD', 400, 'Password must be between 8 and 128 characters')
   }
-  return value;
+  return value
 }
 
 function loginAttemptKey(email: string, clientKey: string): string {
-  const fingerprint = createHash('sha256').update(`${clientKey}\0${email}`).digest('hex');
-  return `${LOGIN_ATTEMPT_PREFIX}${fingerprint}`;
+  const fingerprint = createHash('sha256').update(`${clientKey}\0${email}`).digest('hex')
+  return `${LOGIN_ATTEMPT_PREFIX}${fingerprint}`
 }
 
 async function assertLoginAllowed(key: string): Promise<void> {
-  const redis = await getRedisClient();
-  const attempts = Number(await redis.get(key)) || 0;
+  const redis = await getRedisClient()
+  const attempts = Number(await redis.get(key)) || 0
   if (attempts >= LOGIN_ATTEMPT_LIMIT) {
     throw new AppError(
       'LOGIN_RATE_LIMITED',
       429,
       'Too many failed login attempts. Try again later.',
-    );
+    )
   }
 }
 
 async function recordFailedLogin(key: string): Promise<void> {
-  const redis = await getRedisClient();
-  const attempts = await redis.incr(key);
-  if (attempts === 1) await redis.expire(key, LOGIN_ATTEMPT_WINDOW_SECONDS);
+  const redis = await getRedisClient()
+  const attempts = await redis.incr(key)
+  if (attempts === 1) await redis.expire(key, LOGIN_ATTEMPT_WINDOW_SECONDS)
 }
 
 export async function registerWithPassword(input: {
-  name: unknown;
-  email: unknown;
-  password: unknown;
+  name: unknown
+  email: unknown
+  password: unknown
 }): Promise<UserPublic> {
-  const name = accountName(input.name);
-  const email = registrationEmail(input.email);
-  const password = registrationPassword(input.password);
+  const name = accountName(input.name)
+  const email = registrationEmail(input.email)
+  const password = registrationPassword(input.password)
 
   const existingUser = await prisma.user.findFirst({
     where: { email: { equals: email, mode: 'insensitive' } },
     select: { id: true },
-  });
+  })
   if (existingUser) {
-    throw new AppError('EMAIL_ALREADY_REGISTERED', 409, 'This email is already registered');
+    throw new AppError('EMAIL_ALREADY_REGISTERED', 409, 'This email is already registered')
   }
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await hashPassword(password)
   try {
     const user = await prisma.user.create({
       data: {
@@ -118,43 +105,43 @@ export async function registerWithPassword(input: {
         email,
         password_hash: passwordHash,
       },
-    });
-    return publicUser(user);
+    })
+    return publicUser(user)
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new AppError('EMAIL_ALREADY_REGISTERED', 409, 'This email is already registered');
+      throw new AppError('EMAIL_ALREADY_REGISTERED', 409, 'This email is already registered')
     }
-    throw error;
+    throw error
   }
 }
 
 export async function authenticateWithPassword(input: {
-  email: unknown;
-  password: unknown;
-  clientKey: string;
+  email: unknown
+  password: unknown
+  clientKey: string
 }): Promise<UserPublic> {
-  const parsedEmail = normalizedEmailSchema.safeParse(input.email);
-  const email = parsedEmail.success ? parsedEmail.data : '';
+  const parsedEmail = normalizedEmailSchema.safeParse(input.email)
+  const email = parsedEmail.success ? parsedEmail.data : ''
   const password =
-    typeof input.password === 'string' && input.password.length <= 128 ? input.password : '';
-  const attemptKey = loginAttemptKey(email, input.clientKey);
-  await assertLoginAllowed(attemptKey);
+    typeof input.password === 'string' && input.password.length <= 128 ? input.password : ''
+  const attemptKey = loginAttemptKey(email, input.clientKey)
+  await assertLoginAllowed(attemptKey)
 
   const user = parsedEmail.success
     ? await prisma.user.findFirst({
         where: { email: { equals: email, mode: 'insensitive' } },
       })
-    : null;
-  const passwordMatches = await verifyPassword(password, user?.password_hash ?? null);
+    : null
+  const passwordMatches = await verifyPassword(password, user?.password_hash ?? null)
 
   if (!user || !passwordMatches) {
-    await recordFailedLogin(attemptKey);
-    throw new AppError('INVALID_CREDENTIALS', 401, 'Email or password is incorrect');
+    await recordFailedLogin(attemptKey)
+    throw new AppError('INVALID_CREDENTIALS', 401, 'Email or password is incorrect')
   }
 
-  const redis = await getRedisClient();
-  await redis.del(attemptKey);
-  return publicUser(user);
+  const redis = await getRedisClient()
+  await redis.del(attemptKey)
+  return publicUser(user)
 }
 
 function publicUser(user: User): UserPublic {
@@ -165,34 +152,34 @@ function publicUser(user: User): UserPublic {
     profile_image_url: user.profile_image_url,
     created_at: user.created_at.toISOString(),
     auth_provider: user.password_hash === null ? 'google' : 'password',
-  };
+  }
 }
 
 function stateKey(state: string): string {
-  return `${OAUTH_STATE_PREFIX}${createHash('sha256').update(state).digest('hex')}`;
+  return `${OAUTH_STATE_PREFIX}${createHash('sha256').update(state).digest('hex')}`
 }
 
 function refreshKey(token: string): string {
-  return `${REFRESH_SESSION_PREFIX}${createHash('sha256').update(token).digest('hex')}`;
+  return `${REFRESH_SESSION_PREFIX}${createHash('sha256').update(token).digest('hex')}`
 }
 
 function userSessionsKey(userId: string): string {
-  return `${USER_REFRESH_SESSIONS_PREFIX}${userId}`;
+  return `${USER_REFRESH_SESSIONS_PREFIX}${userId}`
 }
 
 export async function beginGoogleOAuth(returnToValue: unknown): Promise<{
-  authorizationUrl: string;
-  state: string;
+  authorizationUrl: string
+  state: string
 }> {
-  const state = randomBytes(32).toString('base64url');
-  const nonce = randomBytes(32).toString('base64url');
-  const record: OAuthStateRecord = { nonce, returnTo: safeReturnTo(returnToValue) };
-  const redis = await getRedisClient();
+  const state = randomBytes(32).toString('base64url')
+  const nonce = randomBytes(32).toString('base64url')
+  const record: OAuthStateRecord = { nonce, returnTo: safeReturnTo(returnToValue) }
+  const redis = await getRedisClient()
 
   await redis.set(stateKey(state), JSON.stringify(record), {
     EX: config.oauthStateTtlSeconds,
     NX: true,
-  });
+  })
 
   return {
     state,
@@ -203,7 +190,7 @@ export async function beginGoogleOAuth(returnToValue: unknown): Promise<{
       state,
       nonce,
     }),
-  };
+  }
 }
 
 async function consumeOAuthState(
@@ -211,29 +198,29 @@ async function consumeOAuthState(
   cookieState: string | undefined,
 ): Promise<OAuthStateRecord> {
   if (!safeEqual(queryState, cookieState)) {
-    throw new AppError('INVALID_OAUTH_STATE', 401, 'OAuth state did not match');
+    throw new AppError('INVALID_OAUTH_STATE', 401, 'OAuth state did not match')
   }
 
-  const redis = await getRedisClient();
-  const raw = await redis.getDel(stateKey(queryState));
+  const redis = await getRedisClient()
+  const raw = await redis.getDel(stateKey(queryState))
   if (!raw) {
-    throw new AppError('EXPIRED_OAUTH_STATE', 401, 'OAuth state expired or was already used');
+    throw new AppError('EXPIRED_OAUTH_STATE', 401, 'OAuth state expired or was already used')
   }
 
   try {
-    return JSON.parse(raw) as OAuthStateRecord;
+    return JSON.parse(raw) as OAuthStateRecord
   } catch {
-    throw new AppError('INVALID_OAUTH_STATE', 401, 'Stored OAuth state was invalid');
+    throw new AppError('INVALID_OAUTH_STATE', 401, 'Stored OAuth state was invalid')
   }
 }
 
 async function findOrCreateGoogleUser(payload: {
-  sub: string;
-  email: string;
-  name?: string;
-  picture?: string;
+  sub: string
+  email: string
+  name?: string
+  picture?: string
 }): Promise<User> {
-  const email = normalizeEmail(payload.email);
+  const email = normalizeEmail(payload.email)
 
   return prisma.$transaction(async (tx) => {
     const account = await tx.oAuthAccount.findUnique({
@@ -244,12 +231,12 @@ async function findOrCreateGoogleUser(payload: {
         },
       },
       include: { user: true },
-    });
-    if (account) return account.user;
+    })
+    if (account) return account.user
 
     const existingUser = await tx.user.findFirst({
       where: { email: { equals: email, mode: 'insensitive' } },
-    });
+    })
 
     if (existingUser) {
       if (!config.autoLinkVerifiedEmail) {
@@ -257,7 +244,7 @@ async function findOrCreateGoogleUser(payload: {
           'ACCOUNT_LINK_REQUIRED',
           409,
           'An account already exists for this email. Sign in with the existing method first.',
-        );
+        )
       }
 
       await tx.oAuthAccount.create({
@@ -266,8 +253,8 @@ async function findOrCreateGoogleUser(payload: {
           provider: 'google',
           provider_id: payload.sub,
         },
-      });
-      return existingUser;
+      })
+      return existingUser
     }
 
     return tx.user.create({
@@ -283,37 +270,37 @@ async function findOrCreateGoogleUser(payload: {
           },
         },
       },
-    });
-  });
+    })
+  })
 }
 
 export async function completeGoogleOAuth(input: {
-  code: string;
-  state: string;
-  stateCookie: string | undefined;
+  code: string
+  state: string
+  stateCookie: string | undefined
 }): Promise<{ user: UserPublic; returnTo: string }> {
-  const stateRecord = await consumeOAuthState(input.state, input.stateCookie);
-  const tokenResponse = await googleClient.getToken(input.code);
-  const idToken = tokenResponse.tokens.id_token;
+  const stateRecord = await consumeOAuthState(input.state, input.stateCookie)
+  const tokenResponse = await googleClient.getToken(input.code)
+  const idToken = tokenResponse.tokens.id_token
   if (!idToken) {
-    throw new AppError('MISSING_ID_TOKEN', 401, 'Google did not return an ID token');
+    throw new AppError('MISSING_ID_TOKEN', 401, 'Google did not return an ID token')
   }
 
   const ticket = await googleClient.verifyIdToken({
     idToken,
     audience: config.googleClientId,
-  });
-  const payload = ticket.getPayload();
+  })
+  const payload = ticket.getPayload()
 
   if (!payload?.sub || !payload.email || payload.email_verified !== true) {
     throw new AppError(
       'INVALID_GOOGLE_IDENTITY',
       401,
       'Google account identity was incomplete or unverified',
-    );
+    )
   }
   if (!safeEqual(payload.nonce, stateRecord.nonce)) {
-    throw new AppError('INVALID_OAUTH_NONCE', 401, 'OAuth nonce did not match');
+    throw new AppError('INVALID_OAUTH_NONCE', 401, 'OAuth nonce did not match')
   }
 
   const user = await findOrCreateGoogleUser({
@@ -321,125 +308,125 @@ export async function completeGoogleOAuth(input: {
     email: payload.email,
     name: payload.name,
     picture: payload.picture,
-  });
+  })
 
-  return { user: publicUser(user), returnTo: stateRecord.returnTo };
+  return { user: publicUser(user), returnTo: stateRecord.returnTo }
 }
 
 export async function createSession(userId: string): Promise<{
-  accessToken: string;
-  refreshToken: string;
+  accessToken: string
+  refreshToken: string
 }> {
-  const refreshToken = randomBytes(48).toString('base64url');
+  const refreshToken = randomBytes(48).toString('base64url')
   const session: RefreshSessionRecord = {
     userId,
     createdAt: new Date().toISOString(),
-  };
-  const redis = await getRedisClient();
-  const sessionKey = refreshKey(refreshToken);
-  const indexKey = userSessionsKey(userId);
+  }
+  const redis = await getRedisClient()
+  const sessionKey = refreshKey(refreshToken)
+  const indexKey = userSessionsKey(userId)
   await redis
     .multi()
     .set(sessionKey, JSON.stringify(session), { EX: config.refreshTokenTtlSeconds })
     .sAdd(indexKey, sessionKey)
     .expire(indexKey, config.refreshTokenTtlSeconds)
-    .exec();
+    .exec()
 
-  return { accessToken: signAccessToken(userId), refreshToken };
+  return { accessToken: signAccessToken(userId), refreshToken }
 }
 
 export async function rotateSession(refreshToken: string): Promise<{
-  accessToken: string;
-  refreshToken: string;
-  user: UserPublic;
+  accessToken: string
+  refreshToken: string
+  user: UserPublic
 }> {
-  const redis = await getRedisClient();
-  const oldSessionKey = refreshKey(refreshToken);
-  const raw = await redis.getDel(oldSessionKey);
+  const redis = await getRedisClient()
+  const oldSessionKey = refreshKey(refreshToken)
+  const raw = await redis.getDel(oldSessionKey)
   if (!raw) {
-    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh token is invalid or expired');
+    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh token is invalid or expired')
   }
 
-  let session: RefreshSessionRecord;
+  let session: RefreshSessionRecord
   try {
-    session = JSON.parse(raw) as RefreshSessionRecord;
+    session = JSON.parse(raw) as RefreshSessionRecord
   } catch {
-    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh session was invalid');
+    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh session was invalid')
   }
 
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  const user = await prisma.user.findUnique({ where: { id: session.userId } })
   if (!user) {
-    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh session user no longer exists');
+    throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh session user no longer exists')
   }
 
-  await redis.sRem(userSessionsKey(user.id), oldSessionKey);
-  const newSession = await createSession(user.id);
-  return { ...newSession, user: publicUser(user) };
+  await redis.sRem(userSessionsKey(user.id), oldSessionKey)
+  const newSession = await createSession(user.id)
+  return { ...newSession, user: publicUser(user) }
 }
 
 export async function revokeSession(refreshToken: string): Promise<void> {
-  const redis = await getRedisClient();
-  const sessionKey = refreshKey(refreshToken);
-  const raw = await redis.get(sessionKey);
-  if (!raw) return;
+  const redis = await getRedisClient()
+  const sessionKey = refreshKey(refreshToken)
+  const raw = await redis.get(sessionKey)
+  if (!raw) return
 
   try {
-    const session = JSON.parse(raw) as RefreshSessionRecord;
-    await redis.multi().del(sessionKey).sRem(userSessionsKey(session.userId), sessionKey).exec();
+    const session = JSON.parse(raw) as RefreshSessionRecord
+    await redis.multi().del(sessionKey).sRem(userSessionsKey(session.userId), sessionKey).exec()
   } catch {
-    await redis.del(sessionKey);
+    await redis.del(sessionKey)
   }
 }
 
 export async function getCurrentUser(userId: string): Promise<UserPublic> {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new AppError('USER_NOT_FOUND', 404, 'User no longer exists');
-  return publicUser(user);
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) throw new AppError('USER_NOT_FOUND', 404, 'User no longer exists')
+  return publicUser(user)
 }
 
 export async function updateCurrentUser(userId: string, nameValue: unknown): Promise<UserPublic> {
-  const name = accountName(nameValue);
+  const name = accountName(nameValue)
 
   const user = await prisma.user.update({
     where: { id: userId },
     data: { name },
-  });
-  return publicUser(user);
+  })
+  return publicUser(user)
 }
 
 export async function deleteCurrentUser(userId: string): Promise<void> {
-  await prisma.user.delete({ where: { id: userId } });
+  await prisma.user.delete({ where: { id: userId } })
 
-  const redis = await getRedisClient();
-  const indexKey = userSessionsKey(userId);
-  const sessionKeys = await redis.sMembers(indexKey);
-  await redis.del([...sessionKeys, indexKey]);
+  const redis = await getRedisClient()
+  const indexKey = userSessionsKey(userId)
+  const sessionKeys = await redis.sMembers(indexKey)
+  await redis.del([...sessionKeys, indexKey])
 }
 
-const AVATAR_URL_PREFIX = '/uploads/avatars/';
+const AVATAR_URL_PREFIX = '/uploads/avatars/'
 
 async function replaceAvatarUrl(userId: string, url: string | null): Promise<UserPublic> {
   const previous = await prisma.user.findUnique({
     where: { id: userId },
     select: { profile_image_url: true },
-  });
+  })
 
   const user = await prisma.user.update({
     where: { id: userId },
     data: { profile_image_url: url },
-  });
+  })
 
   if (previous?.profile_image_url?.startsWith(AVATAR_URL_PREFIX)) {
-    await deleteUploadedFile('avatars', previous.profile_image_url.slice(AVATAR_URL_PREFIX.length));
+    await deleteUploadedFile('avatars', previous.profile_image_url.slice(AVATAR_URL_PREFIX.length))
   }
 
-  return publicUser(user);
+  return publicUser(user)
 }
 
 export async function updateAvatar(userId: string, file: Express.Multer.File): Promise<UserPublic> {
-  return replaceAvatarUrl(userId, `${AVATAR_URL_PREFIX}${file.filename}`);
+  return replaceAvatarUrl(userId, `${AVATAR_URL_PREFIX}${file.filename}`)
 }
 
 export async function removeAvatar(userId: string): Promise<UserPublic> {
-  return replaceAvatarUrl(userId, null);
+  return replaceAvatarUrl(userId, null)
 }

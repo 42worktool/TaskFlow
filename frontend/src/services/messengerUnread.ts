@@ -1,30 +1,20 @@
 import { computed, reactive } from 'vue'
-import type {
-  DirectMessage,
-  NotificationEvent,
-  WorkspaceMessage,
-} from '../types'
+import type { DirectMessage, NotificationEvent, WorkspaceMessage } from '../types'
 
 export interface VisibleMessengerRoom {
   kind: 'workspace' | 'dm'
   id: string
 }
 
-export const messengerUnreadState = reactive({
+const messengerUnreadState = reactive({
   workspaces: {} as Record<string, number>,
   directMessages: {} as Record<string, number>,
 })
 
 export const totalMessengerUnreadCount = computed(
   () =>
-    Object.values(messengerUnreadState.workspaces).reduce(
-      (total, count) => total + count,
-      0,
-    ) +
-    Object.values(messengerUnreadState.directMessages).reduce(
-      (total, count) => total + count,
-      0,
-    ),
+    Object.values(messengerUnreadState.workspaces).reduce((total, count) => total + count, 0) +
+    Object.values(messengerUnreadState.directMessages).reduce((total, count) => total + count, 0),
 )
 
 export function formatMessengerUnreadCount(count: number): string {
@@ -88,8 +78,7 @@ function recordWorkspaceUnread(
   visibleRoom: VisibleMessengerRoom | null,
 ): boolean {
   if (isVisibleRoom(visibleRoom, 'workspace', workspaceId)) return false
-  messengerUnreadState.workspaces[workspaceId] =
-    workspaceUnreadCount(workspaceId) + 1
+  messengerUnreadState.workspaces[workspaceId] = workspaceUnreadCount(workspaceId) + 1
   return true
 }
 
@@ -117,8 +106,7 @@ export function receiveDirectMessageUnread(
 
   const friendId = message.author.user_id
   if (isVisibleRoom(visibleRoom, 'dm', friendId)) return false
-  messengerUnreadState.directMessages[friendId] =
-    directMessageUnreadCount(friendId) + 1
+  messengerUnreadState.directMessages[friendId] = directMessageUnreadCount(friendId) + 1
   return true
 }
 
@@ -131,9 +119,7 @@ export function receiveWorkspaceActivityUnread(
   return recordWorkspaceUnread(event.workspace_id, visibleRoom)
 }
 
-export function parseNotificationEvent(
-  value: unknown,
-): NotificationEvent | null {
+export function parseNotificationEvent(value: unknown): NotificationEvent | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<NotificationEvent>
   const actor = candidate.actor
@@ -154,8 +140,7 @@ export function parseNotificationEvent(
     actor.user_id.length === 0 ||
     typeof actor.name !== 'string' ||
     actor.name.length === 0 ||
-    (actor.profile_image_url !== null &&
-      typeof actor.profile_image_url !== 'string')
+    (actor.profile_image_url !== null && typeof actor.profile_image_url !== 'string')
   ) {
     return null
   }

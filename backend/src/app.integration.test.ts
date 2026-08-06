@@ -1,16 +1,16 @@
-import assert from 'node:assert/strict';
-import { request } from 'node:http';
-import type { AddressInfo } from 'node:net';
-import type { Server } from 'node:http';
-import test, { after, before } from 'node:test';
+import assert from 'node:assert/strict'
+import { request } from 'node:http'
+import type { AddressInfo } from 'node:net'
+import type { Server } from 'node:http'
+import test, { after, before } from 'node:test'
 
 interface HttpResult {
-  status: number;
-  body: unknown;
+  status: number
+  body: unknown
 }
 
-let server: Server;
-let port: number;
+let server: Server
+let port: number
 
 function setRequiredEnvironment(): void {
   Object.assign(process.env, {
@@ -24,7 +24,7 @@ function setRequiredEnvironment(): void {
     SMTP_USER: 'test',
     SMTP_PASS: 'test',
     SMTP_FROM: 'test@example.com',
-  });
+  })
 }
 
 function send(
@@ -41,46 +41,46 @@ function send(
         headers: options.headers,
       },
       (res) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => chunks.push(chunk))
         res.on('end', () => {
-          const raw = Buffer.concat(chunks).toString('utf8');
+          const raw = Buffer.concat(chunks).toString('utf8')
           resolve({
             status: res.statusCode ?? 0,
             body: raw ? JSON.parse(raw) : null,
-          });
-        });
+          })
+        })
       },
-    );
-    req.on('error', reject);
-    if (options.body !== undefined) req.write(options.body);
-    req.end();
-  });
+    )
+    req.on('error', reject)
+    if (options.body !== undefined) req.write(options.body)
+    req.end()
+  })
 }
 
 before(async () => {
-  setRequiredEnvironment();
-  const { default: app } = await import('./app');
-  server = app.listen(0, '127.0.0.1');
+  setRequiredEnvironment()
+  const { default: app } = await import('./app')
+  server = app.listen(0, '127.0.0.1')
   await new Promise<void>((resolve, reject) => {
-    server.once('listening', resolve);
-    server.once('error', reject);
-  });
-  port = (server.address() as AddressInfo).port;
-});
+    server.once('listening', resolve)
+    server.once('error', reject)
+  })
+  port = (server.address() as AddressInfo).port
+})
 
 after(async () => {
   await new Promise<void>((resolve, reject) => {
-    server.close((error) => error ? reject(error) : resolve());
-  });
-});
+    server.close((error) => (error ? reject(error) : resolve()))
+  })
+})
 
 test('malformed JSON is returned as a 400 API error', async () => {
   const result = await send('/api/auth/login', {
     method: 'POST',
     body: '{"email":',
     headers: { 'Content-Type': 'application/json' },
-  });
+  })
 
   assert.deepEqual(result, {
     status: 400,
@@ -89,15 +89,15 @@ test('malformed JSON is returned as a 400 API error', async () => {
       error: 'BAD_REQUEST',
       message: 'Invalid request',
     },
-  });
-});
+  })
+})
 
 test('oversized JSON is returned as a 413 API error', async () => {
   const result = await send('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ value: 'x'.repeat(110 * 1024) }),
     headers: { 'Content-Type': 'application/json' },
-  });
+  })
 
   assert.deepEqual(result, {
     status: 413,
@@ -106,11 +106,11 @@ test('oversized JSON is returned as a 413 API error', async () => {
       error: 'PAYLOAD_TOO_LARGE',
       message: 'Request body is too large',
     },
-  });
-});
+  })
+})
 
 test('protected routes reject requests without a bearer token', async () => {
-  const result = await send('/api/workspaces');
+  const result = await send('/api/workspaces')
 
   assert.deepEqual(result, {
     status: 401,
@@ -119,8 +119,8 @@ test('protected routes reject requests without a bearer token', async () => {
       error: 'UNAUTHORIZED',
       message: 'A Bearer access token is required',
     },
-  });
-});
+  })
+})
 
 test('feature routes reject requests without a bearer token', async () => {
   for (const path of [
@@ -130,7 +130,7 @@ test('feature routes reject requests without a bearer token', async () => {
     '/api/workspaces/00000000-0000-4000-8000-000000000001/dashboard',
     '/api/workspaces/00000000-0000-4000-8000-000000000001/messages',
   ]) {
-    const result = await send(path);
+    const result = await send(path)
 
     assert.deepEqual(result, {
       status: 401,
@@ -139,7 +139,7 @@ test('feature routes reject requests without a bearer token', async () => {
         error: 'UNAUTHORIZED',
         message: 'A Bearer access token is required',
       },
-    });
+    })
   }
 
   const createMessage = await send(
@@ -149,9 +149,9 @@ test('feature routes reject requests without a bearer token', async () => {
       body: JSON.stringify({ content: 'hello' }),
       headers: { 'Content-Type': 'application/json' },
     },
-  );
-  assert.equal(createMessage.status, 401);
-});
+  )
+  assert.equal(createMessage.status, 401)
+})
 
 test('password login rejects cross-origin requests before service access', async () => {
   const result = await send('/api/auth/login', {
@@ -161,7 +161,7 @@ test('password login rejects cross-origin requests before service access', async
       'Content-Type': 'application/json',
       Origin: 'https://attacker.example',
     },
-  });
+  })
 
   assert.deepEqual(result, {
     status: 403,
@@ -170,5 +170,5 @@ test('password login rejects cross-origin requests before service access', async
       error: 'INVALID_ORIGIN',
       message: 'The request origin is not allowed',
     },
-  });
-});
+  })
+})

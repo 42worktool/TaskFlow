@@ -19,16 +19,9 @@ export const REALTIME_CLOSE_CODE = {
   RATE_LIMITED: 4429,
 } as const
 
-export const REALTIME_CLIENT_CONTROL_EVENTS = [
-  'auth.authenticate',
-  'auth.refresh',
-] as const
+const REALTIME_CLIENT_CONTROL_EVENTS = ['auth.authenticate', 'auth.refresh'] as const
 
-export const REALTIME_SERVER_CONTROL_EVENTS = [
-  'system.ready',
-  'system.ack',
-  'system.error',
-] as const
+const REALTIME_SERVER_CONTROL_EVENTS = ['system.ready', 'system.ack', 'system.error'] as const
 
 const realtimeControlEvents = new Set<string>([
   ...REALTIME_CLIENT_CONTROL_EVENTS,
@@ -39,10 +32,8 @@ export function isRealtimeControlEvent(event: string): boolean {
   return realtimeControlEvents.has(event)
 }
 
-const REALTIME_EVENT_NAME_PATTERN =
-  /^[a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)+$/
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const REALTIME_EVENT_NAME_PATTERN = /^[a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)+$/
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export interface RealtimeMessage<T = unknown> {
   v: typeof REALTIME_PROTOCOL_VERSION
@@ -156,18 +147,14 @@ export function parseRealtimeReadyData(value: unknown): RealtimeReadyData | null
   return candidate as RealtimeReadyData
 }
 
-export function parseRealtimeAuthRefreshResult(
-  value: unknown,
-): RealtimeAuthRefreshResult | null {
+export function parseRealtimeAuthRefreshResult(value: unknown): RealtimeAuthRefreshResult | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<RealtimeAuthRefreshResult>
   if (!isIsoDate(candidate.accessTokenExpiresAt)) return null
   return candidate as RealtimeAuthRefreshResult
 }
 
-export function parseFriendPresenceEvent(
-  value: unknown,
-): FriendPresenceEvent | null {
+export function parseFriendPresenceEvent(value: unknown): FriendPresenceEvent | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<FriendPresenceEvent>
   if (
@@ -187,8 +174,7 @@ export function parseFriendRequest(value: unknown): FriendRequest | null {
     !isUuid(candidate.id) ||
     typeof candidate.name !== 'string' ||
     candidate.name.length === 0 ||
-    (candidate.profile_image_url !== null &&
-      typeof candidate.profile_image_url !== 'string') ||
+    (candidate.profile_image_url !== null && typeof candidate.profile_image_url !== 'string') ||
     !isIsoDate(candidate.requested_at)
   ) {
     return null
@@ -203,8 +189,7 @@ export function parseFriend(value: unknown): Friend | null {
     !isUuid(candidate.id) ||
     typeof candidate.name !== 'string' ||
     candidate.name.length === 0 ||
-    (candidate.profile_image_url !== null &&
-      typeof candidate.profile_image_url !== 'string') ||
+    (candidate.profile_image_url !== null && typeof candidate.profile_image_url !== 'string') ||
     !isIsoDate(candidate.friends_since) ||
     typeof candidate.online !== 'boolean'
   ) {
@@ -213,9 +198,7 @@ export function parseFriend(value: unknown): Friend | null {
   return candidate as Friend
 }
 
-export function parseFriendUserIdEvent(
-  value: unknown,
-): FriendUserIdEvent | null {
+export function parseFriendUserIdEvent(value: unknown): FriendUserIdEvent | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<FriendUserIdEvent>
   if (typeof candidate.user_id !== 'string' || !UUID_PATTERN.test(candidate.user_id)) {
@@ -240,15 +223,13 @@ export function parseDirectMessage(value: unknown): DirectMessage | null {
     !isUuid(author.user_id) ||
     typeof author.name !== 'string' ||
     author.name.length === 0 ||
-    (author.profile_image_url !== null &&
-      typeof author.profile_image_url !== 'string') ||
+    (author.profile_image_url !== null && typeof author.profile_image_url !== 'string') ||
     !recipient ||
     typeof recipient !== 'object' ||
     !isUuid(recipient.user_id) ||
     typeof recipient.name !== 'string' ||
     recipient.name.length === 0 ||
-    (recipient.profile_image_url !== null &&
-      typeof recipient.profile_image_url !== 'string') ||
+    (recipient.profile_image_url !== null && typeof recipient.profile_image_url !== 'string') ||
     author.user_id === recipient.user_id
   ) {
     return null
@@ -256,9 +237,7 @@ export function parseDirectMessage(value: unknown): DirectMessage | null {
   return candidate as DirectMessage
 }
 
-export function parseWorkspaceChangedEvent(
-  value: unknown,
-): WorkspaceChangedEvent | null {
+export function parseWorkspaceChangedEvent(value: unknown): WorkspaceChangedEvent | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<WorkspaceChangedEvent>
   if (
@@ -298,9 +277,7 @@ export function parseWorkspaceMemberPresenceEvent(
   return candidate as WorkspaceMemberPresenceEvent
 }
 
-export function parseWorkspaceMessage(
-  value: unknown,
-): WorkspaceMessage | null {
+export function parseWorkspaceMessage(value: unknown): WorkspaceMessage | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<WorkspaceMessage>
   const author = candidate.author
@@ -316,8 +293,7 @@ export function parseWorkspaceMessage(
     !isUuid(author.user_id) ||
     typeof author.name !== 'string' ||
     author.name.length === 0 ||
-    (author.profile_image_url !== null &&
-      typeof author.profile_image_url !== 'string')
+    (author.profile_image_url !== null && typeof author.profile_image_url !== 'string')
   ) {
     return null
   }

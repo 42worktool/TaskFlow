@@ -1,11 +1,9 @@
 import { z } from 'zod'
 import { normalizedEmailSchema, uuidSchema } from '../../lib/validation'
 
-export const workspaceRoleSchema = z.enum(['ADMIN', 'MEMBER', 'VIEWER'])
+const workspaceRoleSchema = z.enum(['ADMIN', 'MEMBER', 'VIEWER'])
 
-export const workspaceInvitationTokenSchema = z
-  .string()
-  .regex(/^[A-Za-z0-9_-]{43}$/)
+export const workspaceInvitationTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 
 export const workspaceInvitationSchema = z.object({
   workspaceId: uuidSchema,

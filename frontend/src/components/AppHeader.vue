@@ -18,10 +18,7 @@ withDefaults(
     <div class="app-topbar-main">
       <SearchInput :initial-query="initialQuery" />
       <div class="app-topbar-actions">
-        <div
-          v-if="$slots['workspace-actions']"
-          class="app-topbar-workspace-actions"
-        >
+        <div v-if="$slots['workspace-actions']" class="app-topbar-workspace-actions">
           <slot name="workspace-actions" />
         </div>
         <ProfileMenu />

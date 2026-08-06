@@ -14,16 +14,8 @@ import { createdBy, softDeletedBy, updatedBy } from '../../lib/audit'
 import { computeSequence } from '../../lib/ordering'
 import { userSummarySelect } from '../../lib/user-summary'
 import { UPLOAD_DIR, deleteUploadedFile } from '../../lib/upload'
-import {
-  getWorkspaceRole,
-  requireWorkspaceRole,
-} from '../../lib/workspace-permissions'
-import {
-  toAttachmentDto,
-  toCardDetailDto,
-  toCardDto,
-  toCommentDto,
-} from './card.dto'
+import { getWorkspaceRole, requireWorkspaceRole } from '../../lib/workspace-permissions'
+import { toAttachmentDto, toCardDetailDto, toCardDto, toCommentDto } from './card.dto'
 import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 
 // ─── DTOs ─────────────────────────────────────────────────────
@@ -67,15 +59,9 @@ async function getCardOrThrow(cardId: string): Promise<Card> {
   return card
 }
 
-type CardAccessClient = Pick<
-  Prisma.TransactionClient,
-  'list' | 'workspaceMember'
->
+type CardAccessClient = Pick<Prisma.TransactionClient, 'list' | 'workspaceMember'>
 
-async function getListOrThrow(
-  listId: string,
-  client: CardAccessClient = prisma,
-): Promise<List> {
+async function getListOrThrow(listId: string, client: CardAccessClient = prisma): Promise<List> {
   const list = await client.list.findFirst({
     where: { id: listId, deleted_at: null },
   })
@@ -84,20 +70,14 @@ async function getListOrThrow(
 }
 
 /** Write access: inbox card owner, or MEMBER+ in the card's workspace. */
-type CardAccess = Pick<
-  Card,
-  'list_id' | 'user_id' | 'is_completed' | 'start_at' | 'deadline'
->
+type CardAccess = Pick<Card, 'list_id' | 'user_id' | 'is_completed' | 'start_at' | 'deadline'>
 
 interface WorkspaceCardLocation {
   workspaceId: string
   listId: string
 }
 
-async function lockCardOrThrow(
-  tx: Prisma.TransactionClient,
-  cardId: string,
-): Promise<CardAccess> {
+async function lockCardOrThrow(tx: Prisma.TransactionClient, cardId: string): Promise<CardAccess> {
   const cards = await tx.$queryRaw<CardAccess[]>`
     SELECT "list_id", "user_id", "is_completed", "start_at", "deadline"
     FROM "Cards"
@@ -181,16 +161,14 @@ export async function listInboxCards(input: { userId: string }) {
   return cards.map((card) => toCardDto(card))
 }
 
-export async function createCard(
-  input: {
-    userId: string
-    listId: string
-    title: string
-    description?: string | null
-    startAt?: string | null
-    deadline?: string | null
-  },
-) {
+export async function createCard(input: {
+  userId: string
+  listId: string
+  title: string
+  description?: string | null
+  startAt?: string | null
+  deadline?: string | null
+}) {
   const list = await getListOrThrow(input.listId)
   await requireWorkspaceRole(list.workspace_id, input.userId, 'MEMBER')
 
@@ -242,14 +220,12 @@ export async function getCard(input: { userId: string; cardId: string }) {
   return buildCardDetail(card)
 }
 
-export async function updateCard(
-  input: {
-    userId: string
-    cardId: string
-    title?: string
-    description?: string | null
-  },
-) {
+export async function updateCard(input: {
+  userId: string
+  cardId: string
+  title?: string
+  description?: string | null
+}) {
   const result = await prisma.$transaction(async (tx) => {
     const card = await lockCardOrThrow(tx, input.cardId)
     await requireCardWrite(card, input.userId, tx)
@@ -259,9 +235,7 @@ export async function updateCard(
       where: { id: input.cardId },
       data: {
         ...(input.title !== undefined ? { title: input.title } : {}),
-        ...('description' in input
-          ? { description: input.description ?? '' }
-          : {}),
+        ...('description' in input ? { description: input.description ?? '' } : {}),
         ...updatedBy(input.userId),
       },
     })
@@ -303,14 +277,12 @@ export async function deleteCard(input: { userId: string; cardId: string }): Pro
   })
 }
 
-export async function reorderCard(
-  input: {
-    userId: string
-    cardId: string
-    beforeCardId?: string | null
-    afterCardId?: string | null
-  },
-) {
+export async function reorderCard(input: {
+  userId: string
+  cardId: string
+  beforeCardId?: string | null
+  afterCardId?: string | null
+}) {
   const result = await prisma.$transaction(async (tx) => {
     const card = await lockCardOrThrow(tx, input.cardId)
     await requireCardWrite(card, input.userId, tx)
@@ -326,11 +298,7 @@ export async function reorderCard(
       orderBy: { sequence: 'asc' },
     })
 
-    const newSequence = computeSequence(
-      siblings,
-      input.beforeCardId,
-      input.afterCardId,
-    )
+    const newSequence = computeSequence(siblings, input.beforeCardId, input.afterCardId)
     const updated = await tx.card.update({
       where: { id: input.cardId },
       data: { sequence: newSequence, ...updatedBy(input.userId) },
@@ -351,19 +319,15 @@ export async function reorderCard(
   return result.card
 }
 
-export async function moveCard(
-  input: {
-    userId: string
-    cardId: string
-    targetListId: string
-    beforeCardId?: string | null
-    afterCardId?: string | null
-  },
-) {
+export async function moveCard(input: {
+  userId: string
+  cardId: string
+  targetListId: string
+  beforeCardId?: string | null
+  afterCardId?: string | null
+}) {
   const result = await prisma.$transaction(async (tx) => {
-    const lockedTarget = await tx.$queryRaw<
-      Array<{ id: string; workspace_id: string }>
-    >`
+    const lockedTarget = await tx.$queryRaw<Array<{ id: string; workspace_id: string }>>`
       SELECT "id", "workspace_id"
       FROM "Lists"
       WHERE "id" = ${input.targetListId}::uuid
@@ -384,12 +348,7 @@ export async function moveCard(
       }
       sourceListId = sourceList.id
     }
-    await requireWorkspaceRole(
-      targetList.workspace_id,
-      input.userId,
-      'MEMBER',
-      tx,
-    )
+    await requireWorkspaceRole(targetList.workspace_id, input.userId, 'MEMBER', tx)
 
     if (card.list_id === null) {
       const detachedRelation = softDeletedBy(input.userId)
@@ -407,11 +366,7 @@ export async function moveCard(
       },
       orderBy: { sequence: 'asc' },
     })
-    const newSequence = computeSequence(
-      siblings,
-      input.beforeCardId,
-      input.afterCardId,
-    )
+    const newSequence = computeSequence(siblings, input.beforeCardId, input.afterCardId)
 
     const updated = await tx.card.update({
       where: { id: input.cardId },
@@ -446,23 +401,19 @@ export async function moveCard(
   return result.card
 }
 
-export async function updateCardDates(
-  input: {
-    userId: string
-    cardId: string
-    startAt?: string | null
-    deadline?: string | null
-  },
-) {
+export async function updateCardDates(input: {
+  userId: string
+  cardId: string
+  startAt?: string | null
+  deadline?: string | null
+}) {
   const result = await prisma.$transaction(async (tx) => {
     const card = await lockCardOrThrow(tx, input.cardId)
     await requireCardWrite(card, input.userId, tx)
     const location = await workspaceLocationForCard(card, tx)
 
-    const newStart =
-      'startAt' in input ? input.startAt : card.start_at?.toISOString() ?? null
-    const newEnd =
-      'deadline' in input ? input.deadline : card.deadline?.toISOString() ?? null
+    const newStart = 'startAt' in input ? input.startAt : (card.start_at?.toISOString() ?? null)
+    const newEnd = 'deadline' in input ? input.deadline : (card.deadline?.toISOString() ?? null)
     if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
       throw new BadRequestError('start_at must be before or equal to deadline')
     }
@@ -470,9 +421,7 @@ export async function updateCardDates(
     const updated = await tx.card.update({
       where: { id: input.cardId },
       data: {
-        ...('startAt' in input
-          ? { start_at: input.startAt ? new Date(input.startAt) : null }
-          : {}),
+        ...('startAt' in input ? { start_at: input.startAt ? new Date(input.startAt) : null } : {}),
         ...('deadline' in input
           ? { deadline: input.deadline ? new Date(input.deadline) : null }
           : {}),
@@ -568,13 +517,11 @@ export async function moveCardToInbox(input: { userId: string; cardId: string })
 
 // ─── Attachments ──────────────────────────────────────────────
 
-export async function addAttachment(
-  input: {
-    userId: string
-    cardId: string
-    file: Express.Multer.File
-  },
-) {
+export async function addAttachment(input: {
+  userId: string
+  cardId: string
+  file: Express.Multer.File
+}) {
   const card = await getCardOrThrow(input.cardId)
   await requireCardWrite(card, input.userId)
   const location = await workspaceLocationForCard(card)
@@ -648,18 +595,10 @@ export async function removeAttachment(input: {
 // ─── Comments ─────────────────────────────────────────────────
 
 function commentAlreadyDeletedError(): AppError {
-  return new AppError(
-    'COMMENT_ALREADY_DELETED',
-    409,
-    '이 댓글은 삭제되었습니다.',
-  )
+  return new AppError('COMMENT_ALREADY_DELETED', 409, '이 댓글은 삭제되었습니다.')
 }
 
-export async function createComment(input: {
-  userId: string
-  cardId: string
-  comment: string
-}) {
+export async function createComment(input: { userId: string; cardId: string; comment: string }) {
   const card = await getCardOrThrow(input.cardId)
   await requireCardRole(card, input.userId)
   const location = await workspaceLocationForCard(card)
@@ -683,11 +622,7 @@ export async function createComment(input: {
   return dto
 }
 
-export async function updateComment(input: {
-  userId: string
-  commentId: string
-  comment: string
-}) {
+export async function updateComment(input: { userId: string; commentId: string; comment: string }) {
   const comment = await prisma.comment.findFirst({
     where: { id: input.commentId },
   })
@@ -729,10 +664,7 @@ export async function updateComment(input: {
   return dto
 }
 
-export async function deleteComment(input: {
-  userId: string
-  commentId: string
-}): Promise<void> {
+export async function deleteComment(input: { userId: string; commentId: string }): Promise<void> {
   const comment = await prisma.comment.findFirst({
     where: { id: input.commentId },
   })

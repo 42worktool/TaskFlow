@@ -6,13 +6,7 @@ defineProps<{
 </script>
 
 <template>
-  <img
-    v-if="imageUrl"
-    :src="imageUrl"
-    alt=""
-    class="person-avatar"
-    referrerpolicy="no-referrer"
-  />
+  <img v-if="imageUrl" :src="imageUrl" alt="" class="person-avatar" referrerpolicy="no-referrer" />
   <div v-else class="person-avatar person-avatar--fallback">
     {{ name.charAt(0).toUpperCase() }}
   </div>

@@ -1,10 +1,7 @@
 import { prisma } from '../../db'
 import { NotFoundError } from '../../errors'
 import { createdBy } from '../../lib/audit'
-import {
-  MESSAGE_HISTORY_LIMIT,
-  newestMessageOrder,
-} from '../../lib/messaging'
+import { MESSAGE_HISTORY_LIMIT, newestMessageOrder } from '../../lib/messaging'
 import { userSummarySelect } from '../../lib/user-summary'
 import { requireWorkspaceRole } from '../../lib/workspace-permissions'
 import { realtime } from '../../realtime'
@@ -15,9 +12,7 @@ import {
 } from './workspace-message.dto'
 import { publishWorkspaceChange } from './workspace.realtime'
 
-async function deliverWorkspaceMessageCreated(
-  message: WorkspaceMessageDto,
-): Promise<void> {
+async function deliverWorkspaceMessageCreated(message: WorkspaceMessageDto): Promise<void> {
   try {
     const event = workspaceMessageDtoSchema.parse(message)
     const members = await prisma.workspaceMember.findMany({
@@ -40,10 +35,7 @@ async function deliverWorkspaceMessageCreated(
   }
 }
 
-export async function listWorkspaceMessages(input: {
-  userId: string
-  workspaceId: string
-}) {
+export async function listWorkspaceMessages(input: { userId: string; workspaceId: string }) {
   await requireWorkspaceRole(input.workspaceId, input.userId, 'VIEWER')
 
   const messages = await prisma.workspaceMessage.findMany({

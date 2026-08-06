@@ -148,7 +148,9 @@
   justify-content: center;
   line-height: 1;
   opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 
 .project-card-wrapper:hover .card-menu-btn,
@@ -369,8 +371,7 @@
 
 @media (max-width: 760px) {
   .home-shell {
-    --workspace-index-toolbox-space:
-      calc(62px + env(safe-area-inset-bottom, 0px));
+    --workspace-index-toolbox-space: calc(62px + env(safe-area-inset-bottom, 0px));
   }
 
   .home-content {

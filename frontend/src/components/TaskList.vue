@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import draggable from 'vuedraggable'
 import TaskCard from './TaskCard.vue'
 import { isExternalCardDropClaimed } from '../services/messenger'
@@ -21,6 +21,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'card-change': [listId: string, event: DraggableChange<Card>]
+  'update-cards': [listId: string, cards: Card[]]
   'card-drag-start': [card: Card]
   'card-drag-end': []
   'open-card': [card: Card]
@@ -41,6 +42,10 @@ const badgeColors: Record<string, string> = {
 const showAddCard = ref(false)
 const newCardTitle = ref('')
 let originPlaceholder: HTMLElement | null = null
+const cards = computed({
+  get: () => props.list.cards,
+  set: (updated) => emit('update-cards', props.list.id, updated),
+})
 
 function submitAddCard() {
   if (!props.canEdit) return
@@ -111,10 +116,7 @@ function createOriginPlaceholder(item: HTMLElement): void {
   originPlaceholder = placeholder
 }
 
-function startCardDrag(event: {
-  oldIndex?: number | null
-  item?: HTMLElement
-}) {
+function startCardDrag(event: { oldIndex?: number | null; item?: HTMLElement }) {
   const index = event.oldIndex
   if (index === null || index === undefined) return
   const card = props.list.cards[index]
@@ -128,9 +130,7 @@ function finishCardDrag(): void {
   emit('card-drag-end')
 }
 
-function canMoveCard(event: {
-  draggedContext?: { element?: Card }
-}): boolean {
+function canMoveCard(event: { draggedContext?: { element?: Card } }): boolean {
   const cardId = event.draggedContext?.element?.id
   return !cardId || !isExternalCardDropClaimed(cardId)
 }
@@ -143,27 +143,21 @@ const vFocus = {
 </script>
 
 <template>
-  <section
-    class="task-list"
-    :class="{ 'task-list--readonly': !canEdit }"
-  >
+  <section class="task-list" :class="{ 'task-list--readonly': !canEdit }">
     <div class="list-header">
       <input
         v-if="renaming"
         v-model="renameValue"
+        v-focus
         class="list-name-input"
         type="text"
         @keyup.enter="submitRename"
         @keyup.esc="cancelRename"
         @blur="submitRename"
-        v-focus
       />
       <span v-else class="list-name" @click="startRename">{{ list.name }}</span>
       <div class="list-header-actions">
-        <span
-          class="list-count"
-          :style="{ background: badgeColors[list.name] ?? '#6b7280' }"
-        >
+        <span class="list-count" :style="{ background: badgeColors[list.name] ?? '#6b7280' }">
           {{ list.cards.length }}
         </span>
         <button
@@ -179,7 +173,7 @@ const vFocus = {
     </div>
 
     <draggable
-      v-model="list.cards"
+      v-model="cards"
       item-key="id"
       group="board-cards"
       :disabled="!canEdit"
@@ -213,35 +207,22 @@ const vFocus = {
       </template>
     </draggable>
 
-    <form
-      v-if="canEdit && showAddCard"
-      class="add-card-form"
-      @submit.prevent="submitAddCard"
-    >
+    <form v-if="canEdit && showAddCard" class="add-card-form" @submit.prevent="submitAddCard">
       <input
         v-model="newCardTitle"
+        v-focus
         type="text"
         class="add-card-input"
         placeholder="카드 제목 입력"
         required
-        v-focus
         @keyup.esc="cancelAddCard"
         @blur="submitAddCard"
       />
-      <button
-        type="submit"
-        class="add-card-submit-btn"
-        :disabled="!newCardTitle.trim()"
-      >
+      <button type="submit" class="add-card-submit-btn" :disabled="!newCardTitle.trim()">
         추가
       </button>
     </form>
-    <button
-      v-else-if="canEdit"
-      class="add-card-btn"
-      type="button"
-      @click="showAddCard = true"
-    >
+    <button v-else-if="canEdit" class="add-card-btn" type="button" @click="showAddCard = true">
       + 카드 추가
     </button>
   </section>

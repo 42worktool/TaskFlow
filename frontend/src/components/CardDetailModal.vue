@@ -5,11 +5,7 @@ import { CardAPI } from '../api/card'
 import { LabelAPI } from '../api/label'
 import { authState } from '../services/auth'
 import type { Card, CardAttachment, CardComment, CardDetail, Label } from '../types'
-import {
-  isDateRangeValid,
-  toDateInput,
-  toIsoDate,
-} from '../utils/cardDates'
+import { isDateRangeValid, toDateInput, toIsoDate } from '../utils/cardDates'
 import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_ALLOWLIST } from '../utils/uploadLimits'
 
@@ -47,10 +43,7 @@ const commentEditDraft = ref('')
 const commentUpdatingId = ref<string | null>(null)
 const commentDeletingId = ref<string | null>(null)
 const commentMutationPending = computed(
-  () =>
-    commentSaving.value ||
-    commentUpdatingId.value !== null ||
-    commentDeletingId.value !== null,
+  () => commentSaving.value || commentUpdatingId.value !== null || commentDeletingId.value !== null,
 )
 const commentError = ref('')
 const availableLabels = ref<Label[]>([])
@@ -154,7 +147,12 @@ async function onAttachmentSelected(event: Event): Promise<void> {
     const created = await CardAPI.uploadAttachment(cardId, file, (percent) => {
       if (generation === attachmentGeneration) attachmentProgress.value = percent
     })
-    if (!active || generation !== attachmentGeneration || cardId !== props.cardId || !detail.value) {
+    if (
+      !active ||
+      generation !== attachmentGeneration ||
+      cardId !== props.cardId ||
+      !detail.value
+    ) {
       return
     }
     detail.value = {
@@ -300,9 +298,7 @@ function discardCommentEditor(): void {
   commentEditDraft.value = ''
 }
 
-async function loadCard(
-  options: { background?: boolean } = {},
-): Promise<void> {
+async function loadCard(options: { background?: boolean } = {}): Promise<void> {
   const background = options.background ?? false
   const generation = ++loadGeneration
   if (!background) {
@@ -314,19 +310,13 @@ async function loadCard(
     const card = await CardAPI.get(props.cardId)
     void loadLabels()
     if (generation === loadGeneration) {
-      if (
-        background &&
-        (saving.value || (props.editable && hasUnsavedChanges()))
-      ) {
+      if (background && (saving.value || (props.editable && hasUnsavedChanges()))) {
         remoteUpdatePending.value = true
         return
       }
       const editedCommentId = commentEditingId.value
       applyDetail(card)
-      if (
-        editedCommentId &&
-        !card.comments.some((comment) => comment.id === editedCommentId)
-      ) {
+      if (editedCommentId && !card.comments.some((comment) => comment.id === editedCommentId)) {
         discardCommentEditor()
         commentError.value = '이 댓글은 삭제되었습니다.'
       }
@@ -334,18 +324,14 @@ async function loadCard(
     }
   } catch (caught) {
     if (generation === loadGeneration) {
-      error.value =
-        caught instanceof Error ? caught.message : '카드 상세를 불러오지 못했습니다.'
+      error.value = caught instanceof Error ? caught.message : '카드 상세를 불러오지 못했습니다.'
     }
   } finally {
     if (!background && generation === loadGeneration) loading.value = false
   }
 }
 
-async function reloadAfterFailedSave(
-  cardId: string,
-  message: string,
-): Promise<void> {
+async function reloadAfterFailedSave(cardId: string, message: string): Promise<void> {
   if (!active || cardId !== props.cardId) return
   const generation = ++loadGeneration
   try {
@@ -370,12 +356,7 @@ async function submitComment(): Promise<void> {
   commentError.value = ''
   try {
     const created = await CardAPI.createComment(cardId, nextComment)
-    if (
-      !active ||
-      generation !== commentGeneration ||
-      cardId !== props.cardId ||
-      !detail.value
-    ) {
+    if (!active || generation !== commentGeneration || cardId !== props.cardId || !detail.value) {
       return
     }
 
@@ -388,22 +369,11 @@ async function submitComment(): Promise<void> {
     }
     commentDraft.value = ''
   } catch (caught) {
-    if (
-      active &&
-      generation === commentGeneration &&
-      cardId === props.cardId
-    ) {
-      commentError.value =
-        caught instanceof Error
-          ? caught.message
-          : '댓글을 등록하지 못했습니다.'
+    if (active && generation === commentGeneration && cardId === props.cardId) {
+      commentError.value = caught instanceof Error ? caught.message : '댓글을 등록하지 못했습니다.'
     }
   } finally {
-    if (
-      active &&
-      generation === commentGeneration &&
-      cardId === props.cardId
-    ) {
+    if (active && generation === commentGeneration && cardId === props.cardId) {
       commentSaving.value = false
     }
   }
@@ -445,52 +415,31 @@ async function updateComment(comment: CardComment): Promise<void> {
   commentError.value = ''
   try {
     const updated = await CardAPI.updateComment(comment.id, nextComment)
-    if (
-      !active ||
-      generation !== commentGeneration ||
-      cardId !== props.cardId ||
-      !detail.value
-    ) {
+    if (!active || generation !== commentGeneration || cardId !== props.cardId || !detail.value) {
       return
     }
     loadGeneration += 1
     detail.value = {
       ...detail.value,
-      comments: detail.value.comments.map((item) =>
-        item.id === updated.id ? updated : item,
-      ),
+      comments: detail.value.comments.map((item) => (item.id === updated.id ? updated : item)),
     }
     discardCommentEditor()
   } catch (caught) {
-    if (
-      active &&
-      generation === commentGeneration &&
-      cardId === props.cardId
-    ) {
-      commentError.value =
-        caught instanceof Error ? caught.message : '댓글을 수정하지 못했습니다.'
-      if (
-        caught instanceof Error &&
-        caught.cause === 'COMMENT_ALREADY_DELETED'
-      ) {
+    if (active && generation === commentGeneration && cardId === props.cardId) {
+      commentError.value = caught instanceof Error ? caught.message : '댓글을 수정하지 못했습니다.'
+      if (caught instanceof Error && caught.cause === 'COMMENT_ALREADY_DELETED') {
         loadGeneration += 1
         detail.value = detail.value
           ? {
               ...detail.value,
-              comments: detail.value.comments.filter(
-                (item) => item.id !== comment.id,
-              ),
+              comments: detail.value.comments.filter((item) => item.id !== comment.id),
             }
           : null
         discardCommentEditor()
       }
     }
   } finally {
-    if (
-      active &&
-      generation === commentGeneration &&
-      cardId === props.cardId
-    ) {
+    if (active && generation === commentGeneration && cardId === props.cardId) {
       commentUpdatingId.value = null
     }
   }
@@ -511,12 +460,7 @@ async function removeComment(comment: CardComment): Promise<void> {
   commentError.value = ''
   try {
     await CardAPI.removeComment(comment.id)
-    if (
-      !active ||
-      generation !== commentGeneration ||
-      cardId !== props.cardId ||
-      !detail.value
-    ) {
+    if (!active || generation !== commentGeneration || cardId !== props.cardId || !detail.value) {
       return
     }
     loadGeneration += 1
@@ -526,35 +470,21 @@ async function removeComment(comment: CardComment): Promise<void> {
     }
     if (commentEditingId.value === comment.id) discardCommentEditor()
   } catch (caught) {
-    if (
-      active &&
-      generation === commentGeneration &&
-      cardId === props.cardId
-    ) {
-      commentError.value =
-        caught instanceof Error ? caught.message : '댓글을 삭제하지 못했습니다.'
-      if (
-        caught instanceof Error &&
-        caught.cause === 'COMMENT_ALREADY_DELETED'
-      ) {
+    if (active && generation === commentGeneration && cardId === props.cardId) {
+      commentError.value = caught instanceof Error ? caught.message : '댓글을 삭제하지 못했습니다.'
+      if (caught instanceof Error && caught.cause === 'COMMENT_ALREADY_DELETED') {
         loadGeneration += 1
         detail.value = detail.value
           ? {
               ...detail.value,
-              comments: detail.value.comments.filter(
-                (item) => item.id !== comment.id,
-              ),
+              comments: detail.value.comments.filter((item) => item.id !== comment.id),
             }
           : null
         if (commentEditingId.value === comment.id) discardCommentEditor()
       }
     }
   } finally {
-    if (
-      active &&
-      generation === commentGeneration &&
-      cardId === props.cardId
-    ) {
+    if (active && generation === commentGeneration && cardId === props.cardId) {
       commentDeletingId.value = null
     }
   }
@@ -562,22 +492,14 @@ async function removeComment(comment: CardComment): Promise<void> {
 
 const deferComposerSubmit = (callback: () => void): void => void nextTick(callback)
 
-const commentSubmitter = createComposerEnterSubmitter(
-  () => {
-    void submitComment()
-  },
-  deferComposerSubmit,
-)
+const commentSubmitter = createComposerEnterSubmitter(() => {
+  void submitComment()
+}, deferComposerSubmit)
 
-const commentEditSubmitter = createComposerEnterSubmitter(
-  () => {
-    const comment = detail.value?.comments.find(
-      (item) => item.id === commentEditingId.value,
-    )
-    if (comment) void updateComment(comment)
-  },
-  deferComposerSubmit,
-)
+const commentEditSubmitter = createComposerEnterSubmitter(() => {
+  const comment = detail.value?.comments.find((item) => item.id === commentEditingId.value)
+  if (comment) void updateComment(comment)
+}, deferComposerSubmit)
 
 async function submit(): Promise<void> {
   if (!props.editable || saving.value || commentMutationPending.value) return
@@ -595,8 +517,7 @@ async function submit(): Promise<void> {
     return
   }
   if (remoteUpdatePending.value) {
-    error.value =
-      '다른 팀원이 이 카드를 변경했습니다. 입력 보호를 위해 닫았다가 다시 열어 주세요.'
+    error.value = '다른 팀원이 이 카드를 변경했습니다. 입력 보호를 위해 닫았다가 다시 열어 주세요.'
     return
   }
 
@@ -604,12 +525,7 @@ async function submit(): Promise<void> {
   const descriptionChanged = nextDescription !== initialDescription
   const startDateChanged = nextStartDate !== initialStartDate
   const deadlineChanged = nextDeadline !== initialDeadline
-  if (
-    !titleChanged &&
-    !descriptionChanged &&
-    !startDateChanged &&
-    !deadlineChanged
-  ) {
+  if (!titleChanged && !descriptionChanged && !startDateChanged && !deadlineChanged) {
     emit('saved', detail.value!)
     emit('close')
     return
@@ -638,8 +554,7 @@ async function submit(): Promise<void> {
     emit('close')
   } catch (caught) {
     if (!active || cardId !== props.cardId) return
-    const message =
-      caught instanceof Error ? caught.message : '카드를 저장하지 못했습니다.'
+    const message = caught instanceof Error ? caught.message : '카드를 저장하지 못했습니다.'
     await reloadAfterFailedSave(cardId, message)
   } finally {
     if (active) saving.value = false
@@ -795,12 +710,10 @@ onUnmounted(() => {
                   v-model="selectedLabelId"
                   :disabled="labelsLoading || labelPending !== null || isInboxCard"
                 >
-                  <option value="">{{ attachableLabels.length ? '라벨 추가' : '라벨 없음' }}</option>
-                  <option
-                    v-for="label in attachableLabels"
-                    :key="label.id"
-                    :value="label.id"
-                  >
+                  <option value="">
+                    {{ attachableLabels.length ? '라벨 추가' : '라벨 없음' }}
+                  </option>
+                  <option v-for="label in attachableLabels" :key="label.id" :value="label.id">
                     {{ label.label_name }}
                   </option>
                 </select>
@@ -921,9 +834,7 @@ onUnmounted(() => {
                 @compositionend="commentSubmitter.handleCompositionEnd"
               />
               <div class="card-detail-comment-composer-actions">
-                <small id="card-detail-comment-hint">
-                  Enter로 등록 · Shift+Enter로 줄바꿈
-                </small>
+                <small id="card-detail-comment-hint"> Enter로 등록 · Shift+Enter로 줄바꿈 </small>
                 <button
                   type="button"
                   :disabled="saving || commentMutationPending || !commentDraft.trim()"
@@ -932,11 +843,7 @@ onUnmounted(() => {
                   {{ commentSaving ? '등록 중…' : '댓글 등록' }}
                 </button>
               </div>
-              <p
-                v-if="commentError"
-                class="card-detail-comment-error"
-                role="alert"
-              >
+              <p v-if="commentError" class="card-detail-comment-error" role="alert">
                 {{ commentError }}
               </p>
             </div>
@@ -991,10 +898,7 @@ onUnmounted(() => {
                     {{ commentDeletingId === comment.id ? '삭제 중…' : '삭제' }}
                   </button>
                 </header>
-                <div
-                  v-if="commentEditingId === comment.id"
-                  class="card-detail-comment-editor"
-                >
+                <div v-if="commentEditingId === comment.id" class="card-detail-comment-editor">
                   <textarea
                     v-model="commentEditDraft"
                     rows="3"
@@ -1019,10 +923,7 @@ onUnmounted(() => {
                       </button>
                       <button
                         type="button"
-                        :disabled="
-                          commentUpdatingId !== null ||
-                          !commentEditDraft.trim()
-                        "
+                        :disabled="commentUpdatingId !== null || !commentEditDraft.trim()"
                         @click="updateComment(comment)"
                       >
                         {{ commentUpdatingId === comment.id ? '저장 중…' : '저장' }}
@@ -1036,13 +937,9 @@ onUnmounted(() => {
           </section>
 
           <p v-if="error" class="card-detail-error" role="alert">{{ error }}</p>
-          <p
-            v-else-if="remoteUpdatePending"
-            class="card-detail-error"
-            role="status"
-          >
-            다른 팀원이 이 카드를 변경했습니다. 작성 중인 내용을 보호하기 위해
-            자동으로 덮어쓰지 않았습니다.
+          <p v-else-if="remoteUpdatePending" class="card-detail-error" role="status">
+            다른 팀원이 이 카드를 변경했습니다. 작성 중인 내용을 보호하기 위해 자동으로 덮어쓰지
+            않았습니다.
           </p>
 
           <div class="card-detail-actions">

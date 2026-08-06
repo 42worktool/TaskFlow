@@ -34,7 +34,8 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   USER_NOT_FOUND: '해당 이메일로 가입한 사용자를 찾을 수 없습니다.',
   CANNOT_FRIEND_SELF: '자기 자신에게 친구 요청을 보낼 수 없습니다.',
   ALREADY_FRIENDS: '이미 친구인 사용자입니다.',
-  FRIEND_REQUEST_ALREADY_RECEIVED: '상대방이 먼저 보낸 요청이 있습니다. 받은 요청에서 수락해 주세요.',
+  FRIEND_REQUEST_ALREADY_RECEIVED:
+    '상대방이 먼저 보낸 요청이 있습니다. 받은 요청에서 수락해 주세요.',
   FRIEND_REQUEST_NOT_FOUND: '친구 요청을 찾을 수 없습니다. 목록을 새로고침해 주세요.',
   UNSUPPORTED_FILE_TYPE: '지원하지 않는 파일 형식입니다.',
   PAYLOAD_TOO_LARGE: '파일 용량이 너무 큽니다.',
@@ -62,10 +63,7 @@ let refreshInFlight: {
 
 function hasExplicitLogout(): boolean {
   try {
-    return (
-      typeof window !== 'undefined' &&
-      window.localStorage.getItem(EXPLICIT_LOGOUT_KEY) === '1'
-    )
+    return typeof window !== 'undefined' && window.localStorage.getItem(EXPLICIT_LOGOUT_KEY) === '1'
   } catch {
     return false
   }
@@ -122,9 +120,10 @@ export function resolveErrorMessage(
 }
 
 export async function authRequestError(response: Response, fallback: string): Promise<Error> {
-  const body = (await response.json().catch(() => null)) as
-    | { error?: string; message?: string }
-    | null
+  const body = (await response.json().catch(() => null)) as {
+    error?: string
+    message?: string
+  } | null
   return new Error(resolveErrorMessage(body, fallback), { cause: body?.error })
 }
 
@@ -133,10 +132,7 @@ function applyAuthenticatedSession(
   expectedGeneration: number,
   expectedAttempt: number,
 ): AuthUser {
-  if (
-    expectedGeneration !== authGeneration ||
-    expectedAttempt !== authAttempt
-  ) {
+  if (expectedGeneration !== authGeneration || expectedAttempt !== authAttempt) {
     throw new Error('Authentication request was superseded by a newer session')
   }
 
@@ -166,16 +162,10 @@ async function requestPasswordSession(
   })
 
   if (!response.ok) throw await authRequestError(response, fallback)
-  return applyAuthenticatedSession(
-    (await response.json()) as RefreshResponse,
-    generation,
-    attempt,
-  )
+  return applyAuthenticatedSession((await response.json()) as RefreshResponse, generation, attempt)
 }
 
-async function requestRefresh(
-  expectedGeneration = authGeneration,
-): Promise<boolean> {
+async function requestRefresh(expectedGeneration = authGeneration): Promise<boolean> {
   if (expectedGeneration !== authGeneration) return false
   if (hasExplicitLogout()) {
     clearAuth()
@@ -186,9 +176,7 @@ async function requestRefresh(
   if (refreshInFlight?.generation === generation) return refreshInFlight.promise
 
   const controller = new AbortController()
-  let promise!: Promise<boolean>
-
-  promise = (async () => {
+  const promise = (async () => {
     const response = await fetch('/api/auth/refresh', {
       method: 'POST',
       credentials: 'same-origin',
@@ -202,10 +190,7 @@ async function requestRefresh(
       return false
     }
     if (!response.ok) {
-      throw await authRequestError(
-        response,
-        '인증 세션을 갱신하지 못했습니다.',
-      )
+      throw await authRequestError(response, '인증 세션을 갱신하지 못했습니다.')
     }
 
     const body = (await response.json()) as RefreshResponse
@@ -275,7 +260,10 @@ export async function signupWithPassword(
   )
 }
 
-export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+export async function authFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
   await initializeAuth()
   const requestGeneration = authGeneration
 
@@ -288,10 +276,7 @@ export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}
   let response = await makeRequest()
   if (response.status === 401 && requestGeneration === authGeneration) {
     try {
-      if (
-        (await requestRefresh(requestGeneration)) &&
-        requestGeneration === authGeneration
-      ) {
+      if ((await requestRefresh(requestGeneration)) && requestGeneration === authGeneration) {
         response = await makeRequest()
       }
     } catch {
@@ -316,10 +301,7 @@ export async function apiRequest<T>(
   const response = await authFetch(input, requestInit)
 
   if (!response.ok) {
-    throw await authRequestError(
-      response,
-      `Request failed with status ${response.status}`,
-    )
+    throw await authRequestError(response, `Request failed with status ${response.status}`)
   }
 
   if (response.status === 204) return undefined as T
@@ -337,4 +319,3 @@ export async function logout(): Promise<void> {
     headers: { Accept: 'application/json' },
   })
 }
-

@@ -16,9 +16,7 @@ describe('ChatAPI', () => {
     vi.mocked(apiRequest).mockResolvedValueOnce([])
 
     await expect(ChatAPI.list('workspace-1')).resolves.toEqual([])
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/api/workspaces/workspace-1/messages',
-    )
+    expect(apiRequest).toHaveBeenCalledWith('/api/workspaces/workspace-1/messages')
   })
 
   it('sends a workspace message', async () => {
@@ -36,16 +34,11 @@ describe('ChatAPI', () => {
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(message)
 
-    await expect(
-      ChatAPI.send('workspace-1', '안녕하세요'),
-    ).resolves.toEqual(message)
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/api/workspaces/workspace-1/messages',
-      {
-        method: 'POST',
-        json: { content: '안녕하세요' },
-      },
-    )
+    await expect(ChatAPI.send('workspace-1', '안녕하세요')).resolves.toEqual(message)
+    expect(apiRequest).toHaveBeenCalledWith('/api/workspaces/workspace-1/messages', {
+      method: 'POST',
+      json: { content: '안녕하세요' },
+    })
   })
 
   it('sends an optional card reference with a workspace message', async () => {
@@ -63,18 +56,13 @@ describe('ChatAPI', () => {
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(message)
 
-    await expect(
-      ChatAPI.send('workspace-1', '카드 코멘트', 'card-1'),
-    ).resolves.toEqual(message)
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/api/workspaces/workspace-1/messages',
-      {
-        method: 'POST',
-        json: {
-          content: '카드 코멘트',
-          card_id: 'card-1',
-        },
+    await expect(ChatAPI.send('workspace-1', '카드 코멘트', 'card-1')).resolves.toEqual(message)
+    expect(apiRequest).toHaveBeenCalledWith('/api/workspaces/workspace-1/messages', {
+      method: 'POST',
+      json: {
+        content: '카드 코멘트',
+        card_id: 'card-1',
       },
-    )
+    })
   })
 })

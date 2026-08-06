@@ -3,9 +3,7 @@ export interface CardDragContext {
   source: 'board' | 'inbox'
 }
 
-export function getBoardCardDropId(
-  drag: CardDragContext | null,
-): string | null {
+export function getBoardCardDropId(drag: CardDragContext | null): string | null {
   if (drag?.source !== 'board') return null
   const cardId = drag.cardId.trim()
   return cardId || null

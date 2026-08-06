@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  createListSchema,
-  listReorderSchema,
-  updateListSchema,
-} from './list.validation'
+import { createListSchema, listReorderSchema, updateListSchema } from './list.validation'
 
 test('list validation accepts names and strict partial updates', () => {
   assert.deepEqual(createListSchema.parse({ name: 'Todo' }), {
@@ -19,9 +15,6 @@ test('list validation accepts names and strict partial updates', () => {
 })
 
 test('list ordering requires at least one neighbor', () => {
-  assert.equal(
-    listReorderSchema.parse({ after_list_id: null }).after_list_id,
-    null,
-  )
+  assert.equal(listReorderSchema.parse({ after_list_id: null }).after_list_id, null)
   assert.throws(() => listReorderSchema.parse({}))
 })

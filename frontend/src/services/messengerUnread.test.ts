@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type {
-  DirectMessage,
-  NotificationEvent,
-  WorkspaceMessage,
-} from '../types'
+import type { DirectMessage, NotificationEvent, WorkspaceMessage } from '../types'
 import {
   clearMessengerUnread,
   directMessageUnreadCount,
@@ -25,10 +21,7 @@ const OTHER_FRIEND_ID = '00000000-0000-4000-8000-000000000003'
 const WORKSPACE_ID = '00000000-0000-4000-8000-000000000004'
 const OTHER_WORKSPACE_ID = '00000000-0000-4000-8000-000000000005'
 
-function directMessage(
-  id: string,
-  authorId = FRIEND_ID,
-): DirectMessage {
+function directMessage(id: string, authorId = FRIEND_ID): DirectMessage {
   return {
     id,
     content: 'hello',
@@ -99,10 +92,7 @@ describe('messenger unread state', () => {
       null,
     )
     receiveDirectMessageUnread(
-      directMessage(
-        '00000000-0000-4000-8000-000000000012',
-        OTHER_FRIEND_ID,
-      ),
+      directMessage('00000000-0000-4000-8000-000000000012', OTHER_FRIEND_ID),
       CURRENT_USER_ID,
       null,
     )
@@ -112,15 +102,10 @@ describe('messenger unread state', () => {
   })
 
   it('does not count self-authored or currently visible messages', () => {
-    const selfMessage = directMessage(
-      '00000000-0000-4000-8000-000000000013',
-      CURRENT_USER_ID,
-    )
+    const selfMessage = directMessage('00000000-0000-4000-8000-000000000013', CURRENT_USER_ID)
     selfMessage.recipient.user_id = FRIEND_ID
 
-    expect(
-      receiveDirectMessageUnread(selfMessage, CURRENT_USER_ID, null),
-    ).toBe(false)
+    expect(receiveDirectMessageUnread(selfMessage, CURRENT_USER_ID, null)).toBe(false)
     expect(
       receiveDirectMessageUnread(
         directMessage('00000000-0000-4000-8000-000000000014'),
@@ -137,26 +122,15 @@ describe('messenger unread state', () => {
     ).toBe(false)
     expect(
       receiveWorkspaceMessageUnread(
-        workspaceMessage(
-          '00000000-0000-4000-8000-000000000020',
-          CURRENT_USER_ID,
-        ),
+        workspaceMessage('00000000-0000-4000-8000-000000000020', CURRENT_USER_ID),
         CURRENT_USER_ID,
         null,
       ),
     ).toBe(false)
 
-    const wrongRecipient = directMessage(
-      '00000000-0000-4000-8000-000000000021',
-    )
+    const wrongRecipient = directMessage('00000000-0000-4000-8000-000000000021')
     wrongRecipient.recipient.user_id = OTHER_FRIEND_ID
-    expect(
-      receiveDirectMessageUnread(
-        wrongRecipient,
-        CURRENT_USER_ID,
-        null,
-      ),
-    ).toBe(false)
+    expect(receiveDirectMessageUnread(wrongRecipient, CURRENT_USER_ID, null)).toBe(false)
     expect(totalMessengerUnreadCount.value).toBe(0)
   })
 
@@ -197,25 +171,13 @@ describe('messenger unread state', () => {
   })
 
   it('prunes unread counts for rooms no longer in the directory', () => {
+    receiveWorkspaceMessageUnread(workspaceMessage('workspace-message-1'), CURRENT_USER_ID, null)
     receiveWorkspaceMessageUnread(
-      workspaceMessage('workspace-message-1'),
+      workspaceMessage('workspace-message-2', FRIEND_ID, OTHER_WORKSPACE_ID),
       CURRENT_USER_ID,
       null,
     )
-    receiveWorkspaceMessageUnread(
-      workspaceMessage(
-        'workspace-message-2',
-        FRIEND_ID,
-        OTHER_WORKSPACE_ID,
-      ),
-      CURRENT_USER_ID,
-      null,
-    )
-    receiveDirectMessageUnread(
-      directMessage('direct-message-1'),
-      CURRENT_USER_ID,
-      null,
-    )
+    receiveDirectMessageUnread(directMessage('direct-message-1'), CURRENT_USER_ID, null)
     receiveDirectMessageUnread(
       directMessage('direct-message-2', OTHER_FRIEND_ID),
       CURRENT_USER_ID,

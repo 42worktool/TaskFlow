@@ -142,11 +142,7 @@ async function assertSameWorkspace(card: CardWithList, label: Label): Promise<st
   return card.list.workspace_id
 }
 
-export async function addCardLabel(input: {
-  userId: string
-  cardId: string
-  labelId: string
-}) {
+export async function addCardLabel(input: { userId: string; cardId: string; labelId: string }) {
   const card = await getCardWorkspaceOrThrow(input.cardId)
   const label = await getLabelOrThrow(input.labelId)
   const workspaceId = await assertSameWorkspace(card, label)

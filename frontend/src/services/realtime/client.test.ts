@@ -1,14 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  RealtimeClient,
-  RealtimeSendError,
-  type RealtimeClientOptions,
-} from './client'
-import {
-  REALTIME_CLOSE_CODE,
-  REALTIME_PROTOCOL_VERSION,
-  type RealtimeReadyData,
-} from './protocol'
+import { RealtimeClient, RealtimeSendError, type RealtimeClientOptions } from './client'
+import { REALTIME_CLOSE_CODE, REALTIME_PROTOCOL_VERSION, type RealtimeReadyData } from './protocol'
 
 interface TestServerEvents {
   'system.ready': RealtimeReadyData
@@ -102,19 +94,14 @@ async function flushPromises(): Promise<void> {
 }
 
 function createHarness(
-  tokenProvider: (forceRefresh: boolean) => Promise<string | null> = async () =>
-    'access-token',
+  tokenProvider: (forceRefresh: boolean) => Promise<string | null> = async () => 'access-token',
   options: Omit<
     Partial<RealtimeClientOptions>,
     'tokenProvider' | 'urlFactory' | 'webSocketFactory'
   > = {},
 ) {
   const sockets: FakeWebSocket[] = []
-  const client = new RealtimeClient<
-    TestServerEvents,
-    TestClientEvents,
-    TestRequestResults
-  >({
+  const client = new RealtimeClient<TestServerEvents, TestClientEvents, TestRequestResults>({
     ...options,
     tokenProvider,
     urlFactory: () => 'ws://realtime.test/ws',
@@ -141,10 +128,7 @@ async function connectAndAuthenticate(
   const socket = sockets.at(-1)
   if (!socket) throw new Error('Expected a realtime socket')
   socket.open()
-  socket.receive(
-    'system.ready',
-    ready(connectionId, accessTokenExpiresAt, serverTime),
-  )
+  socket.receive('system.ready', ready(connectionId, accessTokenExpiresAt, serverTime))
   await connected
   return socket
 }
@@ -235,21 +219,14 @@ describe('RealtimeClient connection lifecycle', () => {
       .mockResolvedValueOnce('initial-token')
       .mockResolvedValueOnce('refreshed-token')
     const { client, sockets } = createHarness(tokenProvider)
-    const firstSocket = await connectAndAuthenticate(
-      client,
-      sockets,
-      'connection-auth-1',
-    )
+    const firstSocket = await connectAndAuthenticate(client, sockets, 'connection-auth-1')
 
     firstSocket.serverClose(REALTIME_CLOSE_CODE.AUTHENTICATION_REQUIRED)
     await vi.advanceTimersByTimeAsync(0)
     await flushPromises()
 
     expect(sockets).toHaveLength(2)
-    expect(tokenProvider.mock.calls.map(([forceRefresh]) => forceRefresh)).toEqual([
-      false,
-      true,
-    ])
+    expect(tokenProvider.mock.calls.map(([forceRefresh]) => forceRefresh)).toEqual([false, true])
 
     sockets[1].serverClose(REALTIME_CLOSE_CODE.AUTHENTICATION_REQUIRED)
     expect(client.state).toBe('disconnected')
@@ -290,11 +267,7 @@ describe('RealtimeClient connection lifecycle', () => {
     const { client, sockets } = createHarness()
     const recover = vi.fn()
     client.registerSubscriptionRecovery('workspace:private', recover)
-    const firstSocket = await connectAndAuthenticate(
-      client,
-      sockets,
-      'connection-terminal-1',
-    )
+    const firstSocket = await connectAndAuthenticate(client, sockets, 'connection-terminal-1')
     expect(recover).toHaveBeenCalledTimes(1)
 
     firstSocket.serverClose(REALTIME_CLOSE_CODE.SESSION_TERMINATED)
@@ -384,11 +357,7 @@ describe('RealtimeClient connection lifecycle', () => {
       maxOutboundMessageBytes: 256,
       maxBufferedAmountBytes: 256,
     })
-    const socket = await connectAndAuthenticate(
-      client,
-      sockets,
-      'connection-outbound',
-    )
+    const socket = await connectAndAuthenticate(client, sockets, 'connection-outbound')
 
     expect(() =>
       client.send('workspace.subscribe', { workspaceId: 'x'.repeat(1_000) }),
@@ -402,9 +371,7 @@ describe('RealtimeClient connection lifecycle', () => {
     ).rejects.toMatchObject({ code: 'MESSAGE_TOO_LARGE' })
 
     socket.bufferedAmount = 250
-    expect(() =>
-      client.send('workspace.subscribe', { workspaceId: 'workspace-1' }),
-    ).toThrowError(
+    expect(() => client.send('workspace.subscribe', { workspaceId: 'workspace-1' })).toThrowError(
       expect.objectContaining<Partial<RealtimeSendError>>({
         code: 'BACKPRESSURE',
       }),
@@ -532,9 +499,7 @@ describe('RealtimeClient connection lifecycle', () => {
     expect(limited.client.state).toBe('disconnected')
 
     const malformed = createHarness()
-    const malformedConnect = malformed.client.connect().catch(
-      (error: unknown) => error,
-    )
+    const malformedConnect = malformed.client.connect().catch((error: unknown) => error)
     await flushPromises()
     malformed.sockets[0].open()
     malformed.sockets[0].receive('system.ready', {
@@ -551,9 +516,7 @@ describe('RealtimeClient connection lifecycle', () => {
 
   it('fails malformed and non-text server frames instead of hanging', async () => {
     const malformed = createHarness()
-    const malformedConnect = malformed.client.connect().catch(
-      (error: unknown) => error,
-    )
+    const malformedConnect = malformed.client.connect().catch((error: unknown) => error)
     await flushPromises()
     malformed.sockets[0].open()
     malformed.sockets[0].receiveRaw('{')
@@ -571,9 +534,7 @@ describe('RealtimeClient connection lifecycle', () => {
     expect(binary.sockets[0].closeCalls[0]?.code).toBe(4003)
 
     const invalidEvent = createHarness()
-    const invalidEventConnect = invalidEvent.client.connect().catch(
-      (error: unknown) => error,
-    )
+    const invalidEventConnect = invalidEvent.client.connect().catch((error: unknown) => error)
     await flushPromises()
     invalidEvent.sockets[0].open()
     invalidEvent.sockets[0].receive('invalid', {})
@@ -592,9 +553,7 @@ describe('RealtimeClient connection lifecycle', () => {
 
     client.disconnect(1002, 'x'.repeat(200))
 
-    expect(socket.closeCalls).toEqual([
-      { code: 4000, reason: 'Client disconnected' },
-    ])
+    expect(socket.closeCalls).toEqual([{ code: 4000, reason: 'Client disconnected' }])
     expect(client.state).toBe('disconnected')
   })
 

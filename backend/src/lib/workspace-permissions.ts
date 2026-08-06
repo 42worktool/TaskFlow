@@ -2,10 +2,7 @@ import type { Prisma, Role } from '@prisma/client'
 import { prisma } from '../db'
 import { ForbiddenError, NotFoundError } from '../errors'
 
-export type WorkspacePermissionClient = Pick<
-  Prisma.TransactionClient,
-  'workspaceMember'
->
+export type WorkspacePermissionClient = Pick<Prisma.TransactionClient, 'workspaceMember'>
 
 const ROLE_RANK: Readonly<Record<Role, number>> = {
   VIEWER: 1,
@@ -19,17 +16,11 @@ type ReadableWorkspace = {
   members: readonly { user_id: string }[]
 }
 
-export function hasMinimumWorkspaceRole(
-  role: Role,
-  minimumRole: Role,
-): boolean {
+export function hasMinimumWorkspaceRole(role: Role, minimumRole: Role): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[minimumRole]
 }
 
-export function requireMinimumWorkspaceRole(
-  role: Role | null,
-  minimumRole: Role,
-): Role {
+export function requireMinimumWorkspaceRole(role: Role | null, minimumRole: Role): Role {
   if (!role || !hasMinimumWorkspaceRole(role, minimumRole)) {
     throw new ForbiddenError()
   }
@@ -42,9 +33,7 @@ export function requireWorkspaceReadAccess<T extends ReadableWorkspace>(
 ): { workspace: T; isMember: boolean } {
   if (!workspace) throw new NotFoundError()
 
-  const isMember = workspace.members.some(
-    (member) => member.user_id === userId,
-  )
+  const isMember = workspace.members.some((member) => member.user_id === userId)
   if (!workspace.is_public && !isMember) throw new ForbiddenError()
 
   return { workspace, isMember }

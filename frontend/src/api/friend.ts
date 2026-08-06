@@ -1,10 +1,5 @@
 import { apiRequest } from '../services/auth'
-import type {
-  DirectMessage,
-  Friend,
-  FriendRequest,
-  FriendRequestLists,
-} from '../types'
+import type { DirectMessage, Friend, FriendRequest, FriendRequestLists } from '../types'
 
 // A newly opened drawer must not read ahead of a mutation started by the
 // previous drawer instance.

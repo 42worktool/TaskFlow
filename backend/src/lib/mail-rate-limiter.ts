@@ -24,10 +24,7 @@ type MailRateLimitClient = {
   expire(key: string, seconds: number): Promise<unknown>
 }
 
-async function increment(
-  redis: MailRateLimitClient,
-  key: string,
-): Promise<number> {
+async function increment(redis: MailRateLimitClient, key: string): Promise<number> {
   const count = await redis.incr(key)
   if (count === 1) await redis.expire(key, WINDOW_SECONDS)
   return count
@@ -51,9 +48,7 @@ export function createMailRateLimitChecker(redis: MailRateLimitClient) {
   }
 }
 
-export async function checkMailRateLimit(
-  input: MailRateLimitInput,
-): Promise<void> {
+export async function checkMailRateLimit(input: MailRateLimitInput): Promise<void> {
   const redis = await getRedisClient()
   await createMailRateLimitChecker(redis)(input)
 }

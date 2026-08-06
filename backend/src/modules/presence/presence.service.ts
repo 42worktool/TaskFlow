@@ -15,7 +15,7 @@ import {
 import { otherUserId } from '../friend/friend-pair'
 import { publishWorkspacePresenceChanged } from '../workspace/workspace.realtime'
 
-export const friendPresenceEventSchema = z
+const friendPresenceEventSchema = z
   .object({
     user_id: uuidSchema,
     online: z.boolean(),
@@ -50,10 +50,7 @@ async function notifyPresence(userId: string, online: boolean): Promise<void> {
   const [friendships, memberships] = await Promise.all([
     prisma.friendship.findMany({
       where: {
-        OR: [
-          { user_low_id: userId },
-          { user_high_id: userId },
-        ],
+        OR: [{ user_low_id: userId }, { user_high_id: userId }],
       },
       select: {
         user_low_id: true,
@@ -76,14 +73,10 @@ async function notifyPresence(userId: string, online: boolean): Promise<void> {
     user_id: userId,
     online,
   })
-  const friendIds = new Set(
-    friendships.map((friendship) => otherUserId(friendship, userId)),
-  )
+  const friendIds = new Set(friendships.map((friendship) => otherUserId(friendship, userId)))
 
   realtime.sendToUsers(friendIds, 'friend.presence_changed', event)
-  for (const workspaceId of new Set(
-    memberships.map((membership) => membership.workspace_id),
-  )) {
+  for (const workspaceId of new Set(memberships.map((membership) => membership.workspace_id))) {
     publishWorkspacePresenceChanged({
       workspace_id: workspaceId,
       user_id: userId,
@@ -93,8 +86,7 @@ async function notifyPresence(userId: string, online: boolean): Promise<void> {
 }
 
 function schedulePresenceNotification(userId: string, online: boolean): void {
-  let task: Promise<void>
-  task = notifyPresence(userId, online)
+  const task = notifyPresence(userId, online)
     .catch((error: unknown) => {
       console.error(
         '[presence] notification failed',
@@ -105,37 +97,29 @@ function schedulePresenceNotification(userId: string, online: boolean): void {
   pendingNotifications.add(task)
 }
 
-function connectionAuthenticated(
-  connection: Readonly<RealtimeConnectionInfo>,
-): void {
+function connectionAuthenticated(connection: Readonly<RealtimeConnectionInfo>): void {
   if (!running) return
   if (addPresenceConnection(connection.userId, connection.connectionId)) {
     schedulePresenceNotification(connection.userId, true)
   }
 }
 
-function connectionDisconnected(
-  connection: Readonly<RealtimeConnectionDisconnectedInfo>,
-): void {
+function connectionDisconnected(connection: Readonly<RealtimeConnectionDisconnectedInfo>): void {
   if (!running) return
   if (removePresenceConnection(connection.userId, connection.connectionId)) {
     schedulePresenceNotification(connection.userId, false)
   }
 }
 
-export function startPresence(
-  options: { drainTimeoutMs?: number } = {},
-): () => Promise<void> {
+export function startPresence(options: { drainTimeoutMs?: number } = {}): () => Promise<void> {
   if (stopped) {
     throw new Error('Presence service cannot be restarted')
   }
   if (currentStop) return currentStop
 
   running = true
-  const removeAuthenticated =
-    realtime.onConnectionAuthenticated(connectionAuthenticated)
-  const removeDisconnected =
-    realtime.onConnectionDisconnected(connectionDisconnected)
+  const removeAuthenticated = realtime.onConnectionAuthenticated(connectionAuthenticated)
+  const removeDisconnected = realtime.onConnectionDisconnected(connectionDisconnected)
 
   let stopPromise: Promise<void> | null = null
   const stop = (): Promise<void> => {
@@ -146,9 +130,7 @@ export function startPresence(
     removeDisconnected()
     clearPresence()
     currentStop = null
-    stopPromise = drainPendingNotifications(
-      options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS,
-    )
+    stopPromise = drainPendingNotifications(options.drainTimeoutMs ?? DEFAULT_DRAIN_TIMEOUT_MS)
     return stopPromise
   }
   currentStop = stop

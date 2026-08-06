@@ -44,12 +44,7 @@ function stubMethod(
 
 test('workspace realtime authorizes subscriptions and returns an online snapshot', async (t) => {
   setRequiredEnvironment()
-  const [
-    { prisma },
-    { realtime, RealtimeError },
-    realtimeModule,
-    presence,
-  ] = await Promise.all([
+  const [{ prisma }, { realtime, RealtimeError }, realtimeModule, presence] = await Promise.all([
     import('../../db'),
     import('../../realtime'),
     import('./workspace.realtime'),
@@ -66,14 +61,9 @@ test('workspace realtime authorizes subscriptions and returns an online snapshot
     }
   })
 
-  let workspace:
-    | { members: Array<{ user_id: string }> }
-    | null = {
-      members: [
-        { user_id: ONLINE_USER_ID },
-        { user_id: OFFLINE_USER_ID },
-      ],
-    }
+  let workspace: { members: Array<{ user_id: string }> } | null = {
+    members: [{ user_id: ONLINE_USER_ID }, { user_id: OFFLINE_USER_ID }],
+  }
   stubMethod(t, prisma.workspace, 'findFirst', async () => workspace)
 
   presence.addPresenceConnection(ONLINE_USER_ID, 'online-connection')
@@ -97,35 +87,27 @@ test('workspace realtime authorizes subscriptions and returns an online snapshot
   assert.ok(subscribe)
   assert.ok(unsubscribe)
 
-  assert.deepEqual(
-    await subscribe(context, { workspace_id: WORKSPACE_ID }),
-    {
-      workspace_id: WORKSPACE_ID,
-      online_user_ids: [ONLINE_USER_ID],
-    },
-  )
+  assert.deepEqual(await subscribe(context, { workspace_id: WORKSPACE_ID }), {
+    workspace_id: WORKSPACE_ID,
+    online_user_ids: [ONLINE_USER_ID],
+  })
   assert.deepEqual(joins, [`workspace:${WORKSPACE_ID}`])
 
   workspace = null
   await assert.rejects(
     () => subscribe(context, { workspace_id: WORKSPACE_ID }),
     (error: unknown) =>
-      error instanceof RealtimeError &&
-      error.code === 'WORKSPACE_ACCESS_REQUIRED',
+      error instanceof RealtimeError && error.code === 'WORKSPACE_ACCESS_REQUIRED',
   )
   assert.equal(joins.length, 1)
 
-  assert.deepEqual(
-    unsubscribe(context, { workspace_id: WORKSPACE_ID }),
-    { workspace_id: WORKSPACE_ID },
-  )
+  assert.deepEqual(unsubscribe(context, { workspace_id: WORKSPACE_ID }), {
+    workspace_id: WORKSPACE_ID,
+  })
   assert.deepEqual(leaves, [`workspace:${WORKSPACE_ID}`])
 
   stop()
-  assert.deepEqual(
-    removals.sort(),
-    ['workspace.subscribe', 'workspace.unsubscribe'],
-  )
+  assert.deepEqual(removals.sort(), ['workspace.subscribe', 'workspace.unsubscribe'])
 })
 
 test('workspace change validation is bounded and publishing is best effort', async (t) => {
@@ -135,22 +117,20 @@ test('workspace change validation is bounded and publishing is best effort', asy
     import('./workspace.realtime'),
   ])
 
-  assert.equal(
-    realtimeModule.workspaceChangeEventSchema.safeParse({
-      event_id: USER_ID,
-      workspace_id: WORKSPACE_ID,
-      entity: 'card',
-      action: 'moved',
-      entity_id: ONLINE_USER_ID,
-      list_ids: [USER_ID, ONLINE_USER_ID, OFFLINE_USER_ID],
-      actor_user_id: USER_ID,
-      occurred_at: new Date().toISOString(),
-    }).success,
-    false,
-  )
-
   const warnings: unknown[][] = []
   stubMethod(t, console, 'warn', (...args) => warnings.push(args))
+
+  const invalidEvent = realtimeModule.publishWorkspaceChange({
+    workspace_id: WORKSPACE_ID,
+    entity: 'card',
+    action: 'moved',
+    entity_id: ONLINE_USER_ID,
+    list_ids: [USER_ID, ONLINE_USER_ID, OFFLINE_USER_ID],
+    actor_user_id: USER_ID,
+  })
+  assert.equal(invalidEvent, null)
+  warnings.length = 0
+
   stubMethod(t, realtime, 'publish', () => {
     throw new Error('transport unavailable')
   })
@@ -171,17 +151,13 @@ test('workspace change validation is bounded and publishing is best effort', asy
 
 test('a committed member removal prevents an older authorization query from joining', async (t) => {
   setRequiredEnvironment()
-  const [
-    { prisma },
-    { realtime, RealtimeError },
-    realtimeModule,
-    workspaceService,
-  ] = await Promise.all([
-    import('../../db'),
-    import('../../realtime'),
-    import('./workspace.realtime'),
-    import('./workspace.service'),
-  ])
+  const [{ prisma }, { realtime, RealtimeError }, realtimeModule, workspaceService] =
+    await Promise.all([
+      import('../../db'),
+      import('../../realtime'),
+      import('./workspace.realtime'),
+      import('./workspace.service'),
+    ])
 
   const handlers = new Map<string, (...args: any[]) => any>()
   stubMethod(t, realtime, 'register', (event, _schema, handler) => {
@@ -321,12 +297,7 @@ test('a committed workspace deletion prevents an older authorization query from 
 
 test('subscription acknowledgement uses a fresh post-join member snapshot', async (t) => {
   setRequiredEnvironment()
-  const [
-    { prisma },
-    { realtime },
-    realtimeModule,
-    presence,
-  ] = await Promise.all([
+  const [{ prisma }, { realtime }, realtimeModule, presence] = await Promise.all([
     import('../../db'),
     import('../../realtime'),
     import('./workspace.realtime'),
@@ -348,10 +319,7 @@ test('subscription acknowledgement uses a fresh post-join member snapshot', asyn
     queryCount += 1
     if (queryCount === 1) return authorization
     return {
-      members: [
-        { user_id: USER_ID },
-        { user_id: ONLINE_USER_ID },
-      ],
+      members: [{ user_id: USER_ID }, { user_id: ONLINE_USER_ID }],
     }
   })
 

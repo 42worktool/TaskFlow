@@ -2,8 +2,7 @@ import type { Label } from '../types'
 import { apiRequest } from '../services/auth'
 
 export const LabelAPI = {
-  list: (workspaceId: string) =>
-    apiRequest<Label[]>(`/api/workspaces/${workspaceId}/labels`),
+  list: (workspaceId: string) => apiRequest<Label[]>(`/api/workspaces/${workspaceId}/labels`),
 
   create: (workspaceId: string, data: { label_name: string; label_color: string }) =>
     apiRequest<Label>(`/api/workspaces/${workspaceId}/labels`, {
@@ -17,8 +16,7 @@ export const LabelAPI = {
       json: patch,
     }),
 
-  remove: (labelId: string) =>
-    apiRequest<void>(`/api/labels/${labelId}`, { method: 'DELETE' }),
+  remove: (labelId: string) => apiRequest<void>(`/api/labels/${labelId}`, { method: 'DELETE' }),
 
   attach: (cardId: string, labelId: string) =>
     apiRequest<Label>(`/api/cards/${cardId}/labels`, {

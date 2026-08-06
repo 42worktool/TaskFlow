@@ -108,14 +108,24 @@ test('attachment uploads reject a file name that is empty after normalization', 
 test('attachment uploads accept a file name at the 255 character limit', async () => {
   const boundaryName = `${'a'.repeat(MAX_ORIGINAL_FILENAME_LENGTH - 4)}.txt`
   assert.equal(boundaryName.length, MAX_ORIGINAL_FILENAME_LENGTH)
-  const { err, filename } = await invokeFilenameCallback(attachmentUpload, { originalname: boundaryName })
+  const { err, filename } = await invokeFilenameCallback(attachmentUpload, {
+    originalname: boundaryName,
+  })
   assert.equal(err, null)
   assert.ok(filename?.endsWith('.txt'))
 })
 
 test('requireMagicBytesMatch accepts an avatar whose content matches its declared type', async () => {
-  const filePath = writeFixture('avatars', 'real.png', Buffer.concat([PNG_HEADER, Buffer.from('rest')]))
-  const file = { path: filePath, filename: 'real.png', mimetype: 'image/png' } as Express.Multer.File
+  const filePath = writeFixture(
+    'avatars',
+    'real.png',
+    Buffer.concat([PNG_HEADER, Buffer.from('rest')]),
+  )
+  const file = {
+    path: filePath,
+    filename: 'real.png',
+    mimetype: 'image/png',
+  } as Express.Multer.File
 
   const err = await runMagicBytesCheck('avatars', AVATAR_MIME_ALLOWLIST, file)
 
@@ -126,8 +136,16 @@ test('requireMagicBytesMatch accepts an avatar whose content matches its declare
 
 test('requireMagicBytesMatch deletes and rejects an avatar whose content does not match its declared Content-Type', async () => {
   // Actually a JPEG, but the client claims it's a PNG.
-  const filePath = writeFixture('avatars', 'spoofed.png', Buffer.concat([JPEG_HEADER, Buffer.from('rest')]))
-  const file = { path: filePath, filename: 'spoofed.png', mimetype: 'image/png' } as Express.Multer.File
+  const filePath = writeFixture(
+    'avatars',
+    'spoofed.png',
+    Buffer.concat([JPEG_HEADER, Buffer.from('rest')]),
+  )
+  const file = {
+    path: filePath,
+    filename: 'spoofed.png',
+    mimetype: 'image/png',
+  } as Express.Multer.File
 
   const err = await runMagicBytesCheck('avatars', AVATAR_MIME_ALLOWLIST, file)
 
@@ -137,8 +155,16 @@ test('requireMagicBytesMatch deletes and rejects an avatar whose content does no
 })
 
 test('requireMagicBytesMatch deletes and rejects a non-image avatar disguised with an image Content-Type', async () => {
-  const filePath = writeFixture('avatars', 'not-an-image.png', Buffer.from('just plain text, not an image'))
-  const file = { path: filePath, filename: 'not-an-image.png', mimetype: 'image/png' } as Express.Multer.File
+  const filePath = writeFixture(
+    'avatars',
+    'not-an-image.png',
+    Buffer.from('just plain text, not an image'),
+  )
+  const file = {
+    path: filePath,
+    filename: 'not-an-image.png',
+    mimetype: 'image/png',
+  } as Express.Multer.File
 
   const err = await runMagicBytesCheck('avatars', AVATAR_MIME_ALLOWLIST, file)
 
@@ -148,8 +174,16 @@ test('requireMagicBytesMatch deletes and rejects a non-image avatar disguised wi
 })
 
 test('requireMagicBytesMatch accepts an attachment JPEG whose content matches its declared type', async () => {
-  const filePath = writeFixture('attachments', 'photo.jpg', Buffer.concat([JPEG_HEADER, Buffer.from('rest')]))
-  const file = { path: filePath, filename: 'photo.jpg', mimetype: 'image/jpeg' } as Express.Multer.File
+  const filePath = writeFixture(
+    'attachments',
+    'photo.jpg',
+    Buffer.concat([JPEG_HEADER, Buffer.from('rest')]),
+  )
+  const file = {
+    path: filePath,
+    filename: 'photo.jpg',
+    mimetype: 'image/jpeg',
+  } as Express.Multer.File
 
   const err = await runMagicBytesCheck('attachments', ATTACHMENT_MIME_ALLOWLIST, file)
 
@@ -159,8 +193,16 @@ test('requireMagicBytesMatch accepts an attachment JPEG whose content matches it
 })
 
 test('requireMagicBytesMatch accepts an attachment MP4 whose content matches its declared type', async () => {
-  const filePath = writeFixture('attachments', 'clip.mp4', Buffer.concat([MP4_HEADER, Buffer.from('rest')]))
-  const file = { path: filePath, filename: 'clip.mp4', mimetype: 'video/mp4' } as Express.Multer.File
+  const filePath = writeFixture(
+    'attachments',
+    'clip.mp4',
+    Buffer.concat([MP4_HEADER, Buffer.from('rest')]),
+  )
+  const file = {
+    path: filePath,
+    filename: 'clip.mp4',
+    mimetype: 'video/mp4',
+  } as Express.Multer.File
 
   const err = await runMagicBytesCheck('attachments', ATTACHMENT_MIME_ALLOWLIST, file)
 
@@ -171,7 +213,11 @@ test('requireMagicBytesMatch accepts an attachment MP4 whose content matches its
 
 test('requireMagicBytesMatch accepts an attachment text file, including UTF-8 Korean content', async () => {
   const filePath = writeFixture('attachments', 'notes.txt', TEXT_CONTENT)
-  const file = { path: filePath, filename: 'notes.txt', mimetype: 'text/plain' } as Express.Multer.File
+  const file = {
+    path: filePath,
+    filename: 'notes.txt',
+    mimetype: 'text/plain',
+  } as Express.Multer.File
 
   const err = await runMagicBytesCheck('attachments', ATTACHMENT_MIME_ALLOWLIST, file)
 
@@ -181,8 +227,16 @@ test('requireMagicBytesMatch accepts an attachment text file, including UTF-8 Ko
 })
 
 test('requireMagicBytesMatch deletes and rejects an attachment MP4 disguised as a text file', async () => {
-  const filePath = writeFixture('attachments', 'video.txt', Buffer.concat([MP4_HEADER, Buffer.from('rest')]))
-  const file = { path: filePath, filename: 'video.txt', mimetype: 'text/plain' } as Express.Multer.File
+  const filePath = writeFixture(
+    'attachments',
+    'video.txt',
+    Buffer.concat([MP4_HEADER, Buffer.from('rest')]),
+  )
+  const file = {
+    path: filePath,
+    filename: 'video.txt',
+    mimetype: 'text/plain',
+  } as Express.Multer.File
 
   const err = await runMagicBytesCheck('attachments', ATTACHMENT_MIME_ALLOWLIST, file)
 
@@ -198,7 +252,11 @@ test('requireMagicBytesMatch deletes and rejects an attachment binary disguised 
     'binary.txt',
     Buffer.from([0x4d, 0x5a, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00]),
   )
-  const file = { path: filePath, filename: 'binary.txt', mimetype: 'text/plain' } as Express.Multer.File
+  const file = {
+    path: filePath,
+    filename: 'binary.txt',
+    mimetype: 'text/plain',
+  } as Express.Multer.File
 
   const err = await runMagicBytesCheck('attachments', ATTACHMENT_MIME_ALLOWLIST, file)
 

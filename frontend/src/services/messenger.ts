@@ -6,17 +6,10 @@ import {
   markWorkspaceConversationRead,
 } from './messengerUnread'
 
-export type MessengerPane =
-  | 'directory'
-  | 'friends'
-  | 'chat'
-  | 'dm'
+export type MessengerPane = 'directory' | 'friends' | 'chat' | 'dm'
 export type CardDragSource = 'board' | 'inbox'
 export type ExternalCardDropTarget = 'chat' | 'inbox'
-export type ExternalCardDropOwner =
-  | 'chat-panel'
-  | 'toolbox-chat'
-  | 'toolbox-inbox'
+export type ExternalCardDropOwner = 'chat-panel' | 'toolbox-chat' | 'toolbox-inbox'
 export type InboxDestination = Pick<List, 'id' | 'name'>
 export interface FloatingPosition {
   x: number
@@ -53,8 +46,8 @@ export interface PendingChatCardAttachment {
   cardId: string
 }
 
-export const MESSENGER_DRAG_THRESHOLD = 6
-export const MESSENGER_VIEWPORT_MARGIN = 8
+const MESSENGER_DRAG_THRESHOLD = 6
+const MESSENGER_VIEWPORT_MARGIN = 8
 
 export function clampFloatingPosition(
   position: FloatingPosition,
@@ -154,9 +147,7 @@ export function showFriendManagement(): void {
   messengerState.open = true
 }
 
-export function openWorkspaceConversation(
-  workspace: MessengerWorkspace,
-): void {
+export function openWorkspaceConversation(workspace: MessengerWorkspace): void {
   messengerState.activeRoom = {
     kind: 'workspace',
     workspace: { ...workspace },
@@ -189,25 +180,17 @@ export function setMessengerWorkspace(workspace: MessengerWorkspace): void {
 }
 
 export function clearMessengerWorkspace(workspaceId?: string): void {
-  if (
-    workspaceId &&
-    messengerState.workspace &&
-    messengerState.workspace.id !== workspaceId
-  ) {
+  if (workspaceId && messengerState.workspace && messengerState.workspace.id !== workspaceId) {
     return
   }
   const clearedWorkspaceId = messengerState.workspace?.id ?? workspaceId
   messengerState.workspace = null
-  if (
-    messengerState.pendingChatCardAttachment?.workspaceId ===
-    clearedWorkspaceId
-  ) {
+  if (messengerState.pendingChatCardAttachment?.workspaceId === clearedWorkspaceId) {
     messengerState.pendingChatCardAttachment = null
   }
   if (
     messengerState.activeRoom?.kind === 'workspace' &&
-    (!clearedWorkspaceId ||
-      messengerState.activeRoom.workspace.id === clearedWorkspaceId)
+    (!clearedWorkspaceId || messengerState.activeRoom.workspace.id === clearedWorkspaceId)
   ) {
     messengerState.activeRoom = null
     if (messengerState.pane === 'chat') messengerState.pane = 'directory'
@@ -238,10 +221,7 @@ export function finishCardDrag(): void {
 }
 
 function matchesActiveBoardDrag(cardId: string): boolean {
-  return (
-    messengerState.cardDrag?.source === 'board' &&
-    messengerState.cardDrag.cardId === cardId
-  )
+  return messengerState.cardDrag?.source === 'board' && messengerState.cardDrag.cardId === cardId
 }
 
 export function setExternalCardDropHover(
@@ -260,17 +240,9 @@ export function setExternalCardDropHover(
   return true
 }
 
-export function clearExternalCardDropHover(
-  cardId: string,
-  owner: ExternalCardDropOwner,
-): void {
+export function clearExternalCardDropHover(cardId: string, owner: ExternalCardDropOwner): void {
   const drop = messengerState.externalCardDrop
-  if (
-    !drop ||
-    drop.committed ||
-    drop.cardId !== cardId ||
-    drop.owner !== owner
-  ) {
+  if (!drop || drop.committed || drop.cardId !== cardId || drop.owner !== owner) {
     return
   }
   messengerState.externalCardDrop = null
@@ -297,10 +269,7 @@ export function isExternalCardDropClaimed(cardId: string): boolean {
 }
 
 export function clearExternalCardDrop(cardId?: string): void {
-  if (
-    cardId !== undefined &&
-    messengerState.externalCardDrop?.cardId !== cardId
-  ) {
+  if (cardId !== undefined && messengerState.externalCardDrop?.cardId !== cardId) {
     return
   }
   messengerState.externalCardDrop = null
@@ -329,18 +298,14 @@ export function requestChatCardAttachment(
   return true
 }
 
-export function takePendingChatCardAttachment(
-  workspaceId: string,
-): string | null {
+export function takePendingChatCardAttachment(workspaceId: string): string | null {
   const pending = messengerState.pendingChatCardAttachment
   if (!pending || pending.workspaceId !== workspaceId) return null
   messengerState.pendingChatCardAttachment = null
   return pending.cardId
 }
 
-export function setInboxDestinations(
-  destinations: readonly InboxDestination[],
-): void {
+export function setInboxDestinations(destinations: readonly InboxDestination[]): void {
   messengerState.inboxDestinations = destinations.map((list) => ({
     id: list.id,
     name: list.name,

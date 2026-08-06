@@ -23,10 +23,12 @@ describe('LabelAPI', () => {
     vi.mocked(apiRequest).mockResolvedValueOnce([label]).mockResolvedValueOnce(label)
 
     await expect(LabelAPI.list('workspace-1')).resolves.toEqual([label])
-    await expect(LabelAPI.create('workspace-1', {
-      label_name: 'Bug',
-      label_color: '#EF4444',
-    })).resolves.toEqual(label)
+    await expect(
+      LabelAPI.create('workspace-1', {
+        label_name: 'Bug',
+        label_color: '#EF4444',
+      }),
+    ).resolves.toEqual(label)
 
     expect(apiRequest).toHaveBeenNthCalledWith(1, '/api/workspaces/workspace-1/labels')
     expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/workspaces/workspace-1/labels', {
@@ -45,10 +47,12 @@ describe('LabelAPI', () => {
     }
     vi.mocked(apiRequest).mockResolvedValueOnce(label)
 
-    await expect(LabelAPI.update('label-1', {
-      label_name: 'Critical',
-      label_color: '#DC2626',
-    })).resolves.toEqual(label)
+    await expect(
+      LabelAPI.update('label-1', {
+        label_name: 'Critical',
+        label_color: '#DC2626',
+      }),
+    ).resolves.toEqual(label)
     expect(apiRequest).toHaveBeenCalledWith('/api/labels/label-1', {
       method: 'PUT',
       json: { label_name: 'Critical', label_color: '#DC2626' },

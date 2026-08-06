@@ -10,18 +10,12 @@ import {
 
 test('card validation accepts valid create, ordering, date, and comment bodies', () => {
   assert.equal(createCardSchema.parse({ title: 'Card' }).title, 'Card')
-  assert.equal(
-    cardNeighborSchema.parse({ before_card_id: null }).before_card_id,
-    null,
-  )
+  assert.equal(cardNeighborSchema.parse({ before_card_id: null }).before_card_id, null)
   assert.equal(
     cardDatesSchema.parse({ deadline: '2026-07-27T00:00:00Z' }).deadline,
     '2026-07-27T00:00:00Z',
   )
-  assert.equal(
-    cardCompletionSchema.parse({ is_completed: true }).is_completed,
-    true,
-  )
+  assert.equal(cardCompletionSchema.parse({ is_completed: true }).is_completed, true)
   assert.equal(commentSchema.parse({ comment_str: 'Hello' }).comment_str, 'Hello')
 })
 

@@ -11,11 +11,9 @@ export interface WorkspaceInvitationPreview {
 }
 
 export const WorkspaceAPI = {
-  list: () =>
-    apiRequest<{ my: Workspace[]; public: Workspace[] }>('/api/workspaces'),
+  list: () => apiRequest<{ my: Workspace[]; public: Workspace[] }>('/api/workspaces'),
 
-  get: (id: string) =>
-    apiRequest<Workspace>(`/api/workspaces/${id}`),
+  get: (id: string) => apiRequest<Workspace>(`/api/workspaces/${id}`),
 
   create: (name: string, isPublic = false) =>
     apiRequest<Workspace>('/api/workspaces', {
@@ -29,8 +27,7 @@ export const WorkspaceAPI = {
       json: patch,
     }),
 
-  remove: (id: string) =>
-    apiRequest<{ ok: true }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
+  remove: (id: string) => apiRequest<{ ok: true }>(`/api/workspaces/${id}`, { method: 'DELETE' }),
 
   inviteMember: async (workspaceId: string, email: string, role: ManageableWorkspaceRole) =>
     apiRequest<{ ok: true }>(`/api/workspaces/${workspaceId}/members`, {
@@ -38,11 +35,7 @@ export const WorkspaceAPI = {
       json: { email, role },
     }),
 
-  changeMemberRole: async (
-    workspaceId: string,
-    userId: string,
-    role: ManageableWorkspaceRole,
-  ) =>
+  changeMemberRole: async (workspaceId: string, userId: string, role: ManageableWorkspaceRole) =>
     apiRequest<Workspace>(`/api/workspaces/${workspaceId}/members/${userId}`, {
       method: 'PUT',
       json: { role },

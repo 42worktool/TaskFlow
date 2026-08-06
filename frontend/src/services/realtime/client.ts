@@ -11,13 +11,8 @@ import {
   type RealtimeReadyData,
 } from './protocol'
 
-export type RealtimeConnectionState =
-  | 'idle'
-  | 'connecting'
-  | 'authenticating'
-  | 'connected'
-  | 'reconnecting'
-  | 'disconnected'
+type RealtimeConnectionState =
+  'idle' | 'connecting' | 'authenticating' | 'connected' | 'reconnecting' | 'disconnected'
 
 export interface RealtimeClientOptions {
   tokenProvider: (forceRefresh: boolean) => Promise<string | null>
@@ -56,9 +51,7 @@ type RequestResult<
   Event extends PropertyKey,
 > = Event extends keyof ClientRequestResults ? ClientRequestResults[Event] : unknown
 
-export type RealtimeSubscriptionRecovery = (
-  ready: RealtimeReadyData,
-) => void | Promise<void>
+type RealtimeSubscriptionRecovery = (ready: RealtimeReadyData) => void | Promise<void>
 
 interface SubscriptionRecovery {
   recover: RealtimeSubscriptionRecovery
@@ -69,11 +62,7 @@ export class RealtimeRequestError extends Error {
   readonly code: string
   readonly retryable: boolean
 
-  constructor(
-    code: string,
-    message: string,
-    retryable: boolean,
-  ) {
+  constructor(code: string, message: string, retryable: boolean) {
     super(message)
     this.name = 'RealtimeRequestError'
     this.code = code
@@ -81,7 +70,7 @@ export class RealtimeRequestError extends Error {
   }
 }
 
-export type RealtimeSendErrorCode =
+type RealtimeSendErrorCode =
   | 'NOT_CONNECTED'
   | 'CONNECTION_NOT_OPEN'
   | 'INVALID_EVENT'
@@ -130,32 +119,30 @@ function defaultUrl(): string {
 }
 
 function createRequestId(): string {
-  return globalThis.crypto?.randomUUID?.() ??
+  return (
+    globalThis.crypto?.randomUUID?.() ??
     `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  )
 }
 
 function browserCloseCode(code: number): number {
-  if (
-    Number.isInteger(code) &&
-    (code === 1000 || (code >= 3000 && code <= 4999))
-  ) {
+  if (Number.isInteger(code) && (code === 1000 || (code >= 3000 && code <= 4999))) {
     return code
   }
   return 4000
 }
 
 function browserCloseReason(reason: string): string {
-  return new TextEncoder().encode(reason).byteLength <= 123
-    ? reason
-    : 'Client disconnected'
+  return new TextEncoder().encode(reason).byteLength <= 123 ? reason : 'Client disconnected'
 }
 
 export class RealtimeClient<
   ServerEvents extends object,
   ClientEvents extends object,
-  ClientRequestResults extends Partial<
-    Record<ClientEventName<ClientEvents>, unknown>
-  > = Record<never, never>,
+  ClientRequestResults extends Partial<Record<ClientEventName<ClientEvents>, unknown>> = Record<
+    never,
+    never
+  >,
 > {
   private readonly options: RealtimeClientOptions
   private readonly maxOutboundMessageBytes: number
@@ -186,8 +173,7 @@ export class RealtimeClient<
     this.options = options
     this.maxOutboundMessageBytes =
       options.maxOutboundMessageBytes ?? DEFAULT_MAX_OUTBOUND_MESSAGE_BYTES
-    this.maxBufferedAmountBytes =
-      options.maxBufferedAmountBytes ?? this.maxOutboundMessageBytes * 4
+    this.maxBufferedAmountBytes = options.maxBufferedAmountBytes ?? this.maxOutboundMessageBytes * 4
 
     if (
       !Number.isSafeInteger(this.maxOutboundMessageBytes) ||
@@ -268,8 +254,7 @@ export class RealtimeClient<
 
     const generation = this.connectionGeneration
     const socket = this.socket
-    let operation!: Promise<void>
-    operation = this.performAuthenticationRefresh(
+    const operation = this.performAuthenticationRefresh(
       forceHttpRefresh,
       generation,
       socket,
@@ -322,11 +307,7 @@ export class RealtimeClient<
         accessTokenExpiresAt: result.accessTokenExpiresAt,
       }
     }
-    this.scheduleAuthenticationRefresh(
-      result.accessTokenExpiresAt,
-      generation,
-      socket,
-    )
+    this.scheduleAuthenticationRefresh(result.accessTokenExpiresAt, generation, socket)
   }
 
   on<Event extends Extract<keyof ServerEvents, string>>(
@@ -334,8 +315,7 @@ export class RealtimeClient<
     handler: (data: ServerEvents[Event]) => void | Promise<void>,
   ): () => void {
     const handlers = this.handlers.get(event) ?? new Set<EventHandler>()
-    const registration: EventHandler = (data) =>
-      handler(data as ServerEvents[Event])
+    const registration: EventHandler = (data) => handler(data as ServerEvents[Event])
     handlers.add(registration)
     this.handlers.set(event, handlers)
     return () => {
@@ -346,9 +326,7 @@ export class RealtimeClient<
     }
   }
 
-  onStateChange(
-    handler: (state: RealtimeConnectionState) => void | Promise<void>,
-  ): () => void {
+  onStateChange(handler: (state: RealtimeConnectionState) => void | Promise<void>): () => void {
     const registration = (state: RealtimeConnectionState) => handler(state)
     this.stateHandlers.add(registration)
     return () => this.stateHandlers.delete(registration)
@@ -360,10 +338,7 @@ export class RealtimeClient<
    * The callback runs once for every authenticated connection and can issue the
    * feature-specific subscribe request. Removing it stops future replays.
    */
-  registerSubscriptionRecovery(
-    key: string,
-    recover: RealtimeSubscriptionRecovery,
-  ): () => void {
+  registerSubscriptionRecovery(key: string, recover: RealtimeSubscriptionRecovery): () => void {
     if (!key) throw new Error('Realtime subscription keys must not be empty')
 
     const recovery: SubscriptionRecovery = {
@@ -382,10 +357,7 @@ export class RealtimeClient<
     }
   }
 
-  send<Event extends ClientEventName<ClientEvents>>(
-    event: Event,
-    data: ClientEvents[Event],
-  ): void {
+  send<Event extends ClientEventName<ClientEvents>>(event: Event, data: ClientEvents[Event]): void {
     this.assertConnected()
     this.assertApplicationEvent(event)
     this.sendWire({ v: REALTIME_PROTOCOL_VERSION, event, data })
@@ -399,14 +371,10 @@ export class RealtimeClient<
       this.assertApplicationEvent(event)
     } catch (error) {
       return Promise.reject(
-        error instanceof Error
-          ? error
-          : new Error('Realtime request event is invalid'),
+        error instanceof Error ? error : new Error('Realtime request event is invalid'),
       )
     }
-    return this.requestWire(event, data) as Promise<
-      RequestResult<ClientRequestResults, Event>
-    >
+    return this.requestWire(event, data) as Promise<RequestResult<ClientRequestResults, Event>>
   }
 
   private async openSocket(generation: number): Promise<void> {
@@ -546,8 +514,7 @@ export class RealtimeClient<
         if (event.code === 1013) {
           this.scheduleReconnect(
             generation,
-            this.options.serverUnavailableCooldownMs ??
-              DEFAULT_SERVER_UNAVAILABLE_COOLDOWN_MS,
+            this.options.serverUnavailableCooldownMs ?? DEFAULT_SERVER_UNAVAILABLE_COOLDOWN_MS,
           )
           return
         }
@@ -561,11 +528,7 @@ export class RealtimeClient<
       })
 
       socket.addEventListener('error', () => {
-        this.retryActiveConnection(
-          socket,
-          generation,
-          'Realtime transport failed',
-        )
+        this.retryActiveConnection(socket, generation, 'Realtime transport failed')
       })
     } finally {
       if (this.openingGeneration === generation) this.openingGeneration = null
@@ -602,11 +565,7 @@ export class RealtimeClient<
       this.readyData = ready
       this.serverClockOffsetMs = Date.parse(ready.serverTime) - Date.now()
       this.setState('connected')
-      this.scheduleAuthenticationRefresh(
-        ready.accessTokenExpiresAt,
-        generation,
-        this.socket,
-      )
+      this.scheduleAuthenticationRefresh(ready.accessTokenExpiresAt, generation, this.socket)
       this.resolveConnectionWaiter(generation)
       this.replaySubscriptions(generation, ready)
     }
@@ -679,11 +638,7 @@ export class RealtimeClient<
 
   private sendWire(message: RealtimeMessage): void {
     if (!this.socket || this.socket.readyState !== 1) {
-      throw new RealtimeSendError(
-        'CONNECTION_NOT_OPEN',
-        'Realtime connection is not open',
-        true,
-      )
+      throw new RealtimeSendError('CONNECTION_NOT_OPEN', 'Realtime connection is not open', true)
     }
     if (!isRealtimeEventName(message.event)) {
       throw new RealtimeSendError(
@@ -724,21 +679,13 @@ export class RealtimeClient<
     try {
       this.socket.send(serialized)
     } catch {
-      throw new RealtimeSendError(
-        'SEND_FAILED',
-        'Realtime message could not be sent',
-        true,
-      )
+      throw new RealtimeSendError('SEND_FAILED', 'Realtime message could not be sent', true)
     }
   }
 
   private assertConnected(): void {
     if (!this.isConnected) {
-      throw new RealtimeSendError(
-        'NOT_CONNECTED',
-        'Realtime client is not connected',
-        true,
-      )
+      throw new RealtimeSendError('NOT_CONNECTED', 'Realtime client is not connected', true)
     }
   }
 
@@ -769,20 +716,12 @@ export class RealtimeClient<
     }, delay ?? jitteredDelay)
   }
 
-  private scheduleHandshakeTimeout(
-    socket: WebSocket,
-    generation: number,
-  ): void {
+  private scheduleHandshakeTimeout(socket: WebSocket, generation: number): void {
     this.clearHandshakeTimer()
-    const timeoutMs =
-      this.options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS
+    const timeoutMs = this.options.handshakeTimeoutMs ?? DEFAULT_HANDSHAKE_TIMEOUT_MS
     this.handshakeTimer = setTimeout(() => {
       this.handshakeTimer = null
-      this.retryActiveConnection(
-        socket,
-        generation,
-        'Realtime handshake timed out',
-      )
+      this.retryActiveConnection(socket, generation, 'Realtime handshake timed out')
     }, timeoutMs)
   }
 
@@ -796,17 +735,13 @@ export class RealtimeClient<
 
     const leadMs = Math.max(
       0,
-      this.options.authenticationRefreshLeadMs ??
-        DEFAULT_AUTHENTICATION_REFRESH_LEAD_MS,
+      this.options.authenticationRefreshLeadMs ?? DEFAULT_AUTHENTICATION_REFRESH_LEAD_MS,
     )
     const serverNow = Date.now() + this.serverClockOffsetMs
     const remainingMs = Date.parse(accessTokenExpiresAt) - serverNow
     if (remainingMs <= 0) return
     const effectiveLeadMs = Math.min(leadMs, remainingMs / 2)
-    const delayMs = Math.min(
-      MAX_TIMER_DELAY_MS,
-      Math.max(1, remainingMs - effectiveLeadMs),
-    )
+    const delayMs = Math.min(MAX_TIMER_DELAY_MS, Math.max(1, remainingMs - effectiveLeadMs))
     this.authenticationRefreshTimer = setTimeout(() => {
       this.authenticationRefreshTimer = null
       if (
@@ -828,11 +763,7 @@ export class RealtimeClient<
   }
 
   private isActiveSocket(socket: WebSocket | null, generation: number): boolean {
-    return (
-      socket !== null &&
-      socket === this.socket &&
-      generation === this.connectionGeneration
-    )
+    return socket !== null && socket === this.socket && generation === this.connectionGeneration
   }
 
   private stopConnectionLifecycle(
@@ -871,11 +802,7 @@ export class RealtimeClient<
     this.closeSocket(socket, closeCode, reason)
   }
 
-  private retryActiveConnection(
-    socket: WebSocket,
-    generation: number,
-    reason: string,
-  ): void {
+  private retryActiveConnection(socket: WebSocket, generation: number, reason: string): void {
     if (!this.isActiveSocket(socket, generation)) return
     this.socket = null
     this.readyData = null
@@ -969,10 +896,7 @@ export class RealtimeClient<
   }
 
   private rejectConnectionWaiter(error: Error, generation?: number): void {
-    if (
-      generation !== undefined &&
-      this.connectionWaiter?.generation !== generation
-    ) {
+    if (generation !== undefined && this.connectionWaiter?.generation !== generation) {
       return
     }
     this.connectionWaiter?.reject(error)

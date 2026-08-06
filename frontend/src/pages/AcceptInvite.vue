@@ -22,9 +22,7 @@ const roleLabel = computed(() => {
   return invitation.value ? roleLabels[invitation.value.role] : ''
 })
 const currentRoleLabel = computed(() => {
-  return invitation.value?.current_role
-    ? roleLabels[invitation.value.current_role]
-    : ''
+  return invitation.value?.current_role ? roleLabels[invitation.value.current_role] : ''
 })
 
 onMounted(async () => {
@@ -75,8 +73,8 @@ async function switchAccount() {
         <p class="invite-eyebrow">워크스페이스 초대</p>
         <h1>{{ invitation.workspace_name }}</h1>
         <p v-if="invitation.already_member" class="invite-copy">
-          이미 <strong>{{ currentRoleLabel }}</strong> 역할로 참여 중입니다.
-          현재 권한은 변경되지 않습니다.
+          이미 <strong>{{ currentRoleLabel }}</strong> 역할로 참여 중입니다. 현재 권한은 변경되지
+          않습니다.
         </p>
         <p v-else class="invite-copy">
           현재 로그인한 TaskFlow 계정으로 <strong>{{ roleLabel }}</strong> 역할에 참여합니다.

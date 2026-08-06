@@ -12,8 +12,7 @@ function setRequiredEnvironment(): void {
     JWT_ACCESS_SECRET: 'test-secret-that-is-at-least-32-characters',
     GOOGLE_CLIENT_ID: 'test-client',
     GOOGLE_CLIENT_SECRET: 'test-secret',
-    GOOGLE_REDIRECT_URI:
-      'http://localhost:3000/api/auth/oauth/callback/google',
+    GOOGLE_REDIRECT_URI: 'http://localhost:3000/api/auth/oauth/callback/google',
     REDIS_URL: 'redis://localhost:6379',
     SMTP_HOST: 'localhost',
     SMTP_USER: 'test',
@@ -45,8 +44,7 @@ function user(id: string) {
   return {
     id,
     name: id === USER_A ? 'Alice' : id === USER_B ? 'Bob' : 'Carol',
-    profile_image_url:
-      id === USER_B ? 'https://example.com/bob.png' : null,
+    profile_image_url: id === USER_B ? 'https://example.com/bob.png' : null,
   }
 }
 
@@ -103,10 +101,7 @@ test('friend service keeps pending requests separate from friendships', async (t
     ])
     assert.deepEqual(query, {
       where: {
-        OR: [
-          { user_low_id: USER_A },
-          { user_high_id: USER_A },
-        ],
+        OR: [{ user_low_id: USER_A }, { user_high_id: USER_A }],
       },
       include: {
         user_low: {
@@ -219,9 +214,7 @@ test('friend service keeps pending requests separate from friendships', async (t
     stubTransaction(t, prisma)
     stubMethod(t, prisma.user, 'findFirst', async () => ({ id: USER_B }))
     stubMethod(t, prisma.friendship, 'findUnique', async () => null)
-    stubMethod(t, prisma.friendRequest, 'upsert', async () =>
-      friendRequest(USER_B, USER_B),
-    )
+    stubMethod(t, prisma.friendRequest, 'upsert', async () => friendRequest(USER_B, USER_B))
 
     await assert.rejects(
       () =>
@@ -272,9 +265,7 @@ test('friend service keeps pending requests separate from friendships', async (t
       friendshipReads += 1
       return friendshipReads === 1 ? null : { user_low_id: USER_A }
     })
-    stubMethod(t, prisma.friendRequest, 'upsert', async () =>
-      friendRequest(USER_B, USER_A),
-    )
+    stubMethod(t, prisma.friendRequest, 'upsert', async () => friendRequest(USER_B, USER_A))
     let cleanup: unknown
     stubMethod(t, prisma.friendRequest, 'deleteMany', async (args) => {
       cleanup = args
@@ -431,9 +422,7 @@ test('friend service keeps pending requests separate from friendships', async (t
         user_high_id: USER_B,
       },
     })
-    assert.deepEqual(deliveries, [
-      [USER_A, 'friend.request_deleted', { user_id: USER_B }],
-    ])
+    assert.deepEqual(deliveries, [[USER_A, 'friend.request_deleted', { user_id: USER_B }]])
   })
 
   await t.test('removes only the accepted canonical pair', async (t) => {
@@ -451,9 +440,7 @@ test('friend service keeps pending requests separate from friendships', async (t
       userId: USER_B,
       friendUserId: USER_A,
     })
-    assert.deepEqual(deliveries, [
-      [USER_A, 'friend.removed', { user_id: USER_B }],
-    ])
+    assert.deepEqual(deliveries, [[USER_A, 'friend.removed', { user_id: USER_B }]])
 
     assert.deepEqual(deletion, {
       where: {

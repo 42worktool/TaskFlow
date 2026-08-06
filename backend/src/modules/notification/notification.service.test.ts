@@ -65,7 +65,5 @@ test('member joined notification is sent once per other user', async (t) => {
   assert.equal(notification.kind, 'workspace.member_joined')
   assert.equal(notification.category, 'UPDATE')
   assert.match(notification.id, /^[0-9a-f-]{36}$/)
-  assert.deepEqual(deliveries, [
-    [RECIPIENT_ID, 'notification.created', notification],
-  ])
+  assert.deepEqual(deliveries, [[RECIPIENT_ID, 'notification.created', notification]])
 })

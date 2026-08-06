@@ -7,10 +7,7 @@ import { ListAPI } from '../api/list'
 import { realtime } from '../services/realtime'
 import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
 import type { Card, ListWithCards } from '../types'
-import {
-  buildCalendarWeeks,
-  type CalendarRangeSegment,
-} from '../utils/calendar'
+import { buildCalendarWeeks, type CalendarRangeSegment } from '../utils/calendar'
 
 const route = useRoute()
 const props = withDefaults(
@@ -72,9 +69,7 @@ function isToday(date: number | null): boolean {
 function updateSavedCard(saved: Card): void {
   lists.value = lists.value.map((list) => ({
     ...list,
-    cards: list.cards.map((card) =>
-      card.id === saved.id ? saved : card,
-    ),
+    cards: list.cards.map((card) => (card.id === saved.id ? saved : card)),
   }))
 }
 
@@ -82,9 +77,7 @@ function openCard(cardId: string): void {
   if (props.canViewCardDetails) selectedCardId.value = cardId
 }
 
-const calendarWeeks = computed(() =>
-  buildCalendarWeeks(year.value, month.value, cards.value),
-)
+const calendarWeeks = computed(() => buildCalendarWeeks(year.value, month.value, cards.value))
 
 const hasCardsThisMonth = computed(() =>
   calendarWeeks.value.some((week) => week.segments.length > 0),
@@ -124,10 +117,7 @@ function formatCardDate(value: string | null): string {
 function cardRangeLabel(card: Card): string {
   const start = formatCardDate(card.start_at)
   const deadline = formatCardDate(card.deadline)
-  const period =
-    start && deadline
-      ? `${start}부터 ${deadline}까지`
-      : start || deadline
+  const period = start && deadline ? `${start}부터 ${deadline}까지` : start || deadline
   return period ? `${card.title}, ${period}` : card.title
 }
 
@@ -143,20 +133,14 @@ async function loadLists(reset: boolean): Promise<void> {
 
   try {
     const loaded = await ListAPI.listByWorkspace(workspaceId)
-    if (
-      generation === loadGeneration &&
-      workspaceId === String(route.params.workspaceId ?? '')
-    ) {
+    if (generation === loadGeneration && workspaceId === String(route.params.workspaceId ?? '')) {
       lists.value = loaded
       error.value = ''
       if (!fullRefreshPending) fullRefreshRetriesRemaining = 0
     }
   } catch (caught) {
     if (generation !== loadGeneration) return
-    const message =
-      caught instanceof Error
-        ? caught.message
-        : '달력 일정을 불러오지 못했습니다.'
+    const message = caught instanceof Error ? caught.message : '달력 일정을 불러오지 못했습니다.'
     if (showLoading) error.value = message
     else console.warn('[calendar] background refresh failed', message)
     if (!reset && fullRefreshRetriesRemaining > 0) {
@@ -183,14 +167,11 @@ async function refreshLists(listIds: readonly string[]): Promise<void> {
   const refreshed = results
     .filter(
       (result): result is PromiseFulfilledResult<ListWithCards> =>
-        result.status === 'fulfilled' &&
-        result.value.workspace_id === workspaceId,
+        result.status === 'fulfilled' && result.value.workspace_id === workspaceId,
     )
     .map((result) => result.value)
   const refreshedById = new Map(refreshed.map((list) => [list.id, list]))
-  const next = lists.value.map(
-    (list) => refreshedById.get(list.id) ?? list,
-  )
+  const next = lists.value.map((list) => refreshedById.get(list.id) ?? list)
   for (const list of refreshed) {
     if (!next.some((item) => item.id === list.id)) next.push(list)
   }
@@ -202,9 +183,7 @@ function scheduleInvalidationFlush(): void {
   if (
     refreshRunning ||
     refreshTimer ||
-    (!fullRefreshPending &&
-      pendingListIds.size === 0 &&
-      pendingDeletedListIds.size === 0)
+    (!fullRefreshPending && pendingListIds.size === 0 && pendingDeletedListIds.size === 0)
   ) {
     return
   }
@@ -271,65 +250,49 @@ watch(
   },
 )
 
-const removeWorkspaceChangeListener = realtime.on(
-  'workspace.changed',
-  (value) => {
-    const event = parseWorkspaceChangedEvent(value)
-    const currentWorkspaceId = String(route.params.workspaceId ?? '')
-    if (!event || event.workspace_id !== currentWorkspaceId) return
+const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) => {
+  const event = parseWorkspaceChangedEvent(value)
+  const currentWorkspaceId = String(route.params.workspaceId ?? '')
+  if (!event || event.workspace_id !== currentWorkspaceId) return
 
-    if (loading.value) {
-      if (
-        event.entity === 'card' &&
-        selectedCardId.value === event.entity_id
-      ) {
-        cardDetailRefreshToken.value += 1
-      }
-      fullRefreshPending = true
-      pendingListIds.clear()
-      scheduleInvalidationFlush()
-      return
-    }
-
-    if (event.entity === 'list') {
-      if (event.action === 'deleted') {
-        const deletedList = lists.value.find(
-          (list) => list.id === event.entity_id,
-        )
-        if (
-          selectedCardId.value &&
-          deletedList?.cards.some(
-            (card) => card.id === selectedCardId.value,
-          )
-        ) {
-          selectedCardId.value = null
-        }
-        pendingDeletedListIds.add(event.entity_id)
-        pendingListIds.delete(event.entity_id)
-      } else {
-        const ids =
-          event.list_ids.length > 0
-            ? event.list_ids
-            : [event.entity_id]
-        ids.forEach((id) => pendingListIds.add(id))
-      }
-      scheduleInvalidationFlush()
-      return
-    }
-
-    if (event.entity !== 'card') return
-    if (
-      event.action === 'deleted' &&
-      selectedCardId.value === event.entity_id
-    ) {
-      selectedCardId.value = null
-    } else if (selectedCardId.value === event.entity_id) {
+  if (loading.value) {
+    if (event.entity === 'card' && selectedCardId.value === event.entity_id) {
       cardDetailRefreshToken.value += 1
     }
-    event.list_ids.forEach((id) => pendingListIds.add(id))
+    fullRefreshPending = true
+    pendingListIds.clear()
     scheduleInvalidationFlush()
-  },
-)
+    return
+  }
+
+  if (event.entity === 'list') {
+    if (event.action === 'deleted') {
+      const deletedList = lists.value.find((list) => list.id === event.entity_id)
+      if (
+        selectedCardId.value &&
+        deletedList?.cards.some((card) => card.id === selectedCardId.value)
+      ) {
+        selectedCardId.value = null
+      }
+      pendingDeletedListIds.add(event.entity_id)
+      pendingListIds.delete(event.entity_id)
+    } else {
+      const ids = event.list_ids.length > 0 ? event.list_ids : [event.entity_id]
+      ids.forEach((id) => pendingListIds.add(id))
+    }
+    scheduleInvalidationFlush()
+    return
+  }
+
+  if (event.entity !== 'card') return
+  if (event.action === 'deleted' && selectedCardId.value === event.entity_id) {
+    selectedCardId.value = null
+  } else if (selectedCardId.value === event.entity_id) {
+    cardDetailRefreshToken.value += 1
+  }
+  event.list_ids.forEach((id) => pendingListIds.add(id))
+  scheduleInvalidationFlush()
+})
 
 onUnmounted(() => {
   loadGeneration += 1
@@ -343,22 +306,16 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
 <template>
   <div class="calendar-page">
     <div class="cal-header">
-      <button type="button" class="nav-arrow" aria-label="이전 달" @click="prevMonth">
-        &lt;
-      </button>
+      <button type="button" class="nav-arrow" aria-label="이전 달" @click="prevMonth">&lt;</button>
       <h2 class="month-label">{{ monthLabel }}</h2>
-      <button type="button" class="nav-arrow" aria-label="다음 달" @click="nextMonth">
-        &gt;
-      </button>
+      <button type="button" class="nav-arrow" aria-label="다음 달" @click="nextMonth">&gt;</button>
     </div>
 
     <p v-if="loading" class="cal-status" role="status">일정을 불러오는 중…</p>
     <p v-else-if="error" class="cal-status cal-status--error" role="alert">
       {{ error }}
     </p>
-    <p v-else-if="!hasCardsThisMonth" class="cal-empty">
-      이 달에 일정이 있는 카드가 없습니다.
-    </p>
+    <p v-else-if="!hasCardsThisMonth" class="cal-empty">이 달에 일정이 있는 카드가 없습니다.</p>
 
     <div v-if="!loading && !error" class="cal-grid">
       <div class="cal-weekdays">

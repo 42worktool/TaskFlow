@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildContributionCells,
-  contributionLevel,
-  formatDashboardDate,
-} from './dashboard'
+import { buildContributionCells, contributionLevel, formatDashboardDate } from './dashboard'
 
 describe('dashboard utilities', () => {
   it('maps activity counts into four non-zero intensity levels', () => {

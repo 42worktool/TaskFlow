@@ -15,10 +15,7 @@ import {
   setExternalCardDropHover,
   showMessengerDirectory,
 } from '../services/messenger'
-import {
-  formatMessengerUnreadCount,
-  totalMessengerUnreadCount,
-} from '../services/messengerUnread'
+import { formatMessengerUnreadCount, totalMessengerUnreadCount } from '../services/messengerUnread'
 
 const props = withDefaults(
   defineProps<{
@@ -44,43 +41,27 @@ const toolboxDropPending = ref<'inbox' | null>(null)
 const toolboxDropError = ref('')
 let suppressedClick: 'inbox' | 'chat' | null = null
 let suppressedClickTimer: ReturnType<typeof setTimeout> | null = null
-const boardPath = computed(
-  () => props.workspaceId
-    ? `/workspaces/${props.workspaceId}/board`
-    : '',
+const boardPath = computed(() =>
+  props.workspaceId ? `/workspaces/${props.workspaceId}/board` : '',
 )
-const calendarPath = computed(
-  () => props.workspaceId
-    ? `/workspaces/${props.workspaceId}/calendar`
-    : '',
+const calendarPath = computed(() =>
+  props.workspaceId ? `/workspaces/${props.workspaceId}/calendar` : '',
 )
-const dashboardPath = computed(
-  () => props.workspaceId
-    ? `/workspaces/${props.workspaceId}/dashboard`
-    : '',
+const dashboardPath = computed(() =>
+  props.workspaceId ? `/workspaces/${props.workspaceId}/dashboard` : '',
 )
 const hasWorkspaceContext = computed(() => Boolean(props.workspaceId))
 const workspaceActive = computed(() => route.path === '/workspaces')
 const chatOpen = computed(() => messengerState.open)
-const totalUnreadLabel = computed(() =>
-  formatMessengerUnreadCount(totalMessengerUnreadCount.value),
-)
+const totalUnreadLabel = computed(() => formatMessengerUnreadCount(totalMessengerUnreadCount.value))
 const draggedBoardCardId = computed(() =>
-  messengerState.cardDrag?.source === 'board'
-    ? messengerState.cardDrag.cardId
-    : null,
+  messengerState.cardDrag?.source === 'board' ? messengerState.cardDrag.cardId : null,
 )
 const inboxDropReady = computed(
-  () =>
-    Boolean(draggedBoardCardId.value) &&
-    hasWorkspaceContext.value &&
-    !props.inboxOpen,
+  () => Boolean(draggedBoardCardId.value) && hasWorkspaceContext.value && !props.inboxOpen,
 )
 const chatDropReady = computed(
-  () =>
-    Boolean(draggedBoardCardId.value) &&
-    hasWorkspaceContext.value &&
-    !chatOpen.value,
+  () => Boolean(draggedBoardCardId.value) && hasWorkspaceContext.value && !chatOpen.value,
 )
 const inboxDropOver = computed(
   () =>
@@ -162,21 +143,14 @@ function selectChat(): void {
     openMessenger()
     return
   }
-  if (
-    hasWorkspaceContext.value &&
-    messengerState.workspace?.id === props.workspaceId
-  ) {
+  if (hasWorkspaceContext.value && messengerState.workspace?.id === props.workspaceId) {
     openWorkspaceConversation(messengerState.workspace)
     return
   }
   showMessengerDirectory()
 }
 
-function containsPoint(
-  element: HTMLElement | null,
-  clientX: number,
-  clientY: number,
-): boolean {
+function containsPoint(element: HTMLElement | null, clientX: number, clientY: number): boolean {
   if (!element) return false
   const bounds = element.getBoundingClientRect()
   return (
@@ -198,23 +172,13 @@ function updateToolboxDropHover(
   const cardId = draggedBoardCardId.value
   if (!cardId) return null
 
-  if (
-    inboxDropReady.value &&
-    containsPoint(inboxButton.value, event.clientX, event.clientY)
-  ) {
+  if (inboxDropReady.value && containsPoint(inboxButton.value, event.clientX, event.clientY)) {
     clearExternalCardDropHover(cardId, 'toolbox-chat')
-    setExternalCardDropHover(
-      cardId,
-      'inbox',
-      'toolbox-inbox',
-    )
+    setExternalCardDropHover(cardId, 'inbox', 'toolbox-inbox')
     return 'inbox'
   }
 
-  if (
-    chatDropReady.value &&
-    containsPoint(chatButton.value, event.clientX, event.clientY)
-  ) {
+  if (chatDropReady.value && containsPoint(chatButton.value, event.clientX, event.clientY)) {
     clearExternalCardDropHover(cardId, 'toolbox-inbox')
     setExternalCardDropHover(cardId, 'chat', 'toolbox-chat')
     return 'chat'
@@ -243,28 +207,18 @@ async function moveCardToInbox(cardId: string): Promise<void> {
     notifyInboxChanged()
   } catch (caught) {
     toolboxDropError.value =
-      caught instanceof Error
-        ? caught.message
-        : '카드를 인박스로 옮기지 못했습니다.'
+      caught instanceof Error ? caught.message : '카드를 인박스로 옮기지 못했습니다.'
     notifyBoardChanged()
   } finally {
     toolboxDropPending.value = null
   }
 }
 
-function commitToolboxDrop(
-  event: MouseEvent | DragEvent,
-): void {
+function commitToolboxDrop(event: MouseEvent | DragEvent): void {
   const target = updateToolboxDropHover(event)
   const cardId = draggedBoardCardId.value
   const drop = messengerState.externalCardDrop
-  if (
-    !target ||
-    !cardId ||
-    !drop ||
-    drop.cardId !== cardId ||
-    drop.committed
-  ) {
+  if (!target || !cardId || !drop || drop.cardId !== cardId || drop.committed) {
     return
   }
 
@@ -305,11 +259,7 @@ onBeforeUnmount(() => {
 
 <template>
   <nav class="workspace-toolbox" aria-label="워크스페이스 빠른 도구">
-    <p
-      v-if="toolboxDropError"
-      class="workspace-toolbox__drop-error"
-      role="alert"
-    >
+    <p v-if="toolboxDropError" class="workspace-toolbox__drop-error" role="alert">
       {{ toolboxDropError }}
     </p>
     <div
@@ -324,11 +274,7 @@ onBeforeUnmount(() => {
         title="워크스페이스 선택"
         @click="selectWorkspace"
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="3" y="4" width="8" height="7" rx="1.5" />
           <rect x="13" y="4" width="8" height="7" rx="1.5" />
           <rect x="3" y="13" width="8" height="7" rx="1.5" />
@@ -356,11 +302,7 @@ onBeforeUnmount(() => {
         @dragover="handleToolboxDragMove"
         @drop.capture="commitToolboxDrop"
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 4h16l1 10v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5L4 4Z" />
           <path d="M3 14h5l2 3h4l2-3h5" />
         </svg>
@@ -381,11 +323,7 @@ onBeforeUnmount(() => {
         title="보드"
         @click="selectWorkspacePage"
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="3" y="4" width="18" height="16" rx="2" />
           <path d="M9 4v16M15 4v10" />
         </svg>
@@ -398,11 +336,7 @@ onBeforeUnmount(() => {
         title="먼저 워크스페이스를 선택하세요."
         disabled
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="3" y="4" width="18" height="16" rx="2" />
           <path d="M9 4v16M15 4v10" />
         </svg>
@@ -417,11 +351,7 @@ onBeforeUnmount(() => {
         title="캘린더"
         @click="selectWorkspacePage"
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="3" y="5" width="18" height="16" rx="2" />
           <path d="M8 3v4M16 3v4M3 10h18" />
           <path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01" />
@@ -435,11 +365,7 @@ onBeforeUnmount(() => {
         title="먼저 워크스페이스를 선택하세요."
         disabled
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="3" y="5" width="18" height="16" rx="2" />
           <path d="M8 3v4M16 3v4M3 10h18" />
           <path d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01" />
@@ -455,11 +381,7 @@ onBeforeUnmount(() => {
         title="대시보드"
         @click="selectWorkspacePage"
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="3" y="12" width="4" height="8" rx="1" />
           <rect x="10" y="7" width="4" height="13" rx="1" />
           <rect x="17" y="3" width="4" height="17" rx="1" />
@@ -473,11 +395,7 @@ onBeforeUnmount(() => {
         title="먼저 워크스페이스를 선택하세요."
         disabled
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="3" y="12" width="4" height="8" rx="1" />
           <rect x="10" y="7" width="4" height="13" rx="1" />
           <rect x="17" y="3" width="4" height="17" rx="1" />
@@ -509,20 +427,14 @@ onBeforeUnmount(() => {
         @dragover="handleToolboxDragMove"
         @drop.capture="commitToolboxDrop"
       >
-        <svg
-          class="workspace-toolbox__icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
+        <svg class="workspace-toolbox__icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 5h16v12H9l-5 4V5Z" />
           <path d="M8 10h8M8 13h5" />
         </svg>
         <span
           v-if="totalMessengerUnreadCount"
           class="workspace-toolbox__badge"
-          :aria-label="
-            `읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`
-          "
+          :aria-label="`읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`"
         >
           {{ totalUnreadLabel }}
         </span>

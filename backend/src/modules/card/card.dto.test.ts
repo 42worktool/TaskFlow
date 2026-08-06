@@ -57,7 +57,10 @@ test('card DTOs preserve public field names and null values', () => {
     deleted_at: null,
     deleted_by: null,
   } satisfies Attachment
-  assert.equal(toAttachmentDto(attachment).file_url, '/api/cards/attachments/attachment-id/download')
+  assert.equal(
+    toAttachmentDto(attachment).file_url,
+    '/api/cards/attachments/attachment-id/download',
+  )
   assert.equal(toAttachmentDto(attachment).mime_type, 'application/pdf')
   assert.equal(toAttachmentDto(attachment).size_bytes, 1024)
 
@@ -66,10 +69,7 @@ test('card DTOs preserve public field names and null values', () => {
     file_url: 'https://legacy.example.com/notes.pdf',
     storage_key: null,
   } satisfies Attachment
-  assert.equal(
-    toAttachmentDto(legacyAttachment).file_url,
-    'https://legacy.example.com/notes.pdf',
-  )
+  assert.equal(toAttachmentDto(legacyAttachment).file_url, 'https://legacy.example.com/notes.pdf')
 })
 
 test('card detail and comment DTOs preserve nested user shapes', () => {
