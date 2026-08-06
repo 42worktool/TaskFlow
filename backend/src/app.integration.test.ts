@@ -122,6 +122,13 @@ test('protected routes reject requests without a bearer token', async () => {
   })
 })
 
+test('public profile route is reachable without a bearer token', async () => {
+  const result = await send('/api/users/not-a-uuid/profile')
+
+  assert.equal(result.status, 400)
+  assert.equal((result.body as { error?: string }).error, 'VALIDATION_ERROR')
+})
+
 test('feature routes reject requests without a bearer token', async () => {
   for (const path of [
     '/api/friends',

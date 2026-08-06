@@ -21,8 +21,28 @@
 }
 
 .account-description {
-  margin: 8px 0 28px;
+  margin: 8px 0 0;
   color: #6b7280;
+}
+
+.account-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.account-public-link {
+  flex-shrink: 0;
+  margin-top: 8px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.account-public-link:hover {
+  text-decoration: underline;
 }
 
 .identity-row {
@@ -111,6 +131,16 @@
   font: inherit;
 }
 
+.account-form label:not(:first-child) {
+  margin-top: 8px;
+}
+
+.account-field-hint {
+  margin-top: -4px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
 .primary-button,
 .danger-button {
   width: fit-content;
@@ -163,4 +193,23 @@
 
 .danger-button {
   background: #dc2626;
+}
+
+@media (max-width: 600px) {
+  .account-page {
+    padding: 0 14px 24px;
+  }
+
+  .account-card {
+    padding: 24px 20px;
+  }
+
+  .account-heading-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .identity-row {
+    align-items: flex-start;
+  }
 }

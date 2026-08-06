@@ -184,7 +184,9 @@ onUnmounted(() => {
             </span>
           </span>
           <span class="workspace-member-copy">
-            <span class="workspace-member-name">{{ member.user.name }}</span>
+            <RouterLink :to="`/profiles/${member.user_id}`" class="workspace-member-name">
+              {{ member.user.name }}
+            </RouterLink>
             <span class="workspace-member-role">{{ member.role }}</span>
           </span>
           <span

@@ -7,11 +7,14 @@ import {
 import { uploadFile } from '../services/fileTransfer'
 
 export const AccountAPI = {
-  update: async (name: string): Promise<AuthUser> => {
+  update: async (profile: {
+    name: string
+    headline: string
+    linkedin_url: string | null
+  }): Promise<AuthUser> => {
     const user = await apiRequest<AuthUser>('/api/auth/account', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ name }),
+      json: profile,
     })
 
     authState.user = user

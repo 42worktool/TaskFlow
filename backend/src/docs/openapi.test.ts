@@ -15,6 +15,7 @@ test('OpenAPI document contains every active authentication and account route', 
   assert.ok(openApiDocument.paths['/api/auth/me'].get)
   assert.ok(openApiDocument.paths['/api/auth/account'].patch)
   assert.ok(openApiDocument.paths['/api/auth/account'].delete)
+  assert.ok(openApiDocument.paths['/api/users/{userId}/profile'].get)
   assert.ok(openApiDocument.paths['/api/workspaces/{workspaceId}/labels'].get)
   assert.ok(openApiDocument.paths['/api/workspaces/{workspaceId}/labels'].post)
   assert.ok(openApiDocument.paths['/api/labels/{label_id}'].put)
@@ -38,6 +39,8 @@ test('user responses identify the authentication provider', () => {
   const refreshSchema = openApiDocument.components.schemas.AccessTokenResponse
 
   assert.ok(userSchema.required.includes('auth_provider'))
+  assert.ok(userSchema.required.includes('headline'))
+  assert.ok(userSchema.required.includes('linkedin_url'))
   assert.deepEqual(userSchema.properties.auth_provider.enum, ['password', 'google'])
   assert.ok(refreshSchema.required.includes('user'))
   assert.deepEqual(refreshSchema.properties.user, {

@@ -4,6 +4,7 @@ import { AppError, BadRequestError } from '../../errors'
 import { authenticatedUserId } from '../../middleware/auth'
 import { withUploadCleanup } from '../../lib/upload'
 import * as authService from './auth.service'
+import { updateAccountSchema } from './auth.validation'
 
 const OAUTH_STATE_COOKIE = 'ft_oauth_state'
 const REFRESH_TOKEN_COOKIE = 'ft_refresh_token'
@@ -163,7 +164,14 @@ export const me: RequestHandler = async (req, res) => {
 }
 
 export const updateAccount: RequestHandler = async (req, res) => {
-  res.json(await authService.updateCurrentUser(authenticatedUserId(req), req.body?.name))
+  const profile = updateAccountSchema.parse(req.body)
+  res.json(
+    await authService.updateCurrentUser(authenticatedUserId(req), {
+      ...(profile.name !== undefined ? { name: profile.name } : {}),
+      ...(profile.headline !== undefined ? { headline: profile.headline } : {}),
+      ...(profile.linkedin_url !== undefined ? { linkedinUrl: profile.linkedin_url } : {}),
+    }),
+  )
 }
 
 export const deleteAccount: RequestHandler = async (req, res) => {

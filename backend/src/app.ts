@@ -4,6 +4,7 @@ import express from 'express'
 import swaggerUi from 'swagger-ui-express'
 import { openApiDocument } from './docs/openapi'
 import { authRouter, googleCallback } from './modules/auth'
+import { profileRouter } from './modules/profile'
 import { errorHandler } from './errors'
 import { protectedApiRouter } from './routes/protected-api.router'
 import { UPLOAD_DIR } from './lib/upload'
@@ -41,6 +42,8 @@ app.use(
 app.get('/oauth/google', googleCallback)
 
 app.use('/api/auth', authRouter)
+// Public profile reads intentionally sit outside protectedApiRouter.
+app.use('/api/users', profileRouter)
 app.use('/api', protectedApiRouter)
 app.use(errorHandler)
 

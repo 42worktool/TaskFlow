@@ -9,6 +9,7 @@ import Calendar from '../pages/Calendar.vue'
 import Dashboard from '../pages/Dashboard.vue'
 import Search from '../pages/Search.vue'
 import Account from '../pages/Account.vue'
+import Profile from '../pages/Profile.vue'
 import PrivacyPolicy from '../pages/PrivacyPolicy.vue'
 import TermsOfService from '../pages/TermsOfService.vue'
 import AcceptInvite from '../pages/AcceptInvite.vue'
@@ -23,6 +24,7 @@ const router = createRouter({
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: TermsOfService },
     { path: '/account', component: Account, meta: { requiresAuth: true } },
+    { path: '/profiles/:userId', component: Profile },
     {
       path: '/friends',
       redirect: { path: '/workspaces', query: { messenger: 'friends' } },

@@ -28,6 +28,8 @@ export interface UserPublic {
   email: string
   name: string
   profile_image_url: string | null
+  headline: string
+  linkedin_url: string | null
   created_at: string
   auth_provider: 'password' | 'google'
 }
@@ -150,6 +152,8 @@ function publicUser(user: User): UserPublic {
     email: user.email,
     name: user.name,
     profile_image_url: user.profile_image_url,
+    headline: user.headline,
+    linkedin_url: user.linkedin_url,
     created_at: user.created_at.toISOString(),
     auth_provider: user.password_hash === null ? 'google' : 'password',
   }
@@ -384,12 +388,17 @@ export async function getCurrentUser(userId: string): Promise<UserPublic> {
   return publicUser(user)
 }
 
-export async function updateCurrentUser(userId: string, nameValue: unknown): Promise<UserPublic> {
-  const name = accountName(nameValue)
-
+export async function updateCurrentUser(
+  userId: string,
+  input: { name?: string; headline?: string; linkedinUrl?: string | null },
+): Promise<UserPublic> {
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { name },
+    data: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.headline !== undefined ? { headline: input.headline } : {}),
+      ...(input.linkedinUrl !== undefined ? { linkedin_url: input.linkedinUrl } : {}),
+    },
   })
   return publicUser(user)
 }

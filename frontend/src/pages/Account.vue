@@ -8,6 +8,8 @@ import { AVATAR_MAX_BYTES, AVATAR_MIME_ALLOWLIST } from '../utils/uploadLimits'
 
 const router = useRouter()
 const name = ref(authState.user?.name ?? '')
+const headline = ref(authState.user?.headline ?? '안녕하세요')
+const linkedinUrl = ref(authState.user?.linkedin_url ?? '')
 const message = ref('')
 const error = ref('')
 const saving = ref(false)
@@ -22,8 +24,12 @@ async function saveProfile() {
   message.value = ''
   error.value = ''
   try {
-    await AccountAPI.update(name.value)
-    message.value = '계정 정보가 저장되었습니다.'
+    await AccountAPI.update({
+      name: name.value,
+      headline: headline.value,
+      linkedin_url: linkedinUrl.value.trim() || null,
+    })
+    message.value = '프로필 정보가 저장되었습니다.'
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : '계정 정보를 저장하지 못했습니다.'
   } finally {
@@ -96,7 +102,16 @@ async function removeAccount() {
 
     <main class="account-card">
       <h1>계정 설정</h1>
-      <p class="account-description">로그인 계정과 내 정보를 관리합니다.</p>
+      <div class="account-heading-row">
+        <p class="account-description">로그인 계정과 공개 프로필 정보를 관리합니다.</p>
+        <RouterLink
+          v-if="authState.user"
+          :to="`/profiles/${authState.user.id}`"
+          class="account-public-link"
+        >
+          공개 프로필 보기 ↗
+        </RouterLink>
+      </div>
 
       <div class="identity-row">
         <div class="account-avatar-wrap">
@@ -155,6 +170,30 @@ async function removeAccount() {
       <form class="account-form" @submit.prevent="saveProfile">
         <label for="account-name">표시 이름</label>
         <input id="account-name" v-model="name" type="text" minlength="2" maxlength="80" required />
+
+        <label for="account-headline">한줄 소개</label>
+        <input
+          id="account-headline"
+          v-model="headline"
+          type="text"
+          minlength="1"
+          maxlength="160"
+          placeholder="어떤 일을 하는 사람인지 소개해 주세요."
+          required
+        />
+        <span class="account-field-hint">공개 프로필에 표시됩니다. {{ headline.length }}/160</span>
+
+        <label for="account-linkedin">LinkedIn 주소</label>
+        <input
+          id="account-linkedin"
+          v-model="linkedinUrl"
+          type="text"
+          inputmode="url"
+          maxlength="2048"
+          placeholder="linkedin.com/in/username"
+        />
+        <span class="account-field-hint">비워두면 공개 프로필에 링크가 나타나지 않습니다.</span>
+
         <p v-if="message" class="form-message form-message--success" role="status">{{ message }}</p>
         <p v-if="error" class="form-message form-message--error" role="alert">{{ error }}</p>
         <button type="submit" class="primary-button" :disabled="saving">
