@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  compareSearchSortValues,
   criteriaFromRouteQuery,
   criteriaToRouteQuery,
   matchesSearchText,
+  paginationPages,
   parseSearchExpression,
 } from './searchQuery'
+
+const defaultRouteState = {
+  sort: 'relevance' as const,
+  page: 1,
+}
 
 describe('advanced search query parsing', () => {
   it('parses category, workspace, label and free-text commands', () => {
@@ -17,6 +24,7 @@ describe('advanced search query parsing', () => {
       category: 'card',
       workspace: 'TaskFlow Product',
       label: 'backend',
+      ...defaultRouteState,
     })
   })
 
@@ -26,6 +34,7 @@ describe('advanced search query parsing', () => {
       category: 'workspace',
       workspace: 'public',
       label: null,
+      ...defaultRouteState,
     })
   })
 
@@ -35,6 +44,7 @@ describe('advanced search query parsing', () => {
       category: 'user',
       workspace: null,
       label: null,
+      ...defaultRouteState,
     })
   })
 
@@ -44,6 +54,7 @@ describe('advanced search query parsing', () => {
       category: 'user',
       workspace: null,
       label: null,
+      ...defaultRouteState,
     })
   })
 
@@ -53,6 +64,7 @@ describe('advanced search query parsing', () => {
       category: 'all',
       workspace: null,
       label: null,
+      ...defaultRouteState,
     })
   })
 
@@ -62,6 +74,7 @@ describe('advanced search query parsing', () => {
       category: 'all',
       workspace: null,
       label: null,
+      ...defaultRouteState,
     })
   })
 
@@ -71,6 +84,18 @@ describe('advanced search query parsing', () => {
       category: 'all',
       workspace: 'workspace-id',
       label: 'backend',
+      ...defaultRouteState,
+    })
+  })
+
+  it('parses sorting aliases and always starts a new expression on page one', () => {
+    expect(parseSearchExpression('/sort:recent /card oauth')).toEqual({
+      text: 'oauth',
+      category: 'card',
+      workspace: null,
+      label: null,
+      sort: 'newest',
+      page: 1,
     })
   })
 })
@@ -82,6 +107,8 @@ describe('advanced search route state', () => {
       type: 'card',
       workspace: 'workspace-id',
       label: 'label-id',
+      sort: 'newest',
+      page: '3',
     })
 
     expect(criteriaToRouteQuery(criteria)).toEqual({
@@ -89,12 +116,20 @@ describe('advanced search route state', () => {
       type: 'card',
       workspace: 'workspace-id',
       label: 'label-id',
+      sort: 'newest',
+      page: '3',
     })
   })
 
   it('drops empty and default filters from the route', () => {
     expect(
-      criteriaToRouteQuery({ text: '', category: 'all', workspace: null, label: null }),
+      criteriaToRouteQuery({
+        text: '',
+        category: 'all',
+        workspace: null,
+        label: null,
+        ...defaultRouteState,
+      }),
     ).toEqual({})
   })
 
@@ -108,6 +143,7 @@ describe('advanced search route state', () => {
         category: 'card',
         workspace: null,
         label: 'label-id',
+        ...defaultRouteState,
       }),
     ).toEqual({ q: 'oauth', type: 'card' })
   })
@@ -125,7 +161,19 @@ describe('advanced search route state', () => {
       category: 'user',
       workspace: 'workspace-id',
       label: null,
+      ...defaultRouteState,
     })
+  })
+
+  it('normalizes unsupported sort and page values', () => {
+    expect(criteriaFromRouteQuery({ sort: 'oldest', page: '-2' })).toEqual({
+      text: '',
+      category: 'all',
+      workspace: null,
+      label: null,
+      ...defaultRouteState,
+    })
+    expect(criteriaFromRouteQuery({ page: '2nd' }).page).toBe(1)
   })
 })
 
@@ -133,5 +181,41 @@ describe('advanced search text matching', () => {
   it('requires every keyword but allows them in different fields', () => {
     expect(matchesSearchText(['OAuth callback', 'Backend security'], 'oauth backend')).toBe(true)
     expect(matchesSearchText(['OAuth callback', 'Frontend'], 'oauth backend')).toBe(false)
+  })
+})
+
+describe('advanced search sorting and pagination', () => {
+  const alpha = {
+    name: 'Alpha card',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    searchable: ['Alpha card', 'frontend'],
+  }
+  const beta = {
+    name: 'Beta card',
+    createdAt: '2026-02-01T00:00:00.000Z',
+    searchable: ['Beta card', 'alpha backend'],
+  }
+
+  it('sorts exact title matches ahead of secondary-field matches by relevance', () => {
+    expect(
+      [beta, alpha].sort((left, right) =>
+        compareSearchSortValues(left, right, 'relevance', 'alpha'),
+      ),
+    ).toEqual([alpha, beta])
+  })
+
+  it('supports newest and alphabetical ordering', () => {
+    expect(
+      [alpha, beta].sort((left, right) => compareSearchSortValues(left, right, 'newest', '')),
+    ).toEqual([beta, alpha])
+    expect(
+      [beta, alpha].sort((left, right) => compareSearchSortValues(left, right, 'name', '')),
+    ).toEqual([alpha, beta])
+  })
+
+  it('returns a bounded five-page navigation window', () => {
+    expect(paginationPages(1, 9)).toEqual([1, 2, 3, 4, 5])
+    expect(paginationPages(5, 9)).toEqual([3, 4, 5, 6, 7])
+    expect(paginationPages(9, 9)).toEqual([5, 6, 7, 8, 9])
   })
 })

@@ -29,7 +29,9 @@ HTTP controllers or the Vue component tree.
   view on mobile. Desktop supports direct drag-and-drop between Inbox and board
   lists, including horizontal edge scrolling.
 - A calendar that renders card start/deadline ranges as continuous weekly bars,
-  plus text search across workspaces the user can access.
+  plus advanced search across accessible workspaces, cards, labels, and people.
+  Search supports mouse-selectable scopes, `/keyword` and slash-command filters,
+  relevance/newest/name sorting, and URL-backed pagination.
 - A workspace activity dashboard with selectable 7/30/90/365-day ranges,
   date-labelled contribution and issue-flow charts, current completion
   metrics, activity breakdowns, and a recent activity feed.
@@ -241,7 +243,8 @@ environment running the suite must allow loopback port binding.
    Dropping onto the closed Chat tool opens the current workspace room with
    that card already attached.
 9. See team online status and member management from the workspace top bar,
-   search accessible cards, or use the bottom toolbox to switch between the
+   search accessible workspaces, cards, labels, and people with filters,
+   sorting, and pagination, or use the bottom toolbox to switch between the
    board, Calendar, Dashboard, and workspace list.
 10. Use a card's Complete/Reopen action to change its own completion state
     without moving it. List completion markers are optional visual hints only;
@@ -343,7 +346,7 @@ guessing an identity where the repository does not prove one.
 | Email invitations | One-time Redis invitation, explicit account confirmation, mail queue, per-address limit | `Saususge`, `seankim96` |
 | Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
 | Personal inbox | API-backed cards, board/inbox drag round trip, and edge scrolling | `seankim96` |
-| Calendar and search | Range-bar workspace calendar plus cross-accessible-workspace text search, with no mock records | `seankim96`, building on the initial UI by `KHR416` |
+| Calendar and search | Range-bar workspace calendar plus scoped `/keyword` search with people discovery, filters, sorting, and pagination | `seankim96`, building on the initial UI by `KHR416` |
 | Activity dashboard | Selectable-period trigger-backed contribution heatmap, dated activity feed, issue flow, completion metrics, and list/activity charts | `seankim96` |
 | Friends, DMs, and presence | Request/accept flow, symmetric friendships, direct messages, unified messenger, and online/offline events | `seankim96` |
 | Realtime foundation | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain | `seankim96` |
@@ -397,11 +400,12 @@ acceptance and scoring remain the evaluator's decision.
 | OAuth 2.0 authentication | Minor | 1 | Google Authorization Code flow with state, nonce, ID-token verification, and account linking policy | `Sean Kim` |
 | Organization system | Major | 2 | Isolated workspaces, memberships, roles, invitations, and board resources | `Saususge`, `injo`, `KHR416`, `seankim96` |
 | Advanced realtime data visualization | Major | 2 | Trigger-backed activity analytics with live invalidation, a contribution heatmap, issue-flow charts, and current completion metrics | `seankim96` |
-| **Currently defensible total** |  | **10** | Does not count incomplete planned modules |  |
+| Advanced search | Minor | 1 | Workspace-scoped card and label filters, people discovery, slash commands, relevance/newest/name sorting, and URL-backed pagination | `seankim96` |
+| **Currently defensible total** |  | **11** | Does not count incomplete planned modules |  |
 
 The planning document also considered chat/user interaction, full profile
 management, advanced permission administration, realtime collaboration,
-advanced search, file upload, and a public API. They are not claimed
+file upload, and a public API. They are not claimed
 because the current prototype does not implement their complete subject
 requirements.
 
@@ -503,7 +507,9 @@ to an AI system.
 - Presence is designed for a single backend instance, not cross-replica fanout.
 - Friend requests support accept, reject, and cancel, but have no persistent
   history, blocking, or realtime request-delivery event.
-- Search is client-side text matching without filters, ranking, or pagination.
+- Workspace and card search operates on the authenticated browser snapshot
+  rather than a dedicated server-side search index. Sorting and pagination
+  reduce rendered results but do not reduce the initial workspace snapshot.
 - Attachment APIs store URL metadata; there is no binary upload service.
 - Card comments created through linked workspace chat are visible in card
   details; direct comment editing/deletion and the rest of the label/assignment

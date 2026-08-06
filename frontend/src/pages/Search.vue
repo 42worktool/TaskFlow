@@ -9,12 +9,18 @@ import { WorkspaceAPI } from '../api/workspace'
 import { workspaceColor } from '../types'
 import type { Label, ListWithCards, Workspace } from '../types'
 import {
+  compareSearchSortValues,
   criteriaFromRouteQuery,
   criteriaToRouteQuery,
   matchesSearchText,
+  paginationPages,
   type AdvancedSearchCriteria,
   type SearchCategory,
+  type SearchSort,
+  type SearchSortValue,
 } from '../utils/searchQuery'
+
+const PAGE_SIZE = 10
 
 const route = useRoute()
 const router = useRouter()
@@ -37,6 +43,8 @@ const criteria = computed(() =>
     type: route.query.type,
     workspace: route.query.workspace,
     label: route.query.label,
+    sort: route.query.sort,
+    page: route.query.page,
   }),
 )
 const query = computed(() => criteria.value.text)
@@ -158,9 +166,98 @@ const userResults = computed(() => {
   return searchedUsers.value.filter((user) => memberIds.has(user.id))
 })
 
-const totalResults = computed(
-  () => workspaceResults.value.length + cardResults.value.length + userResults.value.length,
+type SearchResultItem =
+  | {
+      kind: 'workspace'
+      key: string
+      workspace: Workspace
+      sortValue: SearchSortValue
+    }
+  | {
+      kind: 'card'
+      key: string
+      result: (typeof cardResults.value)[number]
+      sortValue: SearchSortValue
+    }
+  | {
+      kind: 'user'
+      key: string
+      user: PublicProfile
+      sortValue: SearchSortValue
+    }
+
+const sortedResults = computed<SearchResultItem[]>(() => {
+  const results: SearchResultItem[] = [
+    ...workspaceResults.value.map((workspace): SearchResultItem => ({
+      kind: 'workspace',
+      key: `workspace:${workspace.id}`,
+      workspace,
+      sortValue: {
+        name: workspace.name,
+        createdAt: workspace.updated_at,
+        searchable: [workspace.name, ...workspace.members.map((member) => member.user.name)],
+      },
+    })),
+    ...cardResults.value.map((result): SearchResultItem => ({
+      kind: 'card',
+      key: `card:${result.card.id}`,
+      result,
+      sortValue: {
+        name: result.card.title,
+        createdAt: result.card.created_at,
+        searchable: [
+          result.card.title,
+          result.card.description,
+          result.list.name,
+          result.workspace.name,
+          ...(result.card.labels ?? []).map((label) => label.label_name),
+        ],
+      },
+    })),
+    ...userResults.value.map((user): SearchResultItem => ({
+      kind: 'user',
+      key: `user:${user.id}`,
+      user,
+      sortValue: {
+        name: user.name,
+        createdAt: user.created_at,
+        searchable: [user.name, user.headline],
+      },
+    })),
+  ]
+
+  return results.sort(
+    (left, right) =>
+      compareSearchSortValues(
+        left.sortValue,
+        right.sortValue,
+        criteria.value.sort,
+        criteria.value.text,
+      ) || left.key.localeCompare(right.key),
+  )
+})
+
+const totalResults = computed(() => sortedResults.value.length)
+const pageCount = computed(() => Math.max(1, Math.ceil(totalResults.value / PAGE_SIZE)))
+const currentPage = computed(() => Math.min(criteria.value.page, pageCount.value))
+const pageNumbers = computed(() => paginationPages(currentPage.value, pageCount.value))
+const pagedResults = computed(() => {
+  const start = (currentPage.value - 1) * PAGE_SIZE
+  return sortedResults.value.slice(start, start + PAGE_SIZE)
+})
+const pagedWorkspaceResults = computed(() =>
+  pagedResults.value.flatMap((item) => (item.kind === 'workspace' ? [item.workspace] : [])),
 )
+const pagedCardResults = computed(() =>
+  pagedResults.value.flatMap((item) => (item.kind === 'card' ? [item.result] : [])),
+)
+const pagedUserResults = computed(() =>
+  pagedResults.value.flatMap((item) => (item.kind === 'user' ? [item.user] : [])),
+)
+const firstResultNumber = computed(() =>
+  totalResults.value === 0 ? 0 : (currentPage.value - 1) * PAGE_SIZE + 1,
+)
+const lastResultNumber = computed(() => Math.min(currentPage.value * PAGE_SIZE, totalResults.value))
 const hasResults = computed(() => totalResults.value > 0)
 const workspaceSelectValue = computed(() => selectedWorkspace.value?.id ?? '')
 const labelSelectValue = computed(() => selectedLabel.value?.id ?? '')
@@ -181,7 +278,11 @@ function userWorkspaceSummary(userId: string): string {
 }
 
 function updateCriteria(patch: Partial<AdvancedSearchCriteria>) {
-  const next = { ...criteria.value, ...patch }
+  const next = {
+    ...criteria.value,
+    ...patch,
+    page: patch.page ?? 1,
+  }
   void router.replace({ path: '/search', query: criteriaToRouteQuery(next) })
 }
 
@@ -205,6 +306,17 @@ function selectLabel(event: Event) {
       ? { category: 'card' as const }
       : {}),
   })
+}
+
+function selectSort(event: Event) {
+  updateCriteria({ sort: (event.target as HTMLSelectElement).value as SearchSort })
+}
+
+function setPage(page: number) {
+  const nextPage = Math.min(Math.max(1, page), pageCount.value)
+  if (nextPage === currentPage.value) return
+  updateCriteria({ page: nextPage })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function clearFilters() {
@@ -300,6 +412,15 @@ watch(
   { immediate: true },
 )
 
+watch(
+  [loading, usersLoading, pageCount, () => criteria.value.page],
+  ([searchLoading, peopleLoading, availablePages, requestedPage]) => {
+    if (!searchLoading && !peopleLoading && requestedPage > availablePages) {
+      updateCriteria({ page: availablePages })
+    }
+  },
+)
+
 onMounted(() => {
   void loadSearchData()
 })
@@ -326,7 +447,8 @@ onMounted(() => {
             ><span>카드만 표시</span> <code>/user</code><span>사용자만 표시</span>
             <code>/workspace</code><span>워크스페이스만 표시</span> <code>/workspace:"이름"</code
             ><span>워크스페이스 범위 지정</span> <code>/label:이름</code
-            ><span>선택한 워크스페이스 안의 카드만 표시</span>
+            ><span>선택한 워크스페이스 안의 카드만 표시</span> <code>/sort:newest</code
+            ><span>관련도순 대신 최신순으로 정렬</span>
           </div>
         </details>
       </div>
@@ -396,6 +518,16 @@ onMounted(() => {
             {{ labelLoadError }}
           </small>
         </label>
+
+        <label class="search-filter-group">
+          <span class="search-filter-label">정렬</span>
+          <select :value="criteria.sort" @change="selectSort">
+            <option value="relevance">관련도순</option>
+            <option value="newest">최신순</option>
+            <option value="name">이름순</option>
+          </select>
+          <small class="search-filter-hint">모든 결과 유형에 같은 정렬 기준을 적용합니다.</small>
+        </label>
       </section>
 
       <div
@@ -456,17 +588,14 @@ onMounted(() => {
       </div>
 
       <template v-else>
-        <section
-          v-if="criteria.category !== 'card' && criteria.category !== 'user' && !hasLabelScope"
-          class="result-section"
-        >
+        <section v-if="pagedWorkspaceResults.length" class="result-section">
           <div class="section-header">
             <h2 class="section-title">워크스페이스</h2>
             <span class="result-count">{{ workspaceResults.length }}</span>
           </div>
-          <div v-if="workspaceResults.length" class="result-list">
+          <div class="result-list">
             <RouterLink
-              v-for="workspace in workspaceResults"
+              v-for="workspace in pagedWorkspaceResults"
               :key="workspace.id"
               :to="`/workspaces/${workspace.id}/board`"
               class="result-row"
@@ -482,20 +611,16 @@ onMounted(() => {
               <span class="result-arrow">→</span>
             </RouterLink>
           </div>
-          <div v-else class="section-empty">일치하는 워크스페이스가 없습니다.</div>
         </section>
 
-        <section
-          v-if="criteria.category !== 'workspace' && criteria.category !== 'user'"
-          class="result-section"
-        >
+        <section v-if="pagedCardResults.length" class="result-section">
           <div class="section-header">
             <h2 class="section-title">카드</h2>
             <span class="result-count">{{ cardResults.length }}</span>
           </div>
-          <div v-if="cardResults.length" class="result-list">
+          <div class="result-list">
             <RouterLink
-              v-for="result in cardResults"
+              v-for="result in pagedCardResults"
               :key="result.card.id"
               :to="{
                 path: `/workspaces/${result.workspace.id}/board`,
@@ -525,21 +650,17 @@ onMounted(() => {
               <span class="result-arrow">→</span>
             </RouterLink>
           </div>
-          <div v-else class="section-empty">일치하는 카드가 없습니다.</div>
         </section>
 
-        <section
-          v-if="criteria.category !== 'workspace' && criteria.category !== 'card' && !hasLabelScope"
-          class="result-section"
-        >
+        <section v-if="pagedUserResults.length" class="result-section">
           <div class="section-header">
             <h2 class="section-title">사람</h2>
             <span class="result-count">{{ userResults.length }}</span>
           </div>
           <div v-if="userLoadError" class="section-empty" role="alert">{{ userLoadError }}</div>
-          <div v-else-if="userResults.length" class="result-list result-list--people">
+          <div v-else class="result-list result-list--people">
             <RouterLink
-              v-for="user in userResults"
+              v-for="user in pagedUserResults"
               :key="user.id"
               :to="`/profiles/${user.id}`"
               class="result-row result-person-row"
@@ -564,8 +685,45 @@ onMounted(() => {
               <span class="result-person-action">프로필 보기</span>
             </RouterLink>
           </div>
-          <div v-else class="section-empty">일치하는 사용자가 없습니다.</div>
         </section>
+
+        <nav v-if="pageCount > 1" class="search-pagination" aria-label="검색 결과 페이지">
+          <p class="search-pagination__summary">
+            {{ firstResultNumber }}–{{ lastResultNumber }} / {{ totalResults }}
+          </p>
+          <div class="search-pagination__buttons">
+            <button
+              type="button"
+              class="search-pagination__step"
+              :disabled="currentPage === 1"
+              aria-label="이전 페이지"
+              @click="setPage(currentPage - 1)"
+            >
+              이전
+            </button>
+            <button
+              v-for="page in pageNumbers"
+              :key="page"
+              type="button"
+              class="search-pagination__page"
+              :class="{ 'search-pagination__page--active': page === currentPage }"
+              :aria-current="page === currentPage ? 'page' : undefined"
+              :aria-label="`${page}페이지`"
+              @click="setPage(page)"
+            >
+              {{ page }}
+            </button>
+            <button
+              type="button"
+              class="search-pagination__step"
+              :disabled="currentPage === pageCount"
+              aria-label="다음 페이지"
+              @click="setPage(currentPage + 1)"
+            >
+              다음
+            </button>
+          </div>
+        </nav>
       </template>
     </main>
   </div>

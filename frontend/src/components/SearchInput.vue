@@ -46,6 +46,24 @@ const commands = [
     label: '레이블 범위',
     description: '워크스페이스 선택 후 사용',
   },
+  {
+    command: '/sort:relevance',
+    insert: '/sort:relevance ',
+    label: '관련도순',
+    description: '검색어와 가장 가까운 결과부터 표시',
+  },
+  {
+    command: '/sort:newest',
+    insert: '/sort:newest ',
+    label: '최신순',
+    description: '최근 생성·수정된 결과부터 표시',
+  },
+  {
+    command: '/sort:name',
+    insert: '/sort:name ',
+    label: '이름순',
+    description: '이름과 제목을 가나다순으로 표시',
+  },
 ] as const
 
 function routeString(value: unknown): string | null {
@@ -59,6 +77,8 @@ const routeCriteria = computed(() =>
     type: route.query.type,
     workspace: route.query.workspace,
     label: route.query.label,
+    sort: route.query.sort,
+    page: route.query.page,
   }),
 )
 
@@ -79,6 +99,7 @@ function searchCriteria() {
   const hasCategoryCommand =
     /(^|\s)\/(all|card|cards|workspace|workspaces|user|users)(?=\s|$)/i.test(query.value)
   const hasLabelCommand = /(^|\s)\/label:/i.test(query.value)
+  const hasSortCommand = /(^|\s)\/sort:/i.test(query.value)
   const category =
     hasCategoryCommand || query.value.trim().startsWith('@')
       ? parsed.category
@@ -93,6 +114,8 @@ function searchCriteria() {
         : hasLabelCommand
           ? parsed.label
           : routeCriteria.value.label,
+    sort: hasSortCommand ? parsed.sort : routeCriteria.value.sort,
+    page: 1,
   }
 }
 

@@ -1,15 +1,24 @@
 export type SearchCategory = 'all' | 'workspace' | 'card' | 'user'
+export type SearchSort = 'relevance' | 'newest' | 'name'
 
 export interface AdvancedSearchCriteria {
   text: string
   category: SearchCategory
   workspace: string | null
   label: string | null
+  sort: SearchSort
+  page: number
+}
+
+export interface SearchSortValue {
+  name: string
+  createdAt: string
+  searchable: Array<string | null | undefined>
 }
 
 type RouteQueryValue = string | null | Array<string | null> | undefined
 
-const SCOPED_COMMAND = /(^|\s)\/(type|workspace|in|label):(?:"([^"]*)"|([^\s]+))/gi
+const SCOPED_COMMAND = /(^|\s)\/(type|workspace|in|label|sort):(?:"([^"]*)"|([^\s]+))/gi
 const CATEGORY_COMMAND = /(^|\s)\/(all|card|cards|workspace|workspaces|user|users)(?=\s|$)/gi
 
 function routeString(value: RouteQueryValue): string {
@@ -35,6 +44,27 @@ function searchCategory(value: string): SearchCategory | null {
   }
 }
 
+function searchSort(value: string): SearchSort | null {
+  switch (value.toLowerCase()) {
+    case 'relevance':
+    case 'relevant':
+      return 'relevance'
+    case 'newest':
+    case 'recent':
+      return 'newest'
+    case 'name':
+    case 'alphabetical':
+      return 'name'
+    default:
+      return null
+  }
+}
+
+function routePage(value: RouteQueryValue): number {
+  const parsed = Number(routeString(value))
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
+}
+
 function categorySupportsLabels(category: SearchCategory): boolean {
   return category === 'all' || category === 'card'
 }
@@ -48,6 +78,7 @@ export function parseSearchExpression(
   let category: SearchCategory = 'all'
   let workspace: string | null = defaultWorkspace
   let label: string | null = null
+  let sort: SearchSort = 'relevance'
 
   let remaining = normalizedExpression.replace(
     SCOPED_COMMAND,
@@ -65,6 +96,10 @@ export function parseSearchExpression(
       } else if (normalizedCommand === 'label') {
         if (!value) return match
         label = value
+      } else if (normalizedCommand === 'sort') {
+        const parsedSort = searchSort(value)
+        if (!parsedSort) return match
+        sort = parsedSort
       }
 
       return leading
@@ -85,6 +120,8 @@ export function parseSearchExpression(
     category,
     workspace,
     label: workspace && categorySupportsLabels(category) ? label : null,
+    sort,
+    page: 1,
   }
 }
 
@@ -93,6 +130,8 @@ export function criteriaFromRouteQuery(query: {
   type?: RouteQueryValue
   workspace?: RouteQueryValue
   label?: RouteQueryValue
+  sort?: RouteQueryValue
+  page?: RouteQueryValue
 }): AdvancedSearchCriteria {
   const workspace = routeString(query.workspace) || null
   const category = searchCategory(routeString(query.type)) ?? 'all'
@@ -102,6 +141,8 @@ export function criteriaFromRouteQuery(query: {
     category,
     workspace,
     label: workspace && categorySupportsLabels(category) ? routeString(query.label) || null : null,
+    sort: searchSort(routeString(query.sort)) ?? 'relevance',
+    page: routePage(query.page),
   }
 }
 
@@ -113,6 +154,8 @@ export function criteriaToRouteQuery(criteria: AdvancedSearchCriteria): Record<s
     ...(criteria.workspace && criteria.label && categorySupportsLabels(criteria.category)
       ? { label: criteria.label }
       : {}),
+    ...(criteria.sort !== 'relevance' ? { sort: criteria.sort } : {}),
+    ...(criteria.page > 1 ? { page: String(criteria.page) } : {}),
   }
 }
 
@@ -128,4 +171,59 @@ export function matchesSearchText(
     .join(' ')
     .toLocaleLowerCase()
   return terms.every((term) => searchable.includes(term))
+}
+
+function normalized(value: string): string {
+  return value.trim().toLocaleLowerCase()
+}
+
+function relevanceScore(value: SearchSortValue, query: string): number {
+  const terms = normalized(query).split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return 0
+
+  const name = normalized(value.name)
+  const searchable = normalized(
+    value.searchable.filter((item): item is string => Boolean(item)).join(' '),
+  )
+  let score = 0
+
+  if (name === normalized(query)) score += 1_000
+  else if (name.startsWith(normalized(query))) score += 400
+
+  for (const term of terms) {
+    if (name === term) score += 200
+    else if (name.startsWith(term)) score += 100
+    else if (name.includes(term)) score += 50
+
+    if (searchable.includes(term)) score += 10
+  }
+
+  return score
+}
+
+export function compareSearchSortValues(
+  left: SearchSortValue,
+  right: SearchSortValue,
+  sort: SearchSort,
+  query: string,
+): number {
+  if (sort === 'relevance') {
+    const scoreDifference = relevanceScore(right, query) - relevanceScore(left, query)
+    if (scoreDifference !== 0) return scoreDifference
+  }
+
+  if (sort === 'newest' || sort === 'relevance') {
+    const dateDifference = Date.parse(right.createdAt) - Date.parse(left.createdAt)
+    if (Number.isFinite(dateDifference) && dateDifference !== 0) return dateDifference
+  }
+
+  return left.name.localeCompare(right.name, 'ko', { sensitivity: 'base' })
+}
+
+export function paginationPages(currentPage: number, totalPages: number): number[] {
+  if (totalPages <= 0) return []
+  const safeCurrent = Math.min(Math.max(1, currentPage), totalPages)
+  const start = Math.max(1, Math.min(safeCurrent - 2, totalPages - 4))
+  const end = Math.min(totalPages, start + 4)
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index)
 }
