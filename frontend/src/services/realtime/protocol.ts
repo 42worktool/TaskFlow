@@ -19,13 +19,9 @@ export const REALTIME_CLOSE_CODE = {
   RATE_LIMITED: 4429,
 } as const
 
-export const REALTIME_CLIENT_CONTROL_EVENTS = ['auth.authenticate', 'auth.refresh'] as const
+const REALTIME_CLIENT_CONTROL_EVENTS = ['auth.authenticate', 'auth.refresh'] as const
 
-export const REALTIME_SERVER_CONTROL_EVENTS = [
-  'system.ready',
-  'system.ack',
-  'system.error',
-] as const
+const REALTIME_SERVER_CONTROL_EVENTS = ['system.ready', 'system.ack', 'system.error'] as const
 
 const realtimeControlEvents = new Set<string>([
   ...REALTIME_CLIENT_CONTROL_EVENTS,

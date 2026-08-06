@@ -3,7 +3,7 @@ import { userSummarySchema } from './user-summary'
 import { uuidSchema } from './validation'
 
 export const MESSAGE_HISTORY_LIMIT = 100
-export const MESSAGE_MAX_LENGTH = 1000
+const MESSAGE_MAX_LENGTH = 1000
 
 export const messageContentSchema = z.string().trim().min(1).max(MESSAGE_MAX_LENGTH)
 

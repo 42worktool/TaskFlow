@@ -11,7 +11,7 @@ interface CardDateRange {
   end: number
 }
 
-export interface CalendarDay {
+interface CalendarDay {
   date: number | null
   day: number | null
 }

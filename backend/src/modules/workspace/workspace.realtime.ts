@@ -5,13 +5,13 @@ import { uuidSchema } from '../../lib/validation'
 import { realtime, RealtimeError } from '../../realtime'
 import { isUserOnline } from '../presence/presence.state'
 
-export const workspaceSubscriptionSchema = z
+const workspaceSubscriptionSchema = z
   .object({
     workspace_id: uuidSchema,
   })
   .strict()
 
-export const workspaceChangeEventSchema = z
+const workspaceChangeEventSchema = z
   .object({
     event_id: uuidSchema,
     workspace_id: uuidSchema,
@@ -24,7 +24,7 @@ export const workspaceChangeEventSchema = z
   })
   .strict()
 
-export const workspacePresenceEventSchema = z
+const workspacePresenceEventSchema = z
   .object({
     workspace_id: uuidSchema,
     user_id: uuidSchema,

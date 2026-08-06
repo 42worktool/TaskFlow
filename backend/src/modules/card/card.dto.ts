@@ -59,7 +59,7 @@ interface CardLabelWithLabel {
   }
 }
 
-export function toCardLabelDto(cardLabel: CardLabelWithLabel) {
+function toCardLabelDto(cardLabel: CardLabelWithLabel) {
   return {
     label_id: cardLabel.label.id,
     label_name: cardLabel.label.label_name,

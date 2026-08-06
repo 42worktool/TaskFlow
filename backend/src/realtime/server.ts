@@ -66,7 +66,7 @@ export type RealtimeConnectionLifecycleListener<T> = (
   connection: Readonly<T>,
 ) => void | Promise<void>
 
-export interface PublishOptions {
+interface PublishOptions {
   excludeConnectionId?: string
 }
 

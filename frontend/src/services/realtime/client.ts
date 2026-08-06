@@ -11,7 +11,7 @@ import {
   type RealtimeReadyData,
 } from './protocol'
 
-export type RealtimeConnectionState =
+type RealtimeConnectionState =
   'idle' | 'connecting' | 'authenticating' | 'connected' | 'reconnecting' | 'disconnected'
 
 export interface RealtimeClientOptions {
@@ -51,7 +51,7 @@ type RequestResult<
   Event extends PropertyKey,
 > = Event extends keyof ClientRequestResults ? ClientRequestResults[Event] : unknown
 
-export type RealtimeSubscriptionRecovery = (ready: RealtimeReadyData) => void | Promise<void>
+type RealtimeSubscriptionRecovery = (ready: RealtimeReadyData) => void | Promise<void>
 
 interface SubscriptionRecovery {
   recover: RealtimeSubscriptionRecovery
@@ -70,7 +70,7 @@ export class RealtimeRequestError extends Error {
   }
 }
 
-export type RealtimeSendErrorCode =
+type RealtimeSendErrorCode =
   | 'NOT_CONNECTED'
   | 'CONNECTION_NOT_OPEN'
   | 'INVALID_EVENT'

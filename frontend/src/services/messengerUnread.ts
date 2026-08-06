@@ -6,7 +6,7 @@ export interface VisibleMessengerRoom {
   id: string
 }
 
-export const messengerUnreadState = reactive({
+const messengerUnreadState = reactive({
   workspaces: {} as Record<string, number>,
   directMessages: {} as Record<string, number>,
 })

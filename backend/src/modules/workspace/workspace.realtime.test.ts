@@ -117,22 +117,20 @@ test('workspace change validation is bounded and publishing is best effort', asy
     import('./workspace.realtime'),
   ])
 
-  assert.equal(
-    realtimeModule.workspaceChangeEventSchema.safeParse({
-      event_id: USER_ID,
-      workspace_id: WORKSPACE_ID,
-      entity: 'card',
-      action: 'moved',
-      entity_id: ONLINE_USER_ID,
-      list_ids: [USER_ID, ONLINE_USER_ID, OFFLINE_USER_ID],
-      actor_user_id: USER_ID,
-      occurred_at: new Date().toISOString(),
-    }).success,
-    false,
-  )
-
   const warnings: unknown[][] = []
   stubMethod(t, console, 'warn', (...args) => warnings.push(args))
+
+  const invalidEvent = realtimeModule.publishWorkspaceChange({
+    workspace_id: WORKSPACE_ID,
+    entity: 'card',
+    action: 'moved',
+    entity_id: ONLINE_USER_ID,
+    list_ids: [USER_ID, ONLINE_USER_ID, OFFLINE_USER_ID],
+    actor_user_id: USER_ID,
+  })
+  assert.equal(invalidEvent, null)
+  warnings.length = 0
+
   stubMethod(t, realtime, 'publish', () => {
     throw new Error('transport unavailable')
   })

@@ -4,7 +4,7 @@ import { userSummarySchema } from '../../lib/user-summary'
 import { uuidSchema } from '../../lib/validation'
 import { realtime } from '../../realtime'
 
-export const realtimeNotificationSchema = z
+const realtimeNotificationSchema = z
   .object({
     id: uuidSchema,
     category: z.enum(['MENTION', 'UPDATE']),

@@ -46,8 +46,8 @@ export interface PendingChatCardAttachment {
   cardId: string
 }
 
-export const MESSENGER_DRAG_THRESHOLD = 6
-export const MESSENGER_VIEWPORT_MARGIN = 8
+const MESSENGER_DRAG_THRESHOLD = 6
+const MESSENGER_VIEWPORT_MARGIN = 8
 
 export function clampFloatingPosition(
   position: FloatingPosition,

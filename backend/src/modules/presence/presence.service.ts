@@ -15,7 +15,7 @@ import {
 import { otherUserId } from '../friend/friend-pair'
 import { publishWorkspacePresenceChanged } from '../workspace/workspace.realtime'
 
-export const friendPresenceEventSchema = z
+const friendPresenceEventSchema = z
   .object({
     user_id: uuidSchema,
     online: z.boolean(),

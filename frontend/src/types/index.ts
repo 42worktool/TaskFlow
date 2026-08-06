@@ -111,7 +111,7 @@ export interface Card {
   labels?: CardDetailLabel[]
 }
 
-export interface CardDetailLabel {
+interface CardDetailLabel {
   label_id: UUID
   label_name: string
   label_color: string
@@ -157,8 +157,8 @@ export interface DraggableChange<T extends { id: string } = { id: string }> {
   removed?: { element: T; oldIndex: number }
 }
 
-export type NotificationCategory = 'MENTION' | 'UPDATE'
-export type NotificationKind = 'workspace.member_joined'
+type NotificationCategory = 'MENTION' | 'UPDATE'
+type NotificationKind = 'workspace.member_joined'
 
 export interface NotificationEvent {
   id: UUID
@@ -203,7 +203,7 @@ export interface FriendUserIdEvent {
   user_id: UUID
 }
 
-export interface DashboardSummary {
+interface DashboardSummary {
   current_total: number
   current_done: number
   current_not_done: number
@@ -230,7 +230,7 @@ export interface DashboardDailyFlow {
   reopened: number
 }
 
-export interface DashboardListStatus {
+interface DashboardListStatus {
   list_id: UUID
   name: string
   card_count: number
@@ -239,7 +239,7 @@ export interface DashboardListStatus {
 
 export type DashboardTargetType = 'WORKSPACE' | 'MEMBER' | 'LIST' | 'CARD' | 'COMMENT'
 
-export interface DashboardActivityBreakdown {
+interface DashboardActivityBreakdown {
   target_type: DashboardTargetType
   count: number
 }
