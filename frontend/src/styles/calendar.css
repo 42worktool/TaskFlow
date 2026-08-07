@@ -1,138 +1,22 @@
-.calendar-page {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: #fff;
-  padding: 16px 20px;
-}
-
-.cal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.nav-arrow {
-  width: 32px;
-  height: 32px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
-  font-size: 14px;
-  color: #6b7280;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.nav-arrow:hover {
-  background: #f3f4f6;
-}
-
-.month-label {
-  font-size: 18px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.cal-grid {
-  flex: 1;
-  min-height: 0;
-  border-left: 1px solid #e5e7eb;
-  border-top: 1px solid #e5e7eb;
-  overflow: auto;
-}
-
-.cal-weekdays,
-.cal-week-days,
-.cal-week-ranges {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
 .cal-weekdays {
-  position: sticky;
-  top: 0;
   z-index: 3;
 }
 
-.cal-status,
-.cal-empty {
-  margin: 0 0 12px;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.cal-status--error {
-  color: #b91c1c;
-}
-
 .weekday-header {
-  padding: 8px 10px;
   font-size: 13px;
-  font-weight: 600;
-  color: #6b7280;
-  text-align: center;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
-}
-
-.weekday-sun {
-  color: #ef4444;
 }
 
 .cal-week {
   --cal-lane-count: 1;
-  position: relative;
-  display: grid;
   min-height: max(100px, calc(44px + var(--cal-lane-count) * 25px));
-}
-
-.cal-week-days,
-.cal-week-ranges {
-  grid-area: 1 / 1;
-}
-
-.cal-week-days {
-  z-index: 0;
-}
-
-.cal-cell {
-  min-width: 0;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 6px 8px;
-  overflow: hidden;
-}
-
-.cal-cell--today {
-  background: #eff6ff;
 }
 
 .cell-date {
   font-size: 13px;
-  color: #374151;
-  font-weight: 500;
-  align-self: flex-start;
-}
-
-.cell-date--today {
-  color: #2563eb;
-  font-weight: 700;
 }
 
 .cal-week-ranges {
-  position: relative;
   z-index: 1;
-  align-content: start;
-  grid-auto-rows: 22px;
-  gap: 3px 0;
-  padding: 31px 0 8px;
-  pointer-events: none;
 }
 
 .cal-range {
@@ -165,12 +49,6 @@
   margin-right: 0;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
-}
-
-.cal-range-label {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .cal-range:disabled {

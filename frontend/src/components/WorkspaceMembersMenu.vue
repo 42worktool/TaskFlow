@@ -88,22 +88,22 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="root" class="workspace-members-menu">
+  <div ref="root" class="workspace-members-menu relative inline-flex items-center shrink-0">
     <button
       ref="trigger"
       type="button"
-      class="workspace-members-trigger"
+      class="workspace-members-trigger min-h-9 inline-flex items-center gap-1.75 py-0.75 pr-2 pl-1.5 rounded-lg border border-white/18 bg-white/12 text-white hover:bg-white/22 aria-expanded:bg-white/22 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
       :aria-label="triggerLabel"
       aria-haspopup="dialog"
       :aria-controls="panelId"
       :aria-expanded="open"
       @click="open = !open"
     >
-      <span class="workspace-members-preview" aria-hidden="true">
+      <span class="workspace-members-preview inline-flex items-center pl-1.5" aria-hidden="true">
         <span
           v-for="member in previewMembers"
           :key="member.user_id"
-          class="workspace-member-preview"
+          class="workspace-member-preview relative w-7 h-7 -ml-1.5 rounded-full border-2"
           :title="`${member.user.name} · ${
             onlineUserIds.has(member.user_id) ? '온라인' : '오프라인'
           }`"
@@ -112,29 +112,38 @@ onUnmounted(() => {
             v-if="member.user.profile_image_url"
             :src="member.user.profile_image_url"
             alt=""
-            class="workspace-member-avatar-image"
+            class="workspace-member-avatar-image w-full h-full flex items-center justify-center object-cover"
             referrerpolicy="no-referrer"
           />
           <span
             v-else
-            class="workspace-member-avatar-fallback"
+            class="workspace-member-avatar-fallback w-full h-full flex items-center justify-center"
             :style="{ background: memberColor(member.user_id) }"
           >
             {{ memberInitial(member) }}
           </span>
           <span
-            class="workspace-member-status-dot"
+            class="workspace-member-status-dot absolute -right-0.25 -bottom-0.25 w-2 h-2 rounded-full border-2"
             :class="{
               'workspace-member-status-dot--online': onlineUserIds.has(member.user_id),
             }"
           />
         </span>
-        <span v-if="hiddenMemberCount" class="workspace-members-more">
+        <span
+          v-if="hiddenMemberCount"
+          class="workspace-members-more w-7 h-7 -ml-1.5 inline-flex items-center justify-center rounded-full border-2"
+        >
           +{{ hiddenMemberCount }}
         </span>
-        <span v-if="members.length === 0" class="workspace-members-empty-icon">＋</span>
+        <span
+          v-if="members.length === 0"
+          class="workspace-members-empty-icon w-7 h-7 -ml-1.5 inline-flex items-center justify-center rounded-full border-2"
+          >＋</span
+        >
       </span>
-      <span class="workspace-members-trigger-count"> {{ onlineCount }}/{{ members.length }} </span>
+      <span class="workspace-members-trigger-count min-w-7.75 font-bold text-right whitespace-nowrap">
+        {{ onlineCount }}/{{ members.length }}
+      </span>
     </button>
 
     <section
@@ -145,16 +154,16 @@ onUnmounted(() => {
       aria-modal="false"
       :aria-labelledby="titleId"
     >
-      <header class="workspace-members-panel-header">
+      <header class="workspace-members-panel-header min-h-14.5 flex items-center justify-between gap-3 py-2.5 pr-3 pl-4">
         <div>
-          <h2 :id="titleId" class="workspace-members-title">팀원</h2>
+          <h2 :id="titleId" class="workspace-members-title text-sm">팀원</h2>
           <p class="workspace-members-summary">
             {{ members.length }}명 중 {{ onlineCount }}명 온라인
           </p>
         </div>
         <button
           type="button"
-          class="workspace-members-close"
+          class="workspace-members-close w-8 h-8 shrink-0 border-0 rounded-lg bg-transparent leading-none"
           aria-label="팀원 목록 닫기"
           @click="closeAndRestoreFocus"
         >
@@ -162,35 +171,42 @@ onUnmounted(() => {
         </button>
       </header>
 
-      <ul class="workspace-members-list">
-        <li v-if="members.length === 0" class="workspace-members-list-empty">
+      <ul class="workspace-members-list min-h-0 m-0 p-1.5 overflow-y-auto list-none">
+        <li v-if="members.length === 0" class="workspace-members-list-empty py-7 px-3 text-xs text-center">
           아직 등록된 팀원이 없습니다.
         </li>
-        <li v-for="member in members" :key="member.user_id" class="workspace-members-list-item">
-          <span class="workspace-member-list-avatar" aria-hidden="true">
+        <li
+          v-for="member in members"
+          :key="member.user_id"
+          class="workspace-members-list-item min-h-12 flex items-center gap-2.5 py-1.75 px-2"
+        >
+          <span class="workspace-member-list-avatar w-8 h-8 shrink-0 rounded-full" aria-hidden="true">
             <img
               v-if="member.user.profile_image_url"
               :src="member.user.profile_image_url"
               alt=""
-              class="workspace-member-avatar-image"
+              class="workspace-member-avatar-image w-full h-full flex items-center justify-center object-cover"
               referrerpolicy="no-referrer"
             />
             <span
               v-else
-              class="workspace-member-avatar-fallback"
+              class="workspace-member-avatar-fallback w-full h-full flex items-center justify-center"
               :style="{ background: memberColor(member.user_id) }"
             >
               {{ memberInitial(member) }}
             </span>
           </span>
-          <span class="workspace-member-copy">
-            <RouterLink :to="`/profiles/${member.user_id}`" class="workspace-member-name">
+          <span class="workspace-member-copy min-w-0 flex flex-1 flex-col">
+            <RouterLink
+              :to="`/profiles/${member.user_id}`"
+              class="workspace-member-name overflow-hidden font-semibold text-ellipsis whitespace-nowrap"
+            >
               {{ member.user.name }}
             </RouterLink>
-            <span class="workspace-member-role">{{ member.role }}</span>
+            <span class="workspace-member-role mt-0.25">{{ member.role }}</span>
           </span>
           <span
-            class="workspace-member-presence"
+            class="workspace-member-presence inline-flex items-center gap-1.25 shrink-0"
             :class="{
               'workspace-member-presence--online': onlineUserIds.has(member.user_id),
             }"
@@ -200,8 +216,12 @@ onUnmounted(() => {
         </li>
       </ul>
 
-      <footer v-if="canManage" class="workspace-members-panel-footer">
-        <button type="button" class="workspace-members-manage" @click="requestManage">
+      <footer v-if="canManage" class="workspace-members-panel-footer p-2">
+        <button
+          type="button"
+          class="workspace-members-manage w-full py-2.25 px-3 border-0 text-white text-xs font-semibold text-center"
+          @click="requestManage"
+        >
           초대 및 팀원 관리
         </button>
       </footer>

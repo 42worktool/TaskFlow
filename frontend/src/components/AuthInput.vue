@@ -30,9 +30,7 @@ const model = defineModel<string>({ required: true })
     :disabled="disabled"
     :minlength="minlength"
     :maxlength="maxlength"
-    class="form-input"
+    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-600 focus:bg-white focus:outline-none disabled:cursor-not-allowed disabled:opacity-65"
     required
   />
 </template>
-
-<style scoped src="../styles/auth-input.css"></style>

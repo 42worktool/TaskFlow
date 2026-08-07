@@ -1,12 +1,5 @@
 .task-card {
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  cursor: grab;
-  -webkit-user-select: none;
-  user-select: none;
   -webkit-user-drag: none;
 }
 
@@ -18,100 +11,14 @@
   border: 1px solid rgba(22, 163, 74, 0.2);
 }
 
-.task-card--completed .card-title {
-  color: #64748b;
-}
-
-.task-card:active {
-  cursor: grabbing;
-}
-
-.card-title-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.card-title {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  color: #111827;
-  font-weight: 500;
-  text-align: left;
-}
-
-.card-title--openable {
-  cursor: pointer;
-}
-
-.card-title--openable:hover,
-.card-title--openable:focus-visible {
-  color: #2563eb;
-}
-
-.card-delete-btn {
-  flex-shrink: 0;
-  border: none;
-  background: transparent;
-  color: #9ca3af;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 2px;
-  visibility: hidden;
-}
-
-.task-card:hover .card-delete-btn {
-  visibility: visible;
-}
-
-.card-delete-btn:hover {
-  color: #ef4444;
-}
-
-.card-labels {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: -3px 0 9px;
-}
-
 .card-label {
-  max-width: 100%;
-  overflow: hidden;
-  border-radius: 4px;
-  padding: 3px 7px;
-  color: #fff;
   font-size: 10px;
-  font-weight: 700;
   line-height: 1.2;
-  text-overflow: ellipsis;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  white-space: nowrap;
-}
-
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .card-completion-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 24px;
-  padding: 3px 7px 3px 5px;
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
-  background: #fff;
-  color: #64748b;
-  cursor: pointer;
   font-size: 10px;
-  font-weight: 700;
 }
 
 .card-completion-btn:hover:not(:disabled) {
@@ -120,29 +27,8 @@
   color: #15803d;
 }
 
-.card-completion-btn--completed {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-  color: #15803d;
-}
-
-.card-completion-btn:disabled {
-  cursor: wait;
-  opacity: 0.6;
-}
-
 .card-completion-btn svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.card-date {
-  font-size: 12px;
-  color: #6b7280;
-  margin-left: auto;
 }

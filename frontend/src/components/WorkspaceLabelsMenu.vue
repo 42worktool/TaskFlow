@@ -175,17 +175,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="root" class="workspace-labels-menu">
+  <div ref="root" class="workspace-labels-menu relative">
     <button
       ref="trigger"
       type="button"
-      class="workspace-labels-trigger"
+      class="workspace-labels-trigger inline-flex items-center gap-1.5 rounded-lg py-1.75 px-2.5 bg-white text-slate-700 cursor-pointer text-xs font-bold hover:text-blue-700"
       aria-haspopup="dialog"
       :aria-controls="panelId"
       :aria-expanded="open"
       @click="toggle"
     >
-      <span class="mono-emoji">🏷️</span>
+      <span class="grayscale">🏷️</span>
       <span id="aa">라벨</span>
     </button>
 
@@ -197,14 +197,14 @@ onUnmounted(() => {
       aria-modal="false"
       :aria-labelledby="titleId"
     >
-      <header class="workspace-labels-panel-header">
+      <header class="workspace-labels-panel-header flex items-start justify-between gap-3 mb-3.5">
         <div>
-          <h2 :id="titleId">라벨</h2>
-          <p>카드에 사용할 라벨을 관리하세요.</p>
+          <h2 :id="titleId" class="text-slate-900 text-base">라벨</h2>
+          <p class="workspace-labels-panel-desc mt-1 text-slate-500">카드에 사용할 라벨을 관리하세요.</p>
         </div>
         <button
           type="button"
-          class="workspace-labels-close"
+          class="workspace-labels-close border-0 bg-transparent text-slate-500 cursor-pointer leading-none"
           aria-label="라벨 창 닫기"
           @click="close"
         >
@@ -212,10 +212,14 @@ onUnmounted(() => {
         </button>
       </header>
 
-      <p v-if="error" class="workspace-labels-error" role="alert">{{ error }}</p>
-      <p v-if="loading" class="workspace-labels-state" role="status">불러오는 중…</p>
-      <ul v-else class="workspace-labels-list">
-        <li v-for="label in sortedLabels" :key="label.id" class="workspace-labels-item">
+      <p v-if="error" class="mb-2.5 text-red-700 text-xs" role="alert">{{ error }}</p>
+      <p v-if="loading" class="text-slate-500 text-xs" role="status">불러오는 중…</p>
+      <ul v-else class="workspace-labels-list flex flex-col gap-1.75 mb-3.5 p-0 list-none">
+        <li
+          v-for="label in sortedLabels"
+          :key="label.id"
+          class="workspace-labels-item flex items-center gap-1.5 min-h-7.5"
+        >
           <template v-if="editingId === label.id">
             <input
               v-model="editingName"
@@ -223,37 +227,70 @@ onUnmounted(() => {
               maxlength="50"
               aria-label="라벨 이름"
               :disabled="saving"
+              class="workspace-labels-field min-w-0 flex-1 border border-slate-300 py-1.75 px-2 text-slate-900 disabled:cursor-default disabled:opacity-50"
               @keydown.enter="saveEditing"
             />
-            <input v-model="editingColor" type="color" aria-label="라벨 색상" :disabled="saving" />
-            <button type="button" :disabled="saving || !editingName.trim()" @click="saveEditing">
+            <input
+              v-model="editingColor"
+              type="color"
+              aria-label="라벨 색상"
+              :disabled="saving"
+              class="w-8 h-7.5 border-0 p-0 bg-transparent cursor-pointer disabled:cursor-default disabled:opacity-50"
+            />
+            <button
+              type="button"
+              class="workspace-labels-btn shrink-0 grow-0 py-1.75 px-2.25 bg-blue-50 text-blue-700 cursor-pointer font-bold disabled:cursor-default disabled:opacity-50"
+              :disabled="saving || !editingName.trim()"
+              @click="saveEditing"
+            >
               저장
             </button>
-            <button type="button" :disabled="saving" @click="cancelEditing">취소</button>
+            <button
+              type="button"
+              class="workspace-labels-btn shrink-0 grow-0 py-1.75 px-2.25 bg-red-50 text-red-700 cursor-pointer font-bold disabled:cursor-default disabled:opacity-50"
+              :disabled="saving"
+              @click="cancelEditing"
+            >
+              취소
+            </button>
           </template>
           <template v-else>
             <span
-              class="workspace-label-chip"
+              class="workspace-label-chip min-w-0 flex-1 overflow-hidden rounded-lg py-1.25 px-2.5 text-white text-xs font-bold text-ellipsis whitespace-nowrap"
               :style="{
                 backgroundColor: label.label_color,
                 color: getLabelTextColor(label.label_color),
               }"
               >{{ label.label_name }}</span
             >
-            <button v-if="canManage" type="button" :disabled="saving" @click="startEditing(label)">
+            <button
+              v-if="canManage"
+              type="button"
+              class="workspace-labels-btn shrink-0 grow-0 py-1.75 px-2.25 bg-blue-50 text-blue-700 cursor-pointer font-bold disabled:cursor-default disabled:opacity-50"
+              :disabled="saving"
+              @click="startEditing(label)"
+            >
               수정
             </button>
-            <button v-if="canManage" type="button" :disabled="saving" @click="deleteLabel(label)">
+            <button
+              v-if="canManage"
+              type="button"
+              class="workspace-labels-btn shrink-0 grow-0 py-1.75 px-2.25 bg-red-50 text-red-700 cursor-pointer font-bold disabled:cursor-default disabled:opacity-50"
+              :disabled="saving"
+              @click="deleteLabel(label)"
+            >
               삭제
             </button>
           </template>
         </li>
-        <li v-if="sortedLabels.length === 0" class="workspace-labels-empty">
-          아직 라벨이 없습니다.
-        </li>
+        <li v-if="sortedLabels.length === 0" class="text-slate-500 text-xs">아직 라벨이 없습니다.</li>
       </ul>
 
-      <form v-if="canManage" class="workspace-labels-create" @submit.prevent="createLabel">
+      <form
+        v-if="canManage"
+        class="workspace-labels-create flex items-center gap-1.5 border-t border-slate-200 pt-3"
+        @submit.prevent="createLabel"
+      >
         <input
           v-model="name"
           type="text"
@@ -261,9 +298,20 @@ onUnmounted(() => {
           placeholder="새 라벨 이름"
           aria-label="새 라벨 이름"
           :disabled="saving"
+          class="workspace-labels-field min-w-0 flex-1 border border-slate-300 py-1.75 px-2 text-slate-900 disabled:cursor-default disabled:opacity-50"
         />
-        <input v-model="color" type="color" aria-label="새 라벨 색상" :disabled="saving" />
-        <button type="submit" :disabled="saving || !name.trim()">
+        <input
+          v-model="color"
+          type="color"
+          aria-label="새 라벨 색상"
+          :disabled="saving"
+          class="w-8 h-7.5 border-0 p-0 bg-transparent cursor-pointer disabled:cursor-default disabled:opacity-50"
+        />
+        <button
+          type="submit"
+          class="shrink-0 grow-0 py-1.75 px-2.25 bg-blue-600 text-white cursor-pointer font-bold disabled:cursor-default disabled:opacity-50"
+          :disabled="saving || !name.trim()"
+        >
           {{ saving ? '저장 중…' : '추가' }}
         </button>
       </form>

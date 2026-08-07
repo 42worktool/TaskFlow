@@ -145,30 +145,30 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="inbox-cards-panel">
-    <div class="inbox-panel-header">
+  <section class="inbox-cards-panel w-full h-full bg-white flex flex-col min-h-0">
+    <div class="inbox-panel-header flex items-start justify-between pt-4.5 px-5 pb-3 border-b border-gray-200">
       <div>
-        <h2 class="inbox-panel-title">인박스</h2>
-        <p class="inbox-panel-subtitle">보드 밖에 보관 중인 내 카드</p>
+        <h2 class="inbox-panel-title text-lg font-bold text-gray-900">인박스</h2>
+        <p class="inbox-panel-subtitle mt-0.75 text-gray-500">보드 밖에 보관 중인 내 카드</p>
       </div>
     </div>
 
-    <div class="inbox-panel-toolbar">
-      <span class="card-count">카드 {{ cards.length }}개</span>
-      <span v-if="allowDrag && destinationLists.length" class="inbox-drag-hint">
+    <div class="inbox-panel-toolbar flex items-center justify-between py-3 px-5 border-b border-gray-200">
+      <span class="card-count text-gray-500 font-semibold">카드 {{ cards.length }}개</span>
+      <span v-if="allowDrag && destinationLists.length" class="inbox-drag-hint text-blue-600 font-semibold text-right">
         카드를 보드 리스트로 드래그하세요
       </span>
     </div>
 
-    <p v-if="error" class="inbox-panel-state inbox-panel-state--error" role="alert">
+    <p v-if="error" class="mt-0 py-4.5 px-5 text-gray-500 text-sm bg-red-50 text-red-700" role="alert">
       {{ error }}
     </p>
     <draggable
       v-model="cards"
       tag="ul"
       item-key="id"
-      class="inbox-card-list"
-      :class="{ 'inbox-card-list--drop-active': acceptingDrop }"
+      class="inbox-card-list list-none overflow-y-auto flex-1 min-h-0 pt-3.5 px-4 pb-5 flex flex-col gap-2.5 bg-gray-100"
+      :class="{ 'inbox-card-list--drop-active bg-blue-50': acceptingDrop }"
       :group="{ name: 'board-cards', pull: dragEnabled, put: dragEnabled }"
       :disabled="!dragEnabled"
       :sort="false"
@@ -185,7 +185,7 @@ onUnmounted(() => {
       @change="handleCardChange"
     >
       <template #item="{ element: card }">
-        <li>
+        <li class="flex flex-col gap-1.5">
           <TaskCard
             :card="card"
             :openable="true"
@@ -200,11 +200,24 @@ onUnmounted(() => {
         </li>
       </template>
       <template #footer>
-        <li v-if="acceptingDrop" class="inbox-drop-prompt" aria-hidden="true">
+        <li
+          v-if="acceptingDrop"
+          class="inbox-drop-prompt min-h-22 items-center justify-center border-2 border-dashed border-blue-400 bg-white/72 text-blue-700 font-bold text-center"
+          aria-hidden="true"
+        >
           여기에 놓아 인박스로 이동
         </li>
-        <li v-else-if="loading" class="inbox-panel-state" role="status">인박스를 불러오는 중…</li>
-        <li v-else-if="!error && cards.length === 0" class="inbox-panel-state">
+        <li
+          v-else-if="loading"
+          class="flex-1 items-center justify-center min-h-30 py-5 px-2 text-center text-gray-500 text-sm"
+          role="status"
+        >
+          인박스를 불러오는 중…
+        </li>
+        <li
+          v-else-if="!error && cards.length === 0"
+          class="flex-1 items-center justify-center min-h-30 py-5 px-2 text-center text-gray-500 text-sm"
+        >
           인박스가 비어 있습니다.
         </li>
       </template>

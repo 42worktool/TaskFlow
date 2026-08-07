@@ -419,8 +419,8 @@ onUnmounted(() => {
           >
             ‹
           </button>
-          <div>
-            <div class="messenger-header__title-row">
+          <div class="min-w-0 flex-1">
+            <div class="messenger-header__title-row min-w-0 flex items-center gap-1.5">
               <strong>TaskFlow 메신저</strong>
             </div>
             <span>{{ activeRoomTitle }}</span>
@@ -456,7 +456,7 @@ onUnmounted(() => {
             :inert="!directoryVisible"
             aria-label="메신저 대화 목록"
           >
-            <div class="messenger-directory-heading">
+            <div class="messenger-directory-heading flex items-center justify-between pt-0.5 px-1 pb-2.5">
               <strong>대화</strong>
             </div>
 
@@ -581,9 +581,12 @@ onUnmounted(() => {
           </nav>
 
           <main v-show="conversationVisible" class="messenger-content" aria-live="polite">
-            <div v-if="messengerState.pane === 'directory'" class="messenger-welcome">
+            <div
+              v-if="messengerState.pane === 'directory'"
+              class="messenger-welcome min-h-full p-7 grid place-content-center justify-items-center text-slate-500 text-center"
+            >
               <span aria-hidden="true">💬</span>
-              <h2>대화를 선택하세요</h2>
+              <h2 class="mt-3 mb-1 text-slate-900 text-lg">대화를 선택하세요</h2>
               <p>워크스페이스 대화방이나 친구를 선택하면 바로 이어집니다.</p>
             </div>
             <FriendsPanel

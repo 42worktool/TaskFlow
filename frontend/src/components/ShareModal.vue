@@ -152,51 +152,62 @@ async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
 </script>
 
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal">
-      <div class="modal-header">
+  <div class="modal-overlay bg-black/40" @click.self="$emit('close')">
+    <div class="modal w-120 overflow-y-auto p-6 flex flex-col gap-5">
+      <div class="modal-header items-start pb-4 border-b border-gray-200">
         <div>
-          <h2 class="modal-title">팀원 관리</h2>
-          <p class="modal-subtitle">{{ workspaceName }} · 초대 및 구성원</p>
+          <h2 class="modal-title text-gray-900">팀원 관리</h2>
+          <p class="modal-subtitle mt-0.5 text-gray-500">{{ workspaceName }} · 초대 및 구성원</p>
         </div>
-        <button class="close-btn" @click="$emit('close')">✕</button>
+        <button class="close-btn text-base p-1" @click="$emit('close')">✕</button>
       </div>
 
       <div class="section">
-        <p class="section-label">이메일로 초대</p>
-        <div class="invite-row">
+        <p class="section-label font-semibold text-gray-700 mb-2">이메일로 초대</p>
+        <div class="invite-row flex gap-2 mb-2.5">
           <input
             v-model="inviteEmail"
-            class="invite-input"
+            class="flex-1 py-2.5 px-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
             type="email"
             autocomplete="email"
             placeholder="이메일 주소 입력..."
             required
             @keyup.enter="sendInvite"
           />
-          <select v-model="inviteRole" class="role-btn">
+          <select
+            v-model="inviteRole"
+            class="py-2.5 px-3.5 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white cursor-pointer whitespace-nowrap"
+          >
             <option v-for="r in assignableRoles" :key="r.value" :value="r.value">
               {{ r.label }}
             </option>
           </select>
         </div>
-        <button class="send-btn" :disabled="sending || !inviteEmail.trim()" @click="sendInvite">
+        <button
+          class="send-btn w-full p-3 bg-blue-600 text-white border-none rounded-lg text-sm font-semibold cursor-pointer disabled:cursor-default disabled:opacity-55"
+          :disabled="sending || !inviteEmail.trim()"
+          @click="sendInvite"
+        >
           {{ sending ? '전송 중...' : '초대 메일 보내기' }}
         </button>
-        <p v-if="inviteError" class="error-text">{{ inviteError }}</p>
-        <p v-if="inviteSuccess" class="success-text" role="status">{{ inviteSuccess }}</p>
+        <p v-if="inviteError" class="error-text mt-2 text-red-600">{{ inviteError }}</p>
+        <p v-if="inviteSuccess" class="success-text mt-2 text-emerald-700" role="status">{{ inviteSuccess }}</p>
       </div>
 
       <div class="section">
-        <p class="section-label">현재 팀원</p>
-        <p v-if="memberError" class="error-text">{{ memberError }}</p>
-        <p v-if="memberSuccess" class="success-text" role="status">
+        <p class="section-label font-semibold text-gray-700 mb-2">현재 팀원</p>
+        <p v-if="memberError" class="error-text mt-2 text-red-600">{{ memberError }}</p>
+        <p v-if="memberSuccess" class="success-text mt-2 text-emerald-700" role="status">
           {{ memberSuccess }}
         </p>
-        <ul class="member-list">
-          <li v-for="m in props.workspace.members" :key="m.user_id" class="member-item">
+        <ul class="member-list list-none flex flex-col gap-0.5">
+          <li
+            v-for="m in props.workspace.members"
+            :key="m.user_id"
+            class="member-item flex items-center gap-3 py-2.5 border-b border-gray-100"
+          >
             <div
-              class="member-avatar"
+              class="member-avatar w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
               :style="{
                 background:
                   m.role === 'OWNER' ? '#2563EB' : m.role === 'ADMIN' ? '#10B981' : '#7C3AED',
@@ -204,14 +215,14 @@ async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
             >
               {{ m.user.name[0] }}
             </div>
-            <div class="member-info">
-              <p class="member-name">{{ m.user.name }}</p>
-              <p v-if="m.user.email" class="member-email">{{ m.user.email }}</p>
+            <div class="member-info flex-1">
+              <p class="member-name text-sm font-medium text-gray-900">{{ m.user.name }}</p>
+              <p v-if="m.user.email" class="member-email text-xs text-gray-500">{{ m.user.email }}</p>
             </div>
-            <div class="member-actions">
+            <div class="member-actions flex items-center justify-end flex-wrap gap-2">
               <select
                 v-if="canChangeWorkspaceMemberRole(managerRole, m.role)"
-                class="member-role-select"
+                class="member-role-select min-w-22 py-1.5 pr-7 pl-2.25 border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-60"
                 :value="m.role"
                 :aria-label="`${m.user.name} 권한 변경`"
                 :disabled="
@@ -223,14 +234,20 @@ async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
                   {{ role.label }}
                 </option>
               </select>
-              <span v-else class="role-badge">{{ roleLabels[m.role] }}</span>
-              <span v-if="updatingRole === m.user_id" class="member-action-status" role="status">
+              <span v-else class="role-badge py-1 px-2.5 border border-gray-200 rounded-md text-gray-700">{{
+                roleLabels[m.role]
+              }}</span>
+              <span
+                v-if="updatingRole === m.user_id"
+                class="member-action-status text-xs text-gray-500 whitespace-nowrap"
+                role="status"
+              >
                 저장 중...
               </span>
               <button
                 v-if="managerRole === 'OWNER' && m.role !== 'OWNER'"
                 type="button"
-                class="transfer-btn"
+                class="transfer-btn py-1.25 px-2 border border-blue-200 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold cursor-pointer whitespace-nowrap disabled:cursor-wait disabled:opacity-55"
                 :disabled="
                   transferringOwnership !== null ||
                   removing === m.user_id ||
@@ -242,7 +259,7 @@ async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
               </button>
               <button
                 v-if="canChangeWorkspaceMemberRole(managerRole, m.role)"
-                class="remove-btn"
+                class="remove-btn bg-transparent border-none text-red-500 cursor-pointer disabled:cursor-wait disabled:opacity-55"
                 :disabled="
                   removing === m.user_id ||
                   updatingRole === m.user_id ||
@@ -257,8 +274,13 @@ async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
         </ul>
       </div>
 
-      <div class="modal-footer">
-        <button class="close-footer-btn" @click="$emit('close')">닫기</button>
+      <div class="modal-footer border-t border-gray-200 pt-4">
+        <button
+          class="close-footer-btn w-full p-3 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white cursor-pointer hover:bg-gray-50"
+          @click="$emit('close')"
+        >
+          닫기
+        </button>
       </div>
     </div>
   </div>

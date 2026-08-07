@@ -423,7 +423,7 @@ onUnmounted(() => {
       <aside
         v-if="inboxOpen"
         id="workspace-inbox-panel"
-        class="workspace-inbox-sidebar"
+        class="workspace-inbox-sidebar w-82.5 min-w-70 shrink-0 grow-0 basis-82.5 flex min-h-0 overflow-hidden border-r border-gray-200 bg-white"
         aria-label="인박스"
       >
         <InboxCardsPanel
@@ -437,7 +437,7 @@ onUnmounted(() => {
         />
       </aside>
 
-      <div class="workspace-route-content">
+      <div class="workspace-route-content flex-1 min-w-0 min-h-0 flex overflow-hidden">
         <RouterView v-slot="{ Component }">
           <component
             :is="Component"
@@ -469,7 +469,7 @@ onUnmounted(() => {
   </div>
   <div v-else class="app-shell">
     <AppHeader />
-    <main class="workspace-load-state" :role="loadError ? 'alert' : 'status'">
+    <main class="workspace-load-state grid place-items-center text-slate-500" :role="loadError ? 'alert' : 'status'">
       {{ loadError || '워크스페이스를 불러오는 중…' }}
     </main>
   </div>
