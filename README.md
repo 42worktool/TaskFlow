@@ -168,7 +168,6 @@ Open:
 
 - Application: `https://localhost:4430`
 - Health check: `https://localhost:4430/api/health`
-- Auth/account Swagger UI: `https://localhost:4430/api/docs/`
 
 The browser will warn about the self-signed local certificate. Accept it only
 for this development environment.
@@ -338,7 +337,7 @@ guessing an identity where the repository does not prove one.
 
 | Feature | Implementation summary | Repository contributors |
 | --- | --- | --- |
-| Authentication and account | Password login, Google OAuth, refresh rotation, account edit/delete, OpenAPI | `Sean Kim`; frontend integration by `KHR416` / `wchoe` |
+| Authentication and account | Password login, Google OAuth, refresh rotation, account edit/delete | `Sean Kim`; frontend integration by `KHR416` / `wchoe` |
 | Workspace and permissions | CRUD, role checks, member removal, final-owner guard, public data projection | `Saususge`, `copilot-swe-agent[bot]`, `seankim96` |
 | Email invitations | One-time Redis invitation, explicit account confirmation, mail queue, per-address limit | `Saususge`, `seankim96` |
 | Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
@@ -509,8 +508,6 @@ to an AI system.
   details; direct comment editing/deletion and the rest of the label/assignment
   UI remain incomplete.
 - Public workspaces are visible to authenticated users, not anonymous visitors.
-- Swagger currently documents authentication and account endpoints, not the
-  entire application API.
 
 ## Additional documentation
 

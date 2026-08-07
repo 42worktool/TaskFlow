@@ -404,7 +404,7 @@ async function main() {
           list_id: ids.lists.done,
           user_id: null,
           title: 'API docs refresh',
-          description: 'Swagger examples와 error response 문서를 갱신했습니다.',
+          description: '인증 API와 error response 문서를 갱신했습니다.',
           is_completed: true,
           start_at: dateFromNow(-12),
           deadline: dateFromNow(-9),
