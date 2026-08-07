@@ -50,6 +50,7 @@ const actionError = ref('')
 const boardAnnouncement = ref('')
 const completingCardIds = ref<Set<string>>(new Set())
 const movingCardIds = ref<Set<string>>(new Set())
+const movingListIds = ref<Set<string>>(new Set())
 const selectedCardId = ref<string | null>(null)
 const cardDetailRefreshToken = ref(0)
 const boardColumns = ref<{ $el: HTMLElement } | null>(null)
@@ -325,6 +326,35 @@ function onListChange(event: DraggableChange<ListWithCards>) {
     () => queueFullRefresh(),
     () => queueFullRefresh(),
   )
+}
+
+async function onKeyboardMoveList(listId: string, direction: 'previous' | 'next'): Promise<void> {
+  if (!props.canEditBoard || movingListIds.value.has(listId)) return
+  const currentIndex = lists.value.findIndex((list) => list.id === listId)
+  const list = lists.value[currentIndex]
+  if (!list) return
+  const targetIndex = currentIndex + (direction === 'previous' ? -1 : 1)
+  if (targetIndex < 0 || targetIndex >= lists.value.length) return
+
+  const reorderedLists = lists.value.filter((item) => item.id !== listId)
+  reorderedLists.splice(targetIndex, 0, list)
+  const { beforeId, afterId } = neighborIds(reorderedLists, targetIndex)
+
+  movingListIds.value = new Set(movingListIds.value).add(listId)
+  actionError.value = ''
+  try {
+    await ListAPI.reorder(listId, { before_list_id: beforeId, after_list_id: afterId })
+    boardAnnouncement.value = `${list.name} 리스트를 ${targetIndex + 1}번째 위치로 옮겼습니다.`
+    queueFullRefresh()
+  } catch (caught) {
+    actionError.value =
+      caught instanceof Error ? caught.message : '리스트를 키보드로 이동하지 못했습니다.'
+    queueFullRefresh()
+  } finally {
+    const next = new Set(movingListIds.value)
+    next.delete(listId)
+    movingListIds.value = next
+  }
 }
 
 function persistCardChange(
@@ -684,6 +714,7 @@ onUnmounted(() => {
           :can-open-details="canViewCardDetails"
           :completing-card-ids="completingCardIds"
           :moving-card-ids="movingCardIds"
+          :moving-list="movingListIds.has(col.id)"
           @open-card="openCard"
           @update-cards="onUpdateCards"
           @card-change="onCardChange"
@@ -693,6 +724,7 @@ onUnmounted(() => {
           @delete-card="onDeleteCard"
           @toggle-card-completion="onToggleCardCompletion"
           @move-card="onKeyboardMoveCard"
+          @move-list="onKeyboardMoveList"
           @rename-list="onRenameList"
           @delete-list="onDeleteList"
         />

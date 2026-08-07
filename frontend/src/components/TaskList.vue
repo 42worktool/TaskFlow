@@ -12,12 +12,14 @@ const props = withDefaults(
     canOpenDetails?: boolean
     completingCardIds?: ReadonlySet<string>
     movingCardIds?: ReadonlySet<string>
+    movingList?: boolean
   }>(),
   {
     canEdit: false,
     canOpenDetails: false,
     completingCardIds: () => new Set<string>(),
     movingCardIds: () => new Set<string>(),
+    movingList: false,
   },
 )
 
@@ -31,6 +33,7 @@ const emit = defineEmits<{
   'delete-card': [cardId: string]
   'toggle-card-completion': [card: Card]
   'move-card': [cardId: string, direction: 'previous' | 'next']
+  'move-list': [listId: string, direction: 'previous' | 'next']
   'rename-list': [listId: string, name: string]
   'delete-list': [listId: string]
 }>()
@@ -160,6 +163,24 @@ const vFocus = {
       />
       <span v-else class="list-name" @click="startRename">{{ list.name }}</span>
       <div class="list-header-actions">
+        <div v-if="canEdit" class="list-keyboard-move-actions">
+          <button
+            type="button"
+            :disabled="movingList"
+            :aria-label="`${list.name} 리스트 이전 위치로 이동`"
+            @click.stop="emit('move-list', list.id, 'previous')"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            :disabled="movingList"
+            :aria-label="`${list.name} 리스트 다음 위치로 이동`"
+            @click.stop="emit('move-list', list.id, 'next')"
+          >
+            →
+          </button>
+        </div>
         <span class="list-count" :style="{ background: badgeColors[list.name] ?? '#6b7280' }">
           {{ list.cards.length }}
         </span>
