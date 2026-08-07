@@ -108,10 +108,7 @@ test('unified search merges visible result types before sorting and pagination',
   assert.ok(cardQuery.where.list.is.workspace.OR)
   assert.deepEqual(userQuery.where.AND, [
     {
-      OR: [
-        { name: { contains: 'product', mode: 'insensitive' } },
-        { headline: { contains: 'product', mode: 'insensitive' } },
-      ],
+      name: { contains: 'product', mode: 'insensitive' },
     },
   ])
 })

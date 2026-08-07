@@ -328,7 +328,7 @@ onUnmounted(() => {
     <section class="friend-panel friend-search-panel">
       <div>
         <h2>사람 찾기</h2>
-        <p>이름, 한줄 소개 또는 이메일로 친구를 찾고 요청을 보내세요.</p>
+        <p>이름 또는 이메일로 친구를 찾고 요청을 보내세요.</p>
       </div>
 
       <label class="friend-search-field">
@@ -337,8 +337,8 @@ onUnmounted(() => {
           v-model="friendSearchQuery"
           type="search"
           autocomplete="off"
-          placeholder="이름, 소개 또는 이메일로 친구 찾기"
-          aria-label="이름, 소개 또는 이메일로 친구 찾기"
+          placeholder="이름 또는 이메일로 친구 찾기"
+          aria-label="이름 또는 이메일로 친구 찾기"
           :disabled="loading"
         />
         <small v-if="friendSearchLoading">검색 중…</small>

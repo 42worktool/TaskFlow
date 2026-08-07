@@ -290,10 +290,7 @@ export async function search(input: SearchInput) {
               ? { email: { equals: parsedEmail.data, mode: 'insensitive' as const } }
               : {
                   AND: terms.map((term) => ({
-                    OR: [
-                      { name: { contains: term, mode: 'insensitive' as const } },
-                      { headline: { contains: term, mode: 'insensitive' as const } },
-                    ],
+                    name: { contains: term, mode: 'insensitive' as const },
                   })),
                 }),
           },
@@ -365,7 +362,7 @@ export async function search(input: SearchInput) {
       created_at: user.created_at.toISOString(),
       sortName: user.name,
       sortDate: user.created_at.toISOString(),
-      searchable: [user.name, user.headline],
+      searchable: [user.name],
     })),
   ]
 

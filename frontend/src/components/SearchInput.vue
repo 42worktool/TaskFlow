@@ -27,7 +27,7 @@ let peopleSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const commands = [
   { command: '/card', insert: '/card ', label: '카드만', description: '카드 결과만 검색' },
-  { command: '/user', insert: '/user ', label: '사람', description: '이름과 소개로 검색' },
+  { command: '/user', insert: '/user ', label: '사람', description: '이름 또는 이메일로 검색' },
   {
     command: '/workspace',
     insert: '/workspace ',

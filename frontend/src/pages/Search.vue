@@ -464,7 +464,7 @@ onMounted(() => {
       <div v-else-if="!hasResults" class="empty-state">
         {{
           criteria.category === 'user' && !query
-            ? '검색할 사용자 이름이나 한 줄 소개를 입력하세요.'
+            ? '검색할 사용자 이름 또는 이메일을 입력하세요.'
             : '조건에 맞는 검색 결과가 없습니다.'
         }}
       </div>
