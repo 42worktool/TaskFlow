@@ -12,7 +12,7 @@ Vite server alone starts only the UI; it expects a backend at
 To start only that UI process:
 
 ```bash
-npm ci
+npm install
 npm run dev
 ```
 
