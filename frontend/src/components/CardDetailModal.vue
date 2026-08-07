@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import DatePicker from './DatePicker.vue'
 import { CardAPI } from '../api/card'
 import { LabelAPI } from '../api/label'
 import { authState } from '../services/auth'
@@ -660,24 +661,19 @@ onUnmounted(() => {
           </label>
 
           <div class="card-detail-dates">
-            <label class="card-detail-field">
-              <span>시작일</span>
-              <input
-                v-model="startDate"
-                type="date"
-                :max="deadline || undefined"
-                :disabled="saving || !editable"
-              />
-            </label>
-            <label class="card-detail-field">
-              <span>마감일</span>
-              <input
-                v-model="deadline"
-                type="date"
-                :min="startDate || undefined"
-                :disabled="saving || !editable"
-              />
-            </label>
+            <DatePicker
+              v-model="startDate"
+              label="시작일"
+              :max="deadline || undefined"
+              :disabled="saving || !editable"
+            />
+            <DatePicker
+              v-model="deadline"
+              label="마감일"
+              align="end"
+              :min="startDate || undefined"
+              :disabled="saving || !editable"
+            />
           </div>
 
           <div
