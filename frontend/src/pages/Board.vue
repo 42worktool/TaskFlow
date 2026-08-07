@@ -600,13 +600,32 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="board-page">
-    <p v-if="actionError" class="board-action-error" role="alert">
+  <div class="board-page relative flex-1 min-w-0 flex overflow-hidden bg-gray-100">
+    <p
+      v-if="actionError"
+      class="board-action-error absolute top-3 left-1/2 flex items-center gap-2.5 py-2.25 pr-2.5 pl-3.25 -translate-x-1/2 border border-red-200 bg-white text-red-700 text-xs"
+      role="alert"
+    >
       <span>{{ actionError }}</span>
-      <button type="button" aria-label="알림 닫기" @click="actionError = ''">×</button>
+      <button
+        type="button"
+        class="shrink-0 grow-0 w-6 h-6 p-0 border-0 rounded-md bg-red-50 text-red-700 text-base leading-none"
+        aria-label="알림 닫기"
+        @click="actionError = ''"
+      >
+        ×
+      </button>
     </p>
-    <div v-if="loading" class="board-status">불러오는 중...</div>
-    <div v-else-if="error" class="board-status board-status--error">
+    <div
+      v-if="loading"
+      class="board-status flex-1 flex items-center justify-center text-gray-500 text-sm"
+    >
+      불러오는 중...
+    </div>
+    <div
+      v-else-if="error"
+      class="board-status flex-1 flex items-center justify-center text-sm text-red-500"
+    >
       {{ error }}
     </div>
     <draggable
@@ -616,7 +635,7 @@ onUnmounted(() => {
       item-key="id"
       :disabled="!canEditBoard || loading || Boolean(error)"
       handle=".list-header"
-      class="board-columns"
+      class="board-columns flex-1 min-w-0 flex gap-3.5 py-4 px-5 overflow-x-auto"
       @start="setDragging(true)"
       @end="setDragging(false)"
       @change="onListChange"
@@ -640,27 +659,48 @@ onUnmounted(() => {
         />
       </template>
       <template #footer>
-        <div v-if="loading" class="board-inline-status">보드를 불러오는 중…</div>
-        <div v-else-if="error" class="board-inline-status board-status--error">
+        <div
+          v-if="loading"
+          class="board-inline-status w-70 shrink-0 grow-0 basis-70 grid place-items-center text-gray-500"
+        >
+          보드를 불러오는 중…
+        </div>
+        <div
+          v-else-if="error"
+          class="board-inline-status w-70 shrink-0 grow-0 basis-70 grid place-items-center text-red-500"
+        >
           {{ error }}
         </div>
-        <div v-else-if="canEditBoard" class="add-list-column">
-          <form v-if="showAddList" class="add-list-form" @submit.prevent="submitAddList">
+        <div v-else-if="canEditBoard" class="add-list-column w-70 shrink-0">
+          <form
+            v-if="showAddList"
+            class="add-list-form flex gap-1.5"
+            @submit.prevent="submitAddList"
+          >
             <input
               v-model="newListName"
               type="text"
-              class="add-list-input"
+              class="add-list-input flex-1 min-w-0 py-2.5 px-3 border border-blue-600"
               placeholder="리스트 이름 입력"
               required
               autofocus
               @keyup.esc="cancelAddList"
               @blur="submitAddList"
             />
-            <button type="submit" class="add-list-submit-btn" :disabled="!newListName.trim()">
+            <button
+              type="submit"
+              class="add-list-submit-btn shrink-0 px-3.5 bg-blue-600 border-none font-semibold text-white cursor-pointer disabled:cursor-default disabled:opacity-55"
+              :disabled="!newListName.trim()"
+            >
               추가
             </button>
           </form>
-          <button v-else class="add-list-btn" type="button" @click="showAddList = true">
+          <button
+            v-else
+            class="add-list-btn w-full py-2.5 px-3 bg-white/50 border-none text-gray-500 cursor-pointer text-left hover:bg-white/80 hover:text-gray-700"
+            type="button"
+            @click="showAddList = true"
+          >
             + 리스트 추가
           </button>
         </div>

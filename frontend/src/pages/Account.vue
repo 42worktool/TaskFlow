@@ -275,7 +275,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown, true)
             <h2 class="text-sm font-bold text-slate-800">계정 삭제</h2>
             <div class="mt-2! flex items-center justify-between gap-4 max-sm:items-start">
               <p class="text-xs leading-5 text-slate-500">
-                계정과 로그인 정보가 영구적으로 삭제됩니다.
+                계정과 로그인 정보가 영구적으로 삭제됩니다. 소유한 프로젝트가 있다면 먼저 소유권을
+                위임하거나 프로젝트를 삭제해야 합니다.
               </p>
               <button
                 type="button"
