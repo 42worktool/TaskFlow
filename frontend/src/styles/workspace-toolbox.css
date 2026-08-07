@@ -19,13 +19,6 @@
   box-sizing: border-box;
 }
 
-.workspace-toolbox__group {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-  gap: 3px;
-}
-
 .workspace-toolbox__group + .workspace-toolbox__group {
   margin-left: 5px;
   padding-left: 6px;

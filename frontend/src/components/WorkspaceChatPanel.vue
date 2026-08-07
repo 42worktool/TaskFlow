@@ -396,7 +396,7 @@ onUnmounted(() => {
 <template>
   <section
     ref="panelElement"
-    class="workspace-chat-panel"
+    class="workspace-chat-panel relative min-h-0 h-full flex flex-col bg-slate-50"
     :class="{
       'workspace-chat-panel--card-drop-ready': acceptsCardDrop,
       'workspace-chat-panel--card-drop-over': cardDropOver,
@@ -407,41 +407,64 @@ onUnmounted(() => {
     @dragleave="handleCardDragLeave"
     @drop.capture="handleCardDrop"
   >
-    <div class="workspace-chat-room">
+    <div
+      class="workspace-chat-room min-h-13.5 py-2.25 px-3.5 border-b border-gray-200 flex items-center justify-between gap-3 bg-white"
+    >
       <div>
-        <strong># {{ workspaceName || '워크스페이스' }}</strong>
-        <span>구성원 공용 대화방</span>
+        <strong class="block text-gray-900 text-sm"># {{ workspaceName || '워크스페이스' }}</strong>
+        <span class="workspace-chat-room-subtitle block mt-0.5 text-slate-500"
+          >구성원 공용 대화방</span
+        >
       </div>
     </div>
 
-    <div class="workspace-chat-messages-region">
-      <div ref="messageList" class="workspace-chat-messages" aria-live="polite">
-        <p v-if="loading" class="workspace-chat-state">메시지를 불러오는 중…</p>
-        <p v-else-if="!error && messages.length === 0" class="workspace-chat-state">
+    <div class="workspace-chat-messages-region relative min-h-45 flex-1 overflow-hidden">
+      <div
+        ref="messageList"
+        class="workspace-chat-messages h-full min-h-0 py-4 px-3.5 overflow-y-auto"
+        aria-live="polite"
+      >
+        <p
+          v-if="loading"
+          class="workspace-chat-state grid min-h-full m-0 place-items-center text-slate-400"
+        >
+          메시지를 불러오는 중…
+        </p>
+        <p
+          v-else-if="!error && messages.length === 0"
+          class="workspace-chat-state grid min-h-full m-0 place-items-center text-slate-400"
+        >
           아직 메시지가 없습니다.
         </p>
         <article
           v-for="message in messages"
           :key="message.id"
-          class="workspace-chat-message"
+          class="workspace-chat-message flex items-start gap-2 mb-3.5"
           :class="{
-            'workspace-chat-message--mine': message.author.user_id === authState.user?.id,
+            'workspace-chat-message--mine ml-auto flex-row-reverse':
+              message.author.user_id === authState.user?.id,
           }"
         >
           <img
             v-if="message.author.profile_image_url"
             :src="message.author.profile_image_url"
             alt=""
-            class="workspace-chat-avatar"
+            class="workspace-chat-avatar w-7 h-7 shrink-0 grow-0 basis-7 rounded-full object-cover"
             referrerpolicy="no-referrer"
           />
-          <div v-else class="workspace-chat-avatar workspace-chat-avatar--fallback">
+          <div
+            v-else
+            class="workspace-chat-avatar w-7 h-7 shrink-0 grow-0 basis-7 rounded-full grid place-items-center bg-blue-600 text-white font-bold"
+          >
             {{ message.author.name.charAt(0).toUpperCase() }}
           </div>
-          <div class="workspace-chat-message-body">
-            <div class="workspace-chat-message-meta">
-              <strong>{{ message.author.name }}</strong>
-              <time :datetime="message.created_at">
+          <div class="workspace-chat-message-body min-w-0">
+            <div
+              class="workspace-chat-message-meta flex items-baseline gap-1.5 mb-0.75"
+              :class="{ 'justify-end': message.author.user_id === authState.user?.id }"
+            >
+              <strong class="text-slate-600">{{ message.author.name }}</strong>
+              <time class="text-slate-400" :datetime="message.created_at">
                 {{ formatMessageTime(message.created_at) }}
               </time>
             </div>
@@ -449,12 +472,15 @@ onUnmounted(() => {
             <button
               v-if="message.card_id && cardTitles.has(message.card_id)"
               type="button"
-              class="workspace-chat-card-link"
+              class="workspace-chat-card-link inline-block max-w-full mt-1.25 py-1 px-2 overflow-hidden border border-blue-200 rounded-full bg-blue-50 text-blue-700 font-bold text-ellipsis whitespace-nowrap"
               @click="openLinkedCard(message.card_id)"
             >
               ▣ {{ cardTitles.get(message.card_id) }}
             </button>
-            <span v-else class="workspace-chat-card-link workspace-chat-card-link-error">
+            <span
+              v-else
+              class="workspace-chat-card-link workspace-chat-card-link-error inline-block max-w-full mt-1.25 py-1 px-2 overflow-hidden border border-blue-200 rounded-full bg-blue-50 text-red-700 font-bold text-ellipsis whitespace-nowrap"
+            >
               ▣ 카드 삭제됨
             </span>
           </div>
@@ -462,20 +488,43 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <p v-if="error" class="workspace-chat-error" role="alert">
+    <p
+      v-if="error"
+      class="workspace-chat-error mt-0 py-1.75 px-3.5 bg-red-50 text-red-700"
+      role="alert"
+    >
       {{ error }}
     </p>
 
-    <form class="workspace-chat-composer" @submit.prevent="sendMessage">
-      <p v-if="cardLinkError" class="workspace-chat-card-link-error" role="alert">
+    <form
+      class="workspace-chat-composer relative pt-2.5 px-3 pb-3 border-t border-gray-200 bg-white"
+      @submit.prevent="sendMessage"
+    >
+      <p v-if="cardLinkError" class="workspace-chat-card-link-error text-red-700" role="alert">
         {{ cardLinkError }}
       </p>
-      <div v-if="selectedCard" class="workspace-chat-selected-card">
-        <span>▣ {{ selectedCard.title }}</span>
-        <button type="button" aria-label="카드 연결 해제" @click="selectedCardId = null">×</button>
-        <small>이 메시지는 카드 댓글에도 기록됩니다.</small>
+      <div
+        v-if="selectedCard"
+        class="workspace-chat-selected-card flex items-center gap-1.5 mb-1.75 py-1.75 px-2.25 rounded-lg bg-blue-50 text-blue-700 font-bold"
+      >
+        <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+          >▣ {{ selectedCard.title }}</span
+        >
+        <button
+          type="button"
+          class="border-0 bg-transparent text-blue-700 text-base"
+          aria-label="카드 연결 해제"
+          @click="selectedCardId = null"
+        >
+          ×
+        </button>
+        <small
+          class="workspace-chat-selected-card-hint ml-auto text-slate-500 font-medium whitespace-nowrap"
+        >
+          이 메시지는 카드 댓글에도 기록됩니다.
+        </small>
       </div>
-      <div class="workspace-chat-input-drop-region">
+      <div class="workspace-chat-input-drop-region relative">
         <textarea
           ref="composerInput"
           v-model="content"
@@ -491,7 +540,7 @@ onUnmounted(() => {
           class="workspace-chat-card-drop-hint"
           role="status"
         >
-          <strong>
+          <strong class="text-xs">
             {{ cardDropPending ? '카드를 확인하는 중…' : '카드를 댓글에 연결' }}
           </strong>
           <span>
@@ -503,11 +552,11 @@ onUnmounted(() => {
           </span>
         </div>
       </div>
-      <div class="workspace-chat-composer-actions">
-        <div class="workspace-chat-card-picker">
+      <div class="workspace-chat-composer-actions flex items-center justify-between gap-2 mt-1.75">
+        <div class="workspace-chat-card-picker relative">
           <button
             type="button"
-            class="chat-attach-button"
+            class="chat-attach-button border-0 font-bold py-1.75 px-2.25 bg-slate-100 text-slate-600 disabled:cursor-default disabled:opacity-50"
             :aria-expanded="pickerOpen"
             :disabled="cardsLoading || sending"
             @click="toggleCardPicker"
@@ -515,18 +564,30 @@ onUnmounted(() => {
             ▣ 카드 연결
           </button>
           <div v-if="pickerOpen" class="workspace-chat-card-options">
-            <p v-if="cards.length === 0">
+            <p v-if="cards.length === 0" class="m-0 p-3 text-slate-500 text-xs">
               {{ cardsLoading ? '카드를 불러오는 중…' : '연결할 카드가 없습니다.' }}
             </p>
-            <button v-for="card in cards" :key="card.id" type="button" @click="chooseCard(card.id)">
-              <span>{{ card.title }}</span>
-              <small>{{ card.listName }}</small>
+            <button
+              v-for="card in cards"
+              :key="card.id"
+              type="button"
+              class="workspace-chat-card-option-btn w-full py-2 px-2.25 border-0 bg-transparent text-left hover:bg-blue-50"
+              @click="chooseCard(card.id)"
+            >
+              <span
+                class="block overflow-hidden text-ellipsis whitespace-nowrap text-gray-800 text-xs font-semibold"
+                >{{ card.title }}</span
+              >
+              <small
+                class="workspace-chat-card-option-list block overflow-hidden text-ellipsis whitespace-nowrap mt-0.5 text-slate-400"
+                >{{ card.listName }}</small
+              >
             </button>
           </div>
         </div>
         <button
           type="submit"
-          class="chat-send-button"
+          class="chat-send-button border-0 font-bold py-1.75 px-3 bg-blue-600 text-white disabled:cursor-default disabled:opacity-50"
           :disabled="loading || sending || !content.trim()"
         >
           {{ sending ? '전송 중…' : '보내기' }}

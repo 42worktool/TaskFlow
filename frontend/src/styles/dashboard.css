@@ -41,13 +41,6 @@
   font-size: 14px;
 }
 
-.dashboard-header__actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
 .dashboard-period-picker {
   height: 38px;
   display: inline-flex;

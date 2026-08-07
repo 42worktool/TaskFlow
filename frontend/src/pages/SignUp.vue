@@ -48,7 +48,7 @@ async function signup() {
   <AuthLayout>
     <AppLogo tagline="새 계정 만들기" />
 
-    <form class="auth-form" @submit.prevent="signup">
+    <form class="auth-form flex flex-col gap-2.5 mb-4" @submit.prevent="signup">
       <AuthInput
         v-model="name"
         type="text"
@@ -87,23 +87,27 @@ async function signup() {
         :maxlength="128"
         :disabled="submitting"
       />
-      <p v-if="passwordError" class="auth-error">{{ passwordError }}</p>
-      <p v-if="formError" class="auth-error" role="alert">{{ formError }}</p>
-      <p class="legal-consent">
-        회원가입하면 <RouterLink to="/terms">서비스 이용약관</RouterLink> 및
-        <RouterLink to="/privacy">개인정보처리방침</RouterLink>에 동의하게 됩니다.
+      <p v-if="passwordError" class="auth-error text-red-500 -mt-0.5">{{ passwordError }}</p>
+      <p v-if="formError" class="auth-error text-red-500 -mt-0.5" role="alert">{{ formError }}</p>
+      <p class="mt-0.5 text-gray-500 text-xs leading-normal text-center">
+        회원가입하면 <RouterLink to="/terms" class="text-blue-600">서비스 이용약관</RouterLink> 및
+        <RouterLink to="/privacy" class="text-blue-600">개인정보처리방침</RouterLink>에 동의하게
+        됩니다.
       </p>
-      <button type="submit" class="auth-submit" :disabled="submitting">
+      <button
+        type="submit"
+        class="auth-submit p-3.25 bg-blue-600 text-white border-none rounded-lg font-semibold cursor-pointer mt-1 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-65 disabled:hover:bg-blue-600"
+        :disabled="submitting"
+      >
         {{ submitting ? '가입 중…' : '회원가입' }}
       </button>
     </form>
 
-    <p class="auth-switch-link">
+    <p class="auth-switch-link text-center text-gray-500">
       이미 계정이 있으신가요?
-      <RouterLink :to="signinLocation">로그인 →</RouterLink>
+      <RouterLink :to="signinLocation" class="text-blue-600 font-medium">로그인 →</RouterLink>
     </p>
   </AuthLayout>
 </template>
 
-<style scoped src="../styles/sign-up.css"></style>
 <style scoped src="../styles/auth-form.css"></style>

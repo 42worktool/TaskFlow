@@ -56,18 +56,26 @@ async function loginWithEmail() {
   <AuthLayout>
     <AppLogo tagline="팀 업무를 한눈에 관리하세요" />
 
-    <p v-if="oauthError" class="auth-message auth-message--error" role="alert">
+    <p
+      v-if="oauthError"
+      class="auth-message mb-3 py-2.5 px-3 rounded-lg bg-red-50 text-red-700"
+      role="alert"
+    >
       {{ oauthError }}
     </p>
 
-    <div class="oauth-section">
+    <div class="oauth-section flex flex-col gap-2.5 mb-5">
       <button
         type="button"
-        class="oauth-btn oauth-google"
+        class="oauth-btn oauth-google flex items-center justify-center gap-2.5 p-3 rounded-lg text-sm font-medium cursor-pointer border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-65"
         :disabled="submitting"
         @click="loginWithGoogle"
       >
-        <svg class="google-icon" viewBox="0 0 18 18" aria-hidden="true">
+        <svg
+          class="google-icon w-4.5 h-4.5 shrink-0 grow-0 basis-4.5"
+          viewBox="0 0 18 18"
+          aria-hidden="true"
+        >
           <path
             fill="#4285F4"
             d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62Z"
@@ -89,9 +97,9 @@ async function loginWithEmail() {
       </button>
     </div>
 
-    <div class="divider">또는</div>
+    <div class="divider flex items-center gap-3 text-gray-400 mb-5">또는</div>
 
-    <form class="auth-form" @submit.prevent="loginWithEmail">
+    <form class="auth-form flex flex-col gap-2.5 mb-4" @submit.prevent="loginWithEmail">
       <AuthInput
         v-model="email"
         type="email"
@@ -108,17 +116,25 @@ async function loginWithEmail() {
         placeholder="비밀번호"
         :disabled="submitting"
       />
-      <p v-if="formError" class="auth-message auth-message--error" role="alert">
+      <p
+        v-if="formError"
+        class="auth-message mb-3 py-2.5 px-3 rounded-lg bg-red-50 text-red-700"
+        role="alert"
+      >
         {{ formError }}
       </p>
-      <button type="submit" class="auth-submit" :disabled="submitting">
+      <button
+        type="submit"
+        class="auth-submit p-3.25 bg-blue-600 text-white border-none rounded-lg font-semibold cursor-pointer mt-1 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-65 disabled:hover:bg-blue-600"
+        :disabled="submitting"
+      >
         {{ submitting ? '로그인 중…' : '이메일로 로그인' }}
       </button>
     </form>
 
-    <p class="auth-switch-link">
+    <p class="auth-switch-link text-center text-gray-500">
       계정이 없으신가요?
-      <RouterLink :to="signupLocation">회원가입 →</RouterLink>
+      <RouterLink :to="signupLocation" class="text-blue-600 font-medium">회원가입 →</RouterLink>
     </p>
   </AuthLayout>
 </template>
