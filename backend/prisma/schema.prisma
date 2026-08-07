@@ -301,6 +301,7 @@ model Attachment {
 
   card Card @relation(fields: [card_id], references: [id], onDelete: Cascade)
 
+  @@index([card_id])
   @@map("Attachments")
 }
 
