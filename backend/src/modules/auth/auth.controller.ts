@@ -64,6 +64,7 @@ export const signup: RequestHandler = async (req, res) => {
     name: req.body?.name,
     email: req.body?.email,
     password: req.body?.password,
+    clientIp: req.ip || req.socket.remoteAddress || 'unknown',
   })
   await sendAuthenticatedUser(res, user, 201)
 }

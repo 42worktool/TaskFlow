@@ -3,7 +3,7 @@ import LegalDocumentLayout from '../layouts/LegalDocumentLayout.vue'
 </script>
 
 <template>
-  <LegalDocumentLayout title="이용약관">
+  <LegalDocumentLayout title="이용약관" effective-date="2026년 8월 7일">
     <h2>1. 서비스 목적</h2>
     <p>TaskFlow는 학습 및 기능 시연을 위한 협업 도구 프로젝트입니다.</p>
 
@@ -26,10 +26,17 @@ import LegalDocumentLayout from '../layouts/LegalDocumentLayout.vue'
       있습니다. 중요한 자료의 영구 보관 용도로 사용하지 마세요.
     </p>
 
-    <h2>5. 계정 해지</h2>
+    <h2>5. IP 주소 수집</h2>
+    <p>
+      회원가입 및 로그인 시 악성 자동화 요청을 방지하기 위해 요청자의 IP 주소를 해시 처리하여
+      일시적으로(최대 15분) 저장합니다. 수집된 정보는 보안 목적으로만 사용되며, 그 외의 용도로
+      이용되거나 외부에 제공되지 않습니다.
+    </p>
+
+    <h2>6. 계정 해지</h2>
     <p>사용자는 계정 설정에서 언제든지 계정을 삭제하고 이용을 종료할 수 있습니다.</p>
 
-    <h2>6. 책임 제한</h2>
+    <h2>7. 책임 제한</h2>
     <p>
       서비스는 학습 목적으로 현재 상태 그대로 제공됩니다. 법령이 허용하는 범위에서 서비스의 중단,
       데이터 손실 또는 이용으로 발생한 간접 손해를 보증하지 않습니다.

@@ -7,6 +7,7 @@ import { prisma } from '../../db'
 import { signAccessToken } from '../../lib/access-token'
 import { getRedisClient } from '../../lib/redis'
 import { deleteUploadedFile } from '../../lib/upload'
+import { checkSignupRateLimit } from '../../lib/signup-rate-limiter'
 import { normalizedEmailSchema, normalizeEmail } from '../../lib/validation'
 import { hashPassword, accountName, safeEqual, safeReturnTo, verifyPassword } from './auth.utils'
 
@@ -86,7 +87,10 @@ export async function registerWithPassword(input: {
   name: unknown
   email: unknown
   password: unknown
+  clientIp: string
 }): Promise<UserPublic> {
+  await checkSignupRateLimit(input.clientIp)
+
   const name = accountName(input.name)
   const email = registrationEmail(input.email)
   const password = registrationPassword(input.password)
