@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ProfileAPI, type PublicProfile } from '../api/profile'
+import type { PublicProfile } from '../api/profile'
+import { SearchAPI } from '../api/search'
 import {
   criteriaFromRouteQuery,
   criteriaToRouteQuery,
@@ -194,7 +195,7 @@ watch(
     peopleLoading.value = true
     peopleSearchTimer = setTimeout(async () => {
       try {
-        const users = await ProfileAPI.search(text, workspaceId)
+        const users = await SearchAPI.users(text, workspaceId, 5)
         if (requestVersion !== peopleRequestVersion) return
         peopleSuggestions.value = users
       } catch {

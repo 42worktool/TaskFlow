@@ -3,21 +3,17 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import { LabelAPI } from '../api/label'
-import { ListAPI } from '../api/list'
-import { ProfileAPI, type PublicProfile } from '../api/profile'
+import { SearchAPI, type SearchResult } from '../api/search'
 import { WorkspaceAPI } from '../api/workspace'
 import { workspaceColor } from '../types'
-import type { Label, ListWithCards, Workspace } from '../types'
+import type { Label, Workspace } from '../types'
 import {
-  compareSearchSortValues,
   criteriaFromRouteQuery,
   criteriaToRouteQuery,
-  matchesSearchText,
   paginationPages,
   type AdvancedSearchCriteria,
   type SearchCategory,
   type SearchSort,
-  type SearchSortValue,
 } from '../utils/searchQuery'
 
 const PAGE_SIZE = 10
@@ -25,17 +21,18 @@ const PAGE_SIZE = 10
 const route = useRoute()
 const router = useRouter()
 const allWorkspaces = ref<Workspace[]>([])
-const lists = ref<ListWithCards[]>([])
 const workspaceLabels = ref<Label[]>([])
-const searchedUsers = ref<PublicProfile[]>([])
+const searchResults = ref<SearchResult[]>([])
+const totalResults = ref(0)
+const totalPages = ref(1)
 const loading = ref(true)
 const labelsLoading = ref(false)
-const usersLoading = ref(false)
+const searchLoading = ref(false)
 const loadError = ref('')
 const labelLoadError = ref('')
-const userLoadError = ref('')
+const searchError = ref('')
 let labelRequestVersion = 0
-let userRequestVersion = 0
+let searchRequestVersion = 0
 
 const criteria = computed(() =>
   criteriaFromRouteQuery({
@@ -53,12 +50,6 @@ const hasSearchIntent = computed(
     Boolean(criteria.value.text || criteria.value.workspace || criteria.value.label) ||
     criteria.value.category !== 'all',
 )
-
-function matchesScope(scope: string | null, id: string, name: string): boolean {
-  if (!scope) return true
-  const normalized = scope.toLocaleLowerCase()
-  return id === scope || name.toLocaleLowerCase().includes(normalized)
-}
 
 function resolveWorkspace(scope: string | null): Workspace | null {
   if (!scope) return null
@@ -97,163 +88,29 @@ const labelFilterUnavailable = computed(
   () => criteria.value.category === 'workspace' || criteria.value.category === 'user',
 )
 
-const workspaceResults = computed(() => {
-  if (
-    criteria.value.category === 'card' ||
-    criteria.value.category === 'user' ||
-    hasLabelScope.value
-  )
-    return []
-  return allWorkspaces.value.filter(
-    (workspace) =>
-      matchesScope(criteria.value.workspace, workspace.id, workspace.name) &&
-      matchesSearchText(
-        [workspace.name, ...workspace.members.map((member) => member.user.name)],
-        criteria.value.text,
-      ),
-  )
-})
+const workspaceResults = computed(() =>
+  searchResults.value.flatMap((item) => (item.kind === 'workspace' ? [item] : [])),
+)
+const cardResults = computed(() =>
+  searchResults.value.flatMap((item) =>
+    item.kind === 'card'
+      ? [
+          {
+            card: item,
+            list: item.list,
+            workspace: item.workspace,
+          },
+        ]
+      : [],
+  ),
+)
+const userResults = computed(() =>
+  searchResults.value.flatMap((item) => (item.kind === 'user' ? [item] : [])),
+)
 
-const cardResults = computed(() => {
-  if (criteria.value.category === 'workspace' || criteria.value.category === 'user') return []
-
-  return lists.value.flatMap((list) => {
-    const workspace = allWorkspaces.value.find((item) => item.id === list.workspace_id)
-    if (!workspace) return []
-
-    const workspaceMatches = selectedWorkspace.value
-      ? workspace.id === selectedWorkspace.value.id
-      : matchesScope(criteria.value.workspace, workspace.id, workspace.name)
-    if (!workspaceMatches) return []
-
-    return list.cards
-      .filter((card) => {
-        const labels = card.labels ?? []
-        const labelMatches = hasLabelScope.value
-          ? Boolean(
-              selectedLabel.value &&
-              labels.some((label) => label.label_id === selectedLabel.value?.id),
-            )
-          : true
-        if (!labelMatches) return false
-
-        return matchesSearchText(
-          [
-            card.title,
-            card.description,
-            list.name,
-            workspace.name,
-            ...labels.map((label) => label.label_name),
-          ],
-          criteria.value.text,
-        )
-      })
-      .map((card) => ({ card, list, workspace }))
-  })
-})
-
-const userResults = computed(() => {
-  if (
-    criteria.value.category === 'workspace' ||
-    criteria.value.category === 'card' ||
-    hasLabelScope.value
-  )
-    return []
-  if (criteria.value.workspace && !selectedWorkspace.value) return []
-  if (!selectedWorkspace.value) return searchedUsers.value
-
-  const memberIds = new Set(selectedWorkspace.value.members.map((member) => member.user_id))
-  return searchedUsers.value.filter((user) => memberIds.has(user.id))
-})
-
-type SearchResultItem =
-  | {
-      kind: 'workspace'
-      key: string
-      workspace: Workspace
-      sortValue: SearchSortValue
-    }
-  | {
-      kind: 'card'
-      key: string
-      result: (typeof cardResults.value)[number]
-      sortValue: SearchSortValue
-    }
-  | {
-      kind: 'user'
-      key: string
-      user: PublicProfile
-      sortValue: SearchSortValue
-    }
-
-const sortedResults = computed<SearchResultItem[]>(() => {
-  const results: SearchResultItem[] = [
-    ...workspaceResults.value.map((workspace): SearchResultItem => ({
-      kind: 'workspace',
-      key: `workspace:${workspace.id}`,
-      workspace,
-      sortValue: {
-        name: workspace.name,
-        createdAt: workspace.updated_at,
-        searchable: [workspace.name, ...workspace.members.map((member) => member.user.name)],
-      },
-    })),
-    ...cardResults.value.map((result): SearchResultItem => ({
-      kind: 'card',
-      key: `card:${result.card.id}`,
-      result,
-      sortValue: {
-        name: result.card.title,
-        createdAt: result.card.created_at,
-        searchable: [
-          result.card.title,
-          result.card.description,
-          result.list.name,
-          result.workspace.name,
-          ...(result.card.labels ?? []).map((label) => label.label_name),
-        ],
-      },
-    })),
-    ...userResults.value.map((user): SearchResultItem => ({
-      kind: 'user',
-      key: `user:${user.id}`,
-      user,
-      sortValue: {
-        name: user.name,
-        createdAt: user.created_at,
-        searchable: [user.name, user.headline],
-      },
-    })),
-  ]
-
-  return results.sort(
-    (left, right) =>
-      compareSearchSortValues(
-        left.sortValue,
-        right.sortValue,
-        criteria.value.sort,
-        criteria.value.text,
-      ) || left.key.localeCompare(right.key),
-  )
-})
-
-const totalResults = computed(() => sortedResults.value.length)
-const pageCount = computed(() => Math.max(1, Math.ceil(totalResults.value / PAGE_SIZE)))
+const pageCount = computed(() => totalPages.value)
 const currentPage = computed(() => Math.min(criteria.value.page, pageCount.value))
 const pageNumbers = computed(() => paginationPages(currentPage.value, pageCount.value))
-const pagedResults = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return sortedResults.value.slice(start, start + PAGE_SIZE)
-})
-const pagedWorkspaceResults = computed(() =>
-  pagedResults.value.flatMap((item) => (item.kind === 'workspace' ? [item.workspace] : [])),
-)
-const pagedCardResults = computed(() =>
-  pagedResults.value.flatMap((item) => (item.kind === 'card' ? [item.result] : [])),
-)
-const pagedUserResults = computed(() =>
-  pagedResults.value.flatMap((item) => (item.kind === 'user' ? [item.user] : [])),
-)
 const firstResultNumber = computed(() =>
   totalResults.value === 0 ? 0 : (currentPage.value - 1) * PAGE_SIZE + 1,
 )
@@ -329,10 +186,6 @@ async function loadSearchData() {
   try {
     const workspaces = await WorkspaceAPI.list()
     allWorkspaces.value = [...workspaces.my, ...workspaces.public]
-    const workspaceLists = await Promise.all(
-      allWorkspaces.value.map((workspace) => ListAPI.listByWorkspace(workspace.id)),
-    )
-    lists.value = workspaceLists.flat()
   } catch (caught) {
     loadError.value =
       caught instanceof Error ? caught.message : '검색 데이터를 불러오지 못했습니다.'
@@ -376,46 +229,75 @@ watch([loading, () => criteria.value.label, selectedWorkspace], ([isLoading, lab
 
 watch(
   [
+    loading,
+    labelsLoading,
+    hasSearchIntent,
     query,
     () => criteria.value.category,
-    hasLabelScope,
+    () => criteria.value.sort,
+    () => criteria.value.page,
     () => selectedWorkspace.value?.id ?? null,
+    () => selectedLabel.value?.id ?? null,
     () => criteria.value.workspace,
+    () => criteria.value.label,
   ],
-  async ([text, category, labelScoped, workspaceId, workspaceScope]) => {
-    const requestVersion = ++userRequestVersion
-    searchedUsers.value = []
-    userLoadError.value = ''
+  async ([
+    metadataLoading,
+    currentLabelsLoading,
+    searchIntent,
+    text,
+    category,
+    sort,
+    page,
+    workspaceId,
+    labelId,
+    workspaceScope,
+    labelScope,
+  ]) => {
+    const requestVersion = ++searchRequestVersion
+    searchResults.value = []
+    totalResults.value = 0
+    totalPages.value = 1
+    searchError.value = ''
     if (
-      !text ||
-      (category !== 'all' && category !== 'user') ||
-      labelScoped ||
-      (workspaceScope && !workspaceId)
+      metadataLoading ||
+      !searchIntent ||
+      (workspaceScope && !workspaceId) ||
+      (labelScope && (currentLabelsLoading || !labelId))
     ) {
-      usersLoading.value = false
+      searchLoading.value = false
       return
     }
 
-    usersLoading.value = true
+    searchLoading.value = true
     try {
-      const users = await ProfileAPI.search(text, workspaceId ?? undefined)
-      if (requestVersion !== userRequestVersion) return
-      searchedUsers.value = users
+      const response = await SearchAPI.search({
+        query: text,
+        type: category,
+        workspaceId: workspaceId ?? undefined,
+        labelId: labelId ?? undefined,
+        sort,
+        page,
+        limit: PAGE_SIZE,
+      })
+      if (requestVersion !== searchRequestVersion) return
+      searchResults.value = response.items
+      totalResults.value = response.total
+      totalPages.value = response.total_pages
     } catch (caught) {
-      if (requestVersion !== userRequestVersion) return
-      userLoadError.value =
-        caught instanceof Error ? caught.message : '사용자를 검색하지 못했습니다.'
+      if (requestVersion !== searchRequestVersion) return
+      searchError.value = caught instanceof Error ? caught.message : '검색하지 못했습니다.'
     } finally {
-      if (requestVersion === userRequestVersion) usersLoading.value = false
+      if (requestVersion === searchRequestVersion) searchLoading.value = false
     }
   },
   { immediate: true },
 )
 
 watch(
-  [loading, usersLoading, pageCount, () => criteria.value.page],
-  ([searchLoading, peopleLoading, availablePages, requestedPage]) => {
-    if (!searchLoading && !peopleLoading && requestedPage > availablePages) {
+  [loading, searchLoading, pageCount, () => criteria.value.page],
+  ([metadataLoading, resultsLoading, availablePages, requestedPage]) => {
+    if (!metadataLoading && !resultsLoading && requestedPage > availablePages) {
       updateCriteria({ page: availablePages })
     }
   },
@@ -570,11 +452,11 @@ onMounted(() => {
       </div>
 
       <div v-if="loadError" class="empty-state" role="alert">{{ loadError }}</div>
-      <div v-else-if="loading || usersLoading" class="empty-state" role="status">
+      <div v-else-if="loading || searchLoading" class="empty-state" role="status">
         검색 데이터를 불러오는 중…
       </div>
-      <div v-else-if="userLoadError && !hasResults" class="empty-state" role="alert">
-        {{ userLoadError }}
+      <div v-else-if="searchError && !hasResults" class="empty-state" role="alert">
+        {{ searchError }}
       </div>
       <div v-else-if="!hasSearchIntent" class="empty-state">
         상단 검색창에 키워드를 입력하거나 카테고리·범위 필터를 선택하세요.
@@ -588,14 +470,13 @@ onMounted(() => {
       </div>
 
       <template v-else>
-        <section v-if="pagedWorkspaceResults.length" class="result-section">
+        <section v-if="workspaceResults.length" class="result-section">
           <div class="section-header">
             <h2 class="section-title">워크스페이스</h2>
-            <span class="result-count">{{ workspaceResults.length }}</span>
           </div>
           <div class="result-list">
             <RouterLink
-              v-for="workspace in pagedWorkspaceResults"
+              v-for="workspace in workspaceResults"
               :key="workspace.id"
               :to="`/workspaces/${workspace.id}/board`"
               class="result-row"
@@ -605,7 +486,7 @@ onMounted(() => {
                 <p class="result-title">{{ workspace.name }}</p>
                 <p class="result-meta">
                   {{ workspace.is_public ? '공개 워크스페이스' : '비공개 워크스페이스' }} · 멤버
-                  {{ workspace.members.length }}명
+                  {{ workspace.member_count }}명
                 </p>
               </div>
               <span class="result-arrow">→</span>
@@ -613,14 +494,13 @@ onMounted(() => {
           </div>
         </section>
 
-        <section v-if="pagedCardResults.length" class="result-section">
+        <section v-if="cardResults.length" class="result-section">
           <div class="section-header">
             <h2 class="section-title">카드</h2>
-            <span class="result-count">{{ cardResults.length }}</span>
           </div>
           <div class="result-list">
             <RouterLink
-              v-for="result in pagedCardResults"
+              v-for="result in cardResults"
               :key="result.card.id"
               :to="{
                 path: `/workspaces/${result.workspace.id}/board`,
@@ -652,15 +532,14 @@ onMounted(() => {
           </div>
         </section>
 
-        <section v-if="pagedUserResults.length" class="result-section">
+        <section v-if="userResults.length" class="result-section">
           <div class="section-header">
             <h2 class="section-title">사람</h2>
-            <span class="result-count">{{ userResults.length }}</span>
           </div>
-          <div v-if="userLoadError" class="section-empty" role="alert">{{ userLoadError }}</div>
+          <div v-if="searchError" class="section-empty" role="alert">{{ searchError }}</div>
           <div v-else class="result-list result-list--people">
             <RouterLink
-              v-for="user in pagedUserResults"
+              v-for="user in userResults"
               :key="user.id"
               :to="`/profiles/${user.id}`"
               class="result-row result-person-row"

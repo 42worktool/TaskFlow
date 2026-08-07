@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { FriendAPI } from '../api/friend'
-import { ProfileAPI, type PublicProfile } from '../api/profile'
+import type { PublicProfile } from '../api/profile'
+import { SearchAPI } from '../api/search'
 import PersonAvatar from './PersonAvatar.vue'
 import { authState } from '../services/auth'
 import { realtime } from '../services/realtime'
@@ -63,7 +64,7 @@ watch([friendSearchQuery, loading], ([value, isLoading]) => {
   friendSearchLoading.value = true
   friendSearchTimer = setTimeout(async () => {
     try {
-      const profiles = await ProfileAPI.search(query)
+      const profiles = await SearchAPI.users(query)
       if (version !== friendSearchVersion) return
       friendSearchResults.value = profiles
     } catch {
