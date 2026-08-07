@@ -1,4 +1,4 @@
-*This project has been created as part of the 42 curriculum by ynam, chakim, yeonjuki, injo, wchoe.*
+_This project has been created as part of the 42 curriculum by seungjuk, chakim, yeonjuki, injo, wchoe._
 
 # TaskFlow
 
@@ -93,23 +93,28 @@ installation is only needed when running tests outside Docker.
 cp .env.dev.example .env.dev
 ```
 
-Set every non-default value in `.env.dev`:
+Review the values in `.env.dev` or `.env.prod` and replace every credential or
+deployment-specific placeholder:
 
-| Variable | Purpose |
-| --- | --- |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Credentials for the environment-specific PostgreSQL container |
-| `DATABASE_URL` | Backend connection URL using the same PostgreSQL credentials |
-| `GOOGLE_CLIENT_ID` | Google OAuth web client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `GOOGLE_REDIRECT_URI` | Exact registered callback; local default is `https://localhost:4430/oauth/google` |
-| `APP_ORIGIN` | Canonical browser origin; local default is `https://localhost:4430` |
-| `JWT_ACCESS_SECRET` | Random secret of at least 32 characters |
-| `SMTP_HOST`, `SMTP_PORT` | SMTP server and port |
-| `SMTP_USER`, `SMTP_PASS` | SMTP credentials |
-| `SMTP_FROM` | Sender shown on invitation messages |
-| `OAUTH_AUTO_LINK_VERIFIED_EMAIL` | Toy-project option for linking a verified Google email to an existing local user |
-| `WS_*` | Optional WebSocket timeout, heartbeat, payload, and rate-limit tuning |
-| `ALLOW_DB_SEED` | Explicit development-only seed guard; keep this `false` in production |
+| Variable                                            | Purpose                                                                                               |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                          | Runtime mode; use `development` locally and `production` in deployment                                |
+| `HTTPS_PORT`                                        | Host port exposed by the Nginx HTTPS entrypoint                                                       |
+| `TLS_CERT_DIR`                                      | Production host directory containing `fullchain.pem` and `privkey.pem`; defaults to `./.taskflow/tls` |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Credentials for the environment-specific PostgreSQL container                                         |
+| `DATABASE_URL`                                      | Backend connection URL using the same PostgreSQL credentials                                          |
+| `GOOGLE_CLIENT_ID`                                  | Google OAuth web client ID                                                                            |
+| `GOOGLE_CLIENT_SECRET`                              | Google OAuth client secret                                                                            |
+| `GOOGLE_REDIRECT_URI`                               | Exact registered callback; local default is `https://localhost:4430/oauth/google`                     |
+| `APP_ORIGIN`                                        | Canonical browser origin; local default is `https://localhost:4430`                                   |
+| `JWT_ACCESS_SECRET`                                 | Random secret of at least 32 characters                                                               |
+| `SMTP_HOST`, `SMTP_PORT`                            | SMTP server and port                                                                                  |
+| `SMTP_USER`, `SMTP_PASS`                            | SMTP credentials                                                                                      |
+| `SMTP_FROM`                                         | Sender shown on invitation messages                                                                   |
+| `OAUTH_AUTO_LINK_VERIFIED_EMAIL`                    | Toy-project option for linking a verified Google email to an existing local user                      |
+| `WS_*`                                              | Optional WebSocket timeout, heartbeat, payload, and rate-limit tuning                                 |
+| `ALLOW_DB_SEED`                                     | Explicit development-only seed guard; keep this `false` in production                                 |
+| `DEV_SEED_EMAIL`, `DEV_SEED_PASSWORD`               | Development fixture owner login and shared fixture password; used only when seeding is enabled        |
 
 A suitable development JWT secret can be generated with:
 
@@ -153,13 +158,13 @@ upcoming work remain visible.
 
 All fixture accounts use `DEV_SEED_PASSWORD` from `.env.dev`:
 
-| Role/scenario | Email |
-| --- | --- |
-| Product workspace `OWNER` | Value of `DEV_SEED_EMAIL` (`dev@local.test` by default) |
-| Product workspace `ADMIN` | `alex.admin@local.test` |
-| Product workspace `MEMBER` | `mina.member@local.test` |
-| Product workspace `VIEWER` | `joon.viewer@local.test` |
-| Public non-member and pending request | `guest.pending@local.test` |
+| Role/scenario                         | Email                                                   |
+| ------------------------------------- | ------------------------------------------------------- |
+| Product workspace `OWNER`             | Value of `DEV_SEED_EMAIL` (`dev@local.test` by default) |
+| Product workspace `ADMIN`             | `alex.admin@local.test`                                 |
+| Product workspace `MEMBER`            | `mina.member@local.test`                                |
+| Product workspace `VIEWER`            | `joon.viewer@local.test`                                |
+| Public non-member and pending request | `guest.pending@local.test`                              |
 
 Repeated seed runs restore fixed fixture records without deleting unrelated
 user-created workspaces or cards. They do reset activity history for the two
@@ -251,13 +256,13 @@ environment running the suite must allow loopback port binding.
 
 Workspace permissions are deliberately small:
 
-| Role | Read board | Workspace chat | Edit lists/cards | Invite/manage members | Edit workspace | Delete workspace |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Public non-member | Yes | No | No | No | No | No |
-| `VIEWER` | Yes | Yes | No | No | No | No |
-| `MEMBER` | Yes | Yes | Yes | No | No | No |
-| `ADMIN` | Yes | Yes | Yes | Yes | Yes | No |
-| `OWNER` | Yes | Yes | Yes | Yes | Yes | Yes |
+| Role              | Read board | Workspace chat | Edit lists/cards | Invite/manage members | Edit workspace | Delete workspace |
+| ----------------- | :--------: | :------------: | :--------------: | :-------------------: | :------------: | :--------------: |
+| Public non-member |    Yes     |       No       |        No        |          No           |       No       |        No        |
+| `VIEWER`          |    Yes     |      Yes       |        No        |          No           |       No       |        No        |
+| `MEMBER`          |    Yes     |      Yes       |       Yes        |          No           |       No       |        No        |
+| `ADMIN`           |    Yes     |      Yes       |       Yes        |          Yes          |      Yes       |        No        |
+| `OWNER`           |    Yes     |      Yes       |       Yes        |          Yes          |      Yes       |       Yes        |
 
 OWNER and ADMIN can assign `ADMIN`, `MEMBER`, or `VIEWER` to eligible
 non-owner members from the team-management dialog. The OWNER role itself is
@@ -267,20 +272,20 @@ owner.
 
 ## Technical stack
 
-| Area | Technology | Why it was selected |
-| --- | --- | --- |
-| Frontend | Vue 3, TypeScript, Vite, Vue Router | Small component model, strong typing, and fast prototype iteration |
-| Styling | Tailwind CSS plus project CSS | Fast layout work while keeping reusable component styles |
-| Board interaction | `vuedraggable` | Browser drag-and-drop with a small Vue integration surface |
-| Backend | Express 5, TypeScript, Zod | Minimal HTTP framework with explicit validation and readable services |
-| Realtime | `ws` with a versioned JSON envelope | Direct control over authentication, heartbeat, routing, and future event handlers |
-| ORM | Prisma | Typed PostgreSQL queries, migrations, relations, and transactions |
-| Durable storage | PostgreSQL 15 | Relational integrity for workspaces, roles, boards, and audit data |
-| Ephemeral storage | Redis 7 | Refresh sessions, mail queue, and invitation throttling |
-| Authentication | JWT, Node `scrypt`, Google OAuth/OIDC | Stateless access checks plus revocable sessions and social login |
-| Email | Nodemailer | Provider-neutral SMTP invitation delivery |
-| Edge/runtime | Nginx and Docker Compose | One HTTPS/WSS entrypoint and reproducible local services |
-| Testing | Node test runner and Vitest | Lightweight backend integration/unit tests and frontend behavior tests |
+| Area              | Technology                            | Why it was selected                                                               |
+| ----------------- | ------------------------------------- | --------------------------------------------------------------------------------- |
+| Frontend          | Vue 3, TypeScript, Vite, Vue Router   | Small component model, strong typing, and fast prototype iteration                |
+| Styling           | Tailwind CSS plus project CSS         | Fast layout work while keeping reusable component styles                          |
+| Board interaction | `vuedraggable`                        | Browser drag-and-drop with a small Vue integration surface                        |
+| Backend           | Express 5, TypeScript, Zod            | Minimal HTTP framework with explicit validation and readable services             |
+| Realtime          | `ws` with a versioned JSON envelope   | Direct control over authentication, heartbeat, routing, and future event handlers |
+| ORM               | Prisma                                | Typed PostgreSQL queries, migrations, relations, and transactions                 |
+| Durable storage   | PostgreSQL 15                         | Relational integrity for workspaces, roles, boards, and audit data                |
+| Ephemeral storage | Redis 7                               | Refresh sessions, mail queue, and invitation throttling                           |
+| Authentication    | JWT, Node `scrypt`, Google OAuth/OIDC | Stateless access checks plus revocable sessions and social login                  |
+| Email             | Nodemailer                            | Provider-neutral SMTP invitation delivery                                         |
+| Edge/runtime      | Nginx and Docker Compose              | One HTTPS/WSS entrypoint and reproducible local services                          |
+| Testing           | Node test runner and Vitest           | Lightweight backend integration/unit tests and frontend behavior tests            |
 
 ## Database schema
 
@@ -292,8 +297,6 @@ erDiagram
     WORKSPACE ||--o{ BOARD_LIST : contains
     BOARD_LIST ||--o{ CARD : contains
     USER ||--o{ CARD : owns_inbox
-    USER ||--o{ CARD_MEMBER : assigned
-    CARD ||--o{ CARD_MEMBER : has
     WORKSPACE ||--o{ LABEL : defines
     LABEL ||--o{ CARD_LABEL : tags
     CARD ||--o{ CARD_LABEL : tagged
@@ -304,6 +307,9 @@ erDiagram
     USER ||--o{ FRIEND_REQUEST : participates
     USER ||--o{ WORKSPACE_MESSAGE : writes
     WORKSPACE ||--o{ WORKSPACE_MESSAGE : contains
+    CARD o|--o{ WORKSPACE_MESSAGE : linked_from
+    USER ||--o{ DIRECT_MESSAGE : sends
+    USER ||--o{ DIRECT_MESSAGE : receives
     WORKSPACE ||--o{ ACTIVITY_LOG : logical_scope
 ```
 
@@ -311,23 +317,23 @@ The Prisma models map to plural PostgreSQL table names. `ActivityLogs` is
 created and populated by a SQL trigger migration, then exposed through a
 read-only Prisma model for dashboard aggregation.
 
-| Table | Important fields and types | Relationship or rule |
-| --- | --- | --- |
-| `Users` | `id UUID`, `email String`, `password_hash String?`, `name String`, `profile_image_url String?` | Email is unique; OAuth-only users may have no password hash |
-| `OAuthAccounts` | `id UUID`, `user_id UUID`, `provider String`, `provider_id String` | Unique provider/provider ID pair |
-| `Friendships` | `user_low_id UUID`, `user_high_id UUID`, `created_at DateTime` | Sorted composite key represents one undirected friendship |
-| `FriendRequests` | `user_low_id UUID`, `user_high_id UUID`, `requested_by_id UUID`, `created_at DateTime` | Canonical pending pair; deleted on accept, reject, or cancel |
-| `DirectMessages` | `id UUID`, `sender_user_id UUID`, `recipient_user_id UUID`, `content Text`, `created_at DateTime` | Append-only messages; API access requires the friendship to remain accepted |
-| `Workspaces` | `id UUID`, `name String`, `is_public Boolean` | Parent of members, lists, and labels |
-| `WorkspaceMembers` | `workspace_id UUID`, `user_id UUID`, `role Role` | Composite key; role is `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER` |
-| `WorkspaceMessages` | `id UUID`, `workspace_id UUID`, `user_id UUID`, `card_id UUID?`, `content Text`, `created_at DateTime` | Append-only default-room messages; an optional card link is cleared if the card is deleted |
-| `Lists` | `id UUID`, `workspace_id UUID`, `name String`, `sequence Float`, `is_done Boolean` | Fractional sequence supports reordering; `is_done` is a visual workflow marker |
-| `Cards` | `id UUID`, `list_id UUID?`, `user_id UUID?`, `title String`, `description Text`, `is_completed Boolean`, `start_at DateTime?`, `deadline DateTime?`, `sequence Float` | A null `list_id` denotes a personal inbox card; completion is independent from list position |
-| `Labels` | `id UUID`, `workspace_id UUID`, `label_name String`, `label_color String` | Labels are workspace-scoped |
-| `CardLabels` | `label_id UUID`, `card_id UUID` | Composite card-to-label relation |
-| `Attachments` | `id UUID`, `card_id UUID`, `file_url String?`, `file_name String?` | Stores URL metadata, not uploaded file bytes |
-| `Comments` | `id UUID`, `card_id UUID`, `user_id UUID`, `comment_str String` | Card comment records |
-| `ActivityLogs` | `id UUID`, `workspace_id UUID`, `actor_user_id UUID?`, `operation enum`, `event_type enum`, `target_type enum`, `target_id Text`, `transaction_id BigInt` | Append-only workspace activity records written by triggers |
+| Table               | Important fields and types                                                                                                                                            | Relationship or rule                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `Users`             | `id UUID`, `email String`, `password_hash String?`, `name String`, `profile_image_url String?`, `headline String`, `linkedin_url String?`                             | Email is unique; OAuth-only users may have no password hash                                  |
+| `OAuthAccounts`     | `id UUID`, `user_id UUID`, `provider String`, `provider_id String`                                                                                                    | Unique provider/provider ID pair                                                             |
+| `Friendships`       | `user_low_id UUID`, `user_high_id UUID`, `created_at DateTime`                                                                                                        | Sorted composite key represents one undirected friendship                                    |
+| `FriendRequests`    | `user_low_id UUID`, `user_high_id UUID`, `requested_by_id UUID`, `created_at DateTime`                                                                                | Canonical pending pair; deleted on accept, reject, or cancel                                 |
+| `DirectMessages`    | `id UUID`, `sender_user_id UUID`, `recipient_user_id UUID`, `content Text`, `created_at DateTime`                                                                     | Append-only messages; API access requires the friendship to remain accepted                  |
+| `Workspaces`        | `id UUID`, `name String`, `is_public Boolean`                                                                                                                         | Parent of members, lists, and labels                                                         |
+| `WorkspaceMembers`  | `workspace_id UUID`, `user_id UUID`, `role Role`                                                                                                                      | Composite key; role is `OWNER`, `ADMIN`, `MEMBER`, or `VIEWER`                               |
+| `WorkspaceMessages` | `id UUID`, `workspace_id UUID`, `user_id UUID`, `card_id UUID?`, `content Text`, `created_at DateTime`                                                                | Append-only default-room messages; an optional card link is cleared if the card is deleted   |
+| `Lists`             | `id UUID`, `workspace_id UUID`, `name String`, `sequence Float`                                                                                                       | Fractional sequence supports reordering without rewriting every sibling                      |
+| `Cards`             | `id UUID`, `list_id UUID?`, `user_id UUID?`, `title String`, `description Text`, `is_completed Boolean`, `start_at DateTime?`, `deadline DateTime?`, `sequence Float` | A null `list_id` denotes a personal inbox card; completion is independent from list position |
+| `Labels`            | `id UUID`, `workspace_id UUID`, `label_name String`, `label_color String`                                                                                             | Labels are workspace-scoped                                                                  |
+| `CardLabels`        | `label_id UUID`, `card_id UUID`                                                                                                                                       | Composite card-to-label relation                                                             |
+| `Attachments`       | `id UUID`, `card_id UUID`, `file_url String?`, `file_name String?`, `storage_key String?`, `mime_type String?`, `size_bytes Int?`                                     | Stores metadata for legacy URLs or files persisted in the protected attachment volume        |
+| `Comments`          | `id UUID`, `card_id UUID`, `user_id UUID`, `comment_str String`                                                                                                       | Editable, soft-deletable card comments                                                       |
+| `ActivityLogs`      | `id UUID`, `workspace_id UUID`, `actor_user_id UUID?`, `operation enum`, `event_type enum`, `target_type enum`, `target_id Text`, `transaction_id BigInt`             | Append-only workspace activity records written by triggers                                   |
 
 Most domain models also carry `created_at/by`, `updated_at/by`, and
 `deleted_at/by` audit fields. Soft-deleted rows remain available for audit
@@ -335,42 +341,44 @@ history but are filtered from normal application reads.
 
 ## Features and contributors
 
-Git history uses several aliases. The table preserves those aliases instead of
-guessing an identity where the repository does not prove one.
+Git history uses several aliases. The table normalizes the confirmed aliases to
+the corresponding 42 logins.
 
-| Feature | Implementation summary | Repository contributors |
-| --- | --- | --- |
-| Authentication and account | Password login, Google OAuth, refresh rotation, account edit/delete | `Sean Kim`; frontend integration by `KHR416` / `wchoe` |
-| Workspace and permissions | CRUD, role checks, member removal, final-owner guard, public data projection | `Saususge`, `copilot-swe-agent[bot]`, `seankim96` |
-| Email invitations | One-time Redis invitation, explicit account confirmation, mail queue, per-address limit | `Saususge`, `seankim96` |
-| Lists and cards | Prisma services, ordering, drag-and-drop, details and dates | `injo`, `yeonjunky`, `KHR416`, `seankim96` |
-| Personal inbox | API-backed cards, board/inbox drag round trip, and edge scrolling | `seankim96` |
-| Calendar and search | Range-bar workspace calendar plus scoped `/keyword` search with people discovery, filters, sorting, and pagination | `seankim96`, building on the initial UI by `KHR416` |
-| Activity dashboard | Selectable-period trigger-backed contribution heatmap, dated activity feed, issue flow, completion metrics, and list/activity charts | `seankim96` |
-| Friends, DMs, and presence | Request/accept flow, symmetric friendships, direct messages, unified messenger, and online/offline events | `seankim96` |
-| Realtime foundation | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain | `seankim96` |
-| Workspace realtime and chat | Member-only channels, targeted list reconciliation, team presence, and persistent group chat | `seankim96` |
-| Infrastructure | Docker services, HTTPS/WSS Nginx proxy, migrations | `ynam` / `nyhwbh`, `yeonjunky` / `yeonjunkim` |
-| Database and activity audit | Core schema, migrations, trigger-based activity log | `injo`, `seankim96` |
+| Feature                           | Implementation summary                                                                                                                | Repository contributors                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Authentication and account        | Password login, Google OAuth, refresh rotation, profile edit/delete, and protected routing                                            | `seungjuk`, `wchoe`                               |
+| User profiles and avatars         | Public profile modal/page, headline and LinkedIn fields, validated avatar upload/removal, and fallback avatars                        | `seungjuk`, `injo`, `wchoe`                       |
+| Workspace and permissions         | CRUD, role checks, member removal, final-owner guard, public data projection, and ownership policy                                    | `chakim`, `seungjuk`, `wchoe`                     |
+| Email invitations                 | One-time bearer invitations in Redis, preview/accept flow, mail queue, sender limits, locking, and revocation                         | `chakim`, `wchoe`                                 |
+| Lists and cards                   | Prisma services, fractional ordering, drag-and-drop, editable details, dates, and completion state                                    | `injo`, `yeonjuki`, `wchoe`, `seungjuk`           |
+| Labels, comments, and attachments | Workspace labels, card comments with edit/delete, card-linked chat comments, and validated file upload/preview/download/delete        | `chakim`, `seungjuk`, `injo`, `wchoe`, `yeonjuki` |
+| Personal inbox                    | API-backed cards, board/inbox drag round trip, and edge scrolling                                                                     | `seungjuk`                                        |
+| Calendar                          | Workspace card date ranges rendered as continuous weekly bars with cross-browser date input                                           | `seungjuk`, `wchoe`                               |
+| Advanced search                   | Server-side workspace/card/people discovery with scopes, labels, slash commands, sorting, and pagination                              | `seungjuk`, `wchoe`                               |
+| Activity dashboard                | Selectable-period trigger-backed contribution heatmap, dated activity feed, issue flow, completion metrics, and list/activity charts  | `seungjuk`                                        |
+| Friends, DMs, and presence        | Request/accept/reject/cancel flow, symmetric friendships, direct messages, unified messenger, unread state, and online/offline events | `seungjuk`, `yeonjuki`, `injo`, `wchoe`           |
+| Realtime foundation               | Authenticated protocol, reconnect, refresh, heartbeat, limits, routing, drain                                                         | `seungjuk`                                        |
+| Workspace realtime and chat       | Member-only channels, targeted list reconciliation, team presence, and persistent group chat                                          | `seungjuk`                                        |
+| Accessibility and responsive UI   | Keyboard board movement, modal focus handling, responsive messenger/toolbox layouts, and Tailwind migration                           | `chakim`, `yeonjuki`, `wchoe`                     |
+| Infrastructure and quality        | HTTPS/WSS Nginx proxy, development/production Compose targets, persistent upload volume, CI, linting, formatting, and tests           | `yeonjuki`, `injo`, `wchoe`                       |
+| Database and activity audit       | Core Prisma schema, migrations, indexes, and trigger-based activity log                                                               | `yeonjuki`, `injo`, `seungjuk`, `chakim`          |
 
 ## Team information
 
-The project planning document records the following 42 team:
+The current 42 team roles are:
 
-| Login | Role | Main responsibility |
-| --- | --- | --- |
-| `ynam` | Product Owner | Product direction, requirements, priorities, and initial environment |
-| `chakim` | Project Manager | Planning workflow, coordination, workspace/member and invitation workstream |
-| `yeonjuki` | Tech Lead | Backend structure, infrastructure decisions, card module, and technical review |
-| `injo` | Developer | Relational schema, Prisma list/card services, and drag-and-drop board integration |
-| `wchoe` | Developer | Vue UI structure, routing, shared components, API integration, and frontend hardening |
+| Login      | Role            | Main responsibility                                                                   |
+| ---------- | --------------- | ------------------------------------------------------------------------------------- |
+| `seungjuk` | Product Owner   | Product direction, requirements, priorities, and cross-feature integration            |
+| `chakim`   | Project Manager | Planning workflow, coordination, workspace/member and invitation workstream           |
+| `yeonjuki` | Tech Lead       | Backend structure, infrastructure decisions, card module, and technical review        |
+| `injo`     | Developer       | Relational schema, Prisma list/card services, and drag-and-drop board integration     |
+| `wchoe`    | Developer       | Vue UI structure, routing, shared components, API integration, and frontend hardening |
 
-Repository aliases are not perfectly normalized: `ynam` also appears as
-`nyhwbh`; `yeonjuki` appears as `yeonjunky`/`yeonjunkim`; `injo` also appears
-under a Korean display name; and `wchoe` shares commit history with `KHR416`.
-Workspace commits under `Saususge` and integration commits under
-`Sean Kim`/`seankim96` are not conclusively mapped to the five planning logins
-by files in this repository.
+Confirmed repository aliases are: `wchoe` as `KHR416`; `seungjuk` as
+`seankim96`/`Sean Kim`; `chakim` as `Saususge`; `yeonjuki` as
+`yeonjunky`/`yeonjunkim`; and `injo` as `carryplz`/`조인철`. Automated authors
+and co-authors are excluded from the contributor summaries.
 
 ## Project management
 
@@ -380,83 +388,130 @@ by files in this repository.
   and `Stretch` marked lower-priority goals.
 - Work was split into two-to-three-day checklist items, implemented on feature
   branches, and moved to review with relevant links and context on the card.
-- GitHub branches, pull requests, and commit history carried code integration
-  and review.
-- Trello card descriptions and activity comments preserved asynchronous
-  technical decisions. The exact voice/chat channel and meeting cadence were
-  handled outside the repository and are therefore not asserted here.
+- GitHub branches and pull requests carried implementation and integration.
+  Teammates reviewed changes, requested revisions where needed, approved the
+  final result, and then merged it into `main`.
+- KakaoTalk was used for day-to-day communication, sharing blockers, scheduling
+  discussions, and urgent coordination.
+- Trello card descriptions and comments preserved task context, while GitHub PR
+  discussions preserved code-level review decisions.
 
 ## Modules
 
-This table claims only modules that the current source can demonstrate. Module
-acceptance and scoring remain the evaluator's decision.
+The subject requires 14 points. Each Major module is worth 2 points and each
+Minor module is worth 1 point. This table claims only modules whose complete
+requirements can be demonstrated from the current source; final acceptance
+remains the evaluator's decision.
 
-| Module | Level | Points | Justification and implementation | Contributors |
-| --- | --- | ---: | --- | --- |
-| Use a frontend and backend framework | Major | 2 | Vue 3 frontend and Express 5 backend, both in TypeScript | `wchoe`, `yeonjuki`, `injo`, `Saususge`, `Sean Kim` |
-| Realtime features with WebSockets | Major | 2 | Authenticated WSS protocol, presence, and member-join events | `seankim96` |
-| Use an ORM | Minor | 1 | Prisma schema, relations, transactions, and migrations over PostgreSQL | `injo`, `Saususge`, `KHR416` |
-| OAuth 2.0 authentication | Minor | 1 | Google Authorization Code flow with state, nonce, ID-token verification, and account linking policy | `Sean Kim` |
-| Organization system | Major | 2 | Isolated workspaces, memberships, roles, invitations, and board resources | `Saususge`, `injo`, `KHR416`, `seankim96` |
-| Advanced realtime data visualization | Major | 2 | Trigger-backed activity analytics with live invalidation, a contribution heatmap, issue-flow charts, and current completion metrics | `seankim96` |
-| Advanced search | Minor | 1 | Workspace-scoped card and label filters, people discovery, slash commands, relevance/newest/name sorting, and URL-backed pagination | `seankim96` |
-| **Currently defensible total** |  | **11** | Does not count incomplete planned modules |  |
+| Module                                                | Level | Points | Justification and implementation                                                                                                                                              | Contributors                                      |
+| ----------------------------------------------------- | ----- | -----: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Use a frontend and backend framework                  | Major |      2 | Vue 3 frontend and Express 5 backend, both in TypeScript                                                                                                                      | `wchoe`, `yeonjuki`, `injo`, `chakim`, `seungjuk` |
+| Implement real-time features using WebSockets         | Major |      2 | Authenticated WSS protocol with cross-client updates, channel broadcasting, reconnect, token refresh, heartbeat, graceful disconnect, and server drain                        | `seungjuk`                                        |
+| Allow users to interact with other users              | Major |      2 | Persistent direct and workspace chat, public profile views, friend request/removal flows, friend lists, and online presence                                                   | `seungjuk`, `yeonjuki`, `injo`, `wchoe`           |
+| Use an ORM                                            | Minor |      1 | Prisma schema, relations, transactions, and migrations over PostgreSQL                                                                                                        | `yeonjuki`, `injo`, `chakim`, `wchoe`             |
+| Real-time collaborative features                      | Minor |      1 | Shared workspaces synchronize list, card, label, membership, chat-link, and presence changes across connected clients                                                         | `seungjuk`                                        |
+| Advanced search with filters, sorting, and pagination | Minor |      1 | Workspace-scoped card and label filters, people discovery, slash commands, relevance/newest/name sorting, and URL-backed pagination                                           | `seungjuk`, `wchoe`                               |
+| File upload and management system                     | Minor |      1 | Card attachments support multiple media types, client/server validation, content-signature checks, access-controlled storage, image preview, progress, download, and deletion | `injo`                                            |
+| Standard user management and authentication           | Major |      2 | Profile editing, validated avatar upload/removal with fallback avatars, public profile views, friends, and realtime online status                                             | `seungjuk`, `injo`, `yeonjuki`, `wchoe`           |
+| Remote authentication with OAuth 2.0                  | Minor |      1 | Google Authorization Code flow with state, nonce, ID-token verification, and account linking policy                                                                           | `seungjuk`                                        |
+| Organization system                                   | Major |      2 | Workspace create/edit/delete, invitations, member add/remove, role-aware views/actions, and list/card resources within each workspace                                         | `chakim`, `injo`, `wchoe`, `seungjuk`             |
+| User activity analytics and insights dashboard        | Minor |      1 | Trigger-backed contribution heatmap, dated activity feed, issue flow, completion metrics, list/activity charts, and selectable periods                                        | `seungjuk`                                        |
+| **Currently defensible total**                        |       | **16** | Exceeds the 14-point subject requirement by 2 points                                                                                                                          |                                                   |
 
-The planning document also considered chat/user interaction, full profile
-management, advanced permission administration, realtime collaboration,
-file upload, and a public API. They are not claimed
-because the current prototype does not implement their complete subject
-requirements.
+The advanced analytics dashboard is not claimed: although its charts, live
+updates, and date filters are implemented, the Major module also requires PDF
+or CSV export. Advanced permissions, a public API, complete notifications,
+SSR, PWA, and complete WCAG 2.1 AA compliance are likewise not claimed because
+their full subject requirements are not currently demonstrated.
 
 ## Individual contributions and challenges
 
-### ynam — Product Owner
+### seungjuk — Product Owner
 
-- Established the initial environment, repository identity, and product scope.
-- Kept the product centered on a Trello-like workflow.
-- Challenge: balancing a broad module plan with a deliverable prototype.
-  Resolution: prioritized the workspace and board flow as the product core.
+- Implemented password authentication and Google OAuth, including account
+  linking, refresh-token rotation, logout, and account lifecycle handling.
+- Designed the authenticated WebSocket foundation and hardened reconnect,
+  disconnect, heartbeat, token refresh, presence, and graceful shutdown flows.
+- Added workspace synchronization and team chat, then integrated friends,
+  direct messages, unread state, notifications, and presence into the unified
+  messenger.
+- Replaced prototype data in the inbox and calendar, implemented public
+  profiles and advanced search, and built the activity analytics dashboard.
+- Centralized workspace permission checks, enforced owner/role hierarchy, and
+  limited private member data exposed to public viewers.
+- Challenge: live state could diverge during reconnects, shutdown, or concurrent
+  workspace updates. Resolution: introduced authenticated channel routing,
+  explicit lifecycle handling, targeted reconciliation events, and integration
+  tests for failure paths.
 
 ### chakim — Project Manager
 
-- Defined the Trello workflow, ownership labels, blocker handling, and
-  invitation workstream in the project plan.
-- Coordinated workspace/member management requirements.
-- Challenge: invitations span authorization, email, and account lifecycle.
-  Resolution: used expiring, one-time bearer links with explicit account
-  confirmation and a queued SMTP send.
+- Implemented workspace CRUD across the Express service and Vue interface,
+  including creation, editing, deletion, member role changes, member removal,
+  and the final-owner guard.
+- Built the invitation mail flow with Nodemailer, templates, Redis-backed
+  queues, SMTP configuration, sender limits, and graceful worker shutdown.
+- Added the label backend and frontend, displayed labels on board cards, and
+  removed the obsolete list-level completion model.
+- Improved keyboard accessibility with list/card movement controls and modal
+  focus trapping, and added signup rate limiting and attachment indexing.
+- Challenge: membership and invitation mutations could race or leave partial
+  state. Resolution: wrapped search-then-mutate operations in transactions,
+  protected owner invariants, queued mail delivery, and rate-limited entry
+  points.
 
 ### yeonjuki — Tech Lead
 
-- Structured backend modules and contributed card-domain foundations.
-- Implemented the HTTPS Nginx reverse proxy and local certificate workflow
-  under the repository aliases `yeonjunky`/`yeonjunkim`.
-- Challenge: serving frontend, REST, OAuth callback, and WSS from one origin.
-  Resolution: routed them through a single Nginx TLS entrypoint.
+- Established the modular backend structure and implemented the initial card
+  module used by the board domain.
+- Implemented HTTPS through Nginx, self-signed certificate generation, reverse
+  tunneling documentation, and Vite host configuration for remote development.
+- Built the realtime friend-request lifecycle and refined the friends and
+  messaging interfaces.
+- Led the Tailwind migration for existing styles and improved responsive
+  behavior across the toolbox, messenger, and card-detail views.
+- Challenge: REST, OAuth callbacks, frontend assets, and WSS needed to work from
+  one secure origin. Resolution: routed them through one Nginx TLS entrypoint
+  and aligned the development tunnel and allowed-host configuration.
 
 ### injo — Developer
 
-- Created the initial Prisma schema and migrations.
-- Implemented list/card persistence and integrated API-backed drag-and-drop.
-- Challenge: stable ordering without rewriting every sibling.
-  Resolution: used fractional sequence values and transactional checks.
+- Created the initial Prisma schema and migration, then implemented the list
+  service and rewrote card persistence around Prisma and shared error handling.
+- Connected board lists and cards to the API with drag-and-drop ordering and
+  added explicit list/card creation actions.
+- Implemented card attachments and avatar uploads, including file-type and
+  content-signature validation, filename normalization, access-controlled
+  downloads, deletion, and persistent Docker storage.
+- Made membership transitions atomic, fixed Redis startup blocking, and
+  consolidated the friend request/list interface.
+- Challenge: uploaded files could be spoofed, lost on container recreation, or
+  exposed without membership checks. Resolution: verified magic bytes, stored
+  normalized server-side names in a dedicated volume, and authorized every
+  attachment operation through its workspace.
 
 ### wchoe — Developer
 
-- Built and reorganized the Vue UI, routes, shared components, and API client.
-- Removed initial mock dependencies and hardened board/API error paths under
-  the `KHR416` and `wchoe` aliases.
-- Challenge: keeping role-dependent controls consistent with backend rules.
-  Resolution: centralized authenticated requests and rendered write actions
-  only for roles that can perform them.
-
-### Integration history
-
-Later authentication, realtime, and prototype-completion commits appear as
-`Sean Kim`/`seankim96`, with automation co-author records on selected changes.
-Because the repository does not prove how this alias maps to the planning
-logins, this work is kept explicit instead of being silently attributed to a
-team member.
+- Built the initial Vue application structure for authentication, workspaces,
+  boards, and calendars, then extracted shared layouts, components, styles, and
+  the authenticated API client.
+- Replaced mock workspace and login data, hardened card movement and API error
+  paths, and kept role-dependent controls aligned with backend authorization.
+- Implemented one-time Redis invitations and strengthened them with scoped
+  locking, serialized sends, sender limits, role preservation, revocation, and
+  race-focused tests.
+- Added the unified search endpoint and frontend integration, comment
+  edit/delete flows with membership and race checks, and messenger friend
+  request unread state.
+- Added development fixtures, production/development container targets, CI
+  quality gates, formatting and lint tooling, dependency security fixes, and
+  the documented run workflows.
+- Refined keyboard board controls into focus-driven popovers and fixed chat card
+  links so only previously linked, subsequently deleted cards show as deleted.
+- Challenge: asynchronous invitations, comments, and UI state were vulnerable
+  to races and stale responses. Resolution: used scoped locks and atomic server
+  operations, guarded frontend mutations, centralized requests, and added
+  regression tests and CI checks.
 
 ## Resources
 
@@ -493,35 +548,3 @@ Humans remained responsible for product scope and final decisions. Suggested
 changes were reviewed as diffs and accepted only after type checks, automated
 tests, and production builds. No user secrets or `.env` contents were supplied
 to an AI system.
-
-## Prototype limitations
-
-- Workspace chat has one default room and optional single-card links, but no
-  editing, deletion, read receipts, typing indicator, file attachment, or
-  additional-room lifecycle. Direct messages share the same prototype limits.
-- Workspace change events are best-effort invalidation hints rather than a
-  durable event stream; reconnect performs a canonical REST snapshot refresh.
-- Workspace activity and message unread counts are session-local; they have no
-  separate notification history or persistent read-state backend.
-- Presence is designed for a single backend instance, not cross-replica fanout.
-- Friend requests support accept, reject, and cancel, but have no persistent
-  history, blocking, or realtime request-delivery event.
-- Workspace and card search operates on the authenticated browser snapshot
-  rather than a dedicated server-side search index. Sorting and pagination
-  reduce rendered results but do not reduce the initial workspace snapshot.
-- Attachment APIs store URL metadata; there is no binary upload service.
-- Card comments created through linked workspace chat are visible in card
-  details; direct comment editing/deletion and the rest of the label/assignment
-  UI remain incomplete.
-- Public workspaces are visible to authenticated users, not anonymous visitors.
-
-## Additional documentation
-
-- [Authentication and account API](docs/auth-api.md)
-- [Realtime protocol and extension points](docs/realtime.md)
-- [Workspace synchronization, chat, and team presence](docs/workspace-realtime.md)
-- [Workspace activity dashboard metrics](docs/dashboard.md)
-- [Friend API and presence events](docs/friends.md)
-- [Workspace DTO contract](docs/workspaces.dto.ts)
-- [Email invitation pipeline](docs/mail.md)
-- [Design decisions and tradeoffs](docs/CONSIDERATIONS.md)
