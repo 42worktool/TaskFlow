@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { CardAPI } from '../api/card'
 import { LabelAPI } from '../api/label'
@@ -64,6 +64,8 @@ const attachmentProgress = ref(0)
 const attachmentError = ref('')
 const attachmentPreviews = reactive<Record<string, string>>({})
 const attachmentPreviewLoading = ref('')
+const modal = ref<HTMLElement | null>(null)
+const closeButton = ref<HTMLButtonElement | null>(null)
 let loadGeneration = 0
 let commentGeneration = 0
 let attachmentGeneration = 0
@@ -72,6 +74,41 @@ let initialTitle = ''
 let initialDescription = ''
 let initialStartDate = ''
 let initialDeadline = ''
+let returnFocus: HTMLElement | null = null
+
+function focusableElements(): HTMLElement[] {
+  return [
+    ...(modal.value?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? []),
+  ].filter((element) => element.getClientRects().length > 0)
+}
+
+function handleModalKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    close()
+    return
+  }
+  if (event.key !== 'Tab') return
+
+  const focusable = focusableElements()
+  if (focusable.length === 0) {
+    event.preventDefault()
+    modal.value?.focus()
+    return
+  }
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
 
 function close(): void {
   if (!saving.value && !commentMutationPending.value && !attachmentUploading.value) emit('close')
@@ -598,6 +635,11 @@ watch(
   },
 )
 
+onMounted(() => {
+  returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  void nextTick(() => closeButton.value?.focus())
+})
+
 onUnmounted(() => {
   commentSubmitter.reset()
   commentEditSubmitter.reset()
@@ -606,22 +648,26 @@ onUnmounted(() => {
   commentGeneration += 1
   attachmentGeneration += 1
   revokeAttachmentPreviews()
+  if (returnFocus?.isConnected) returnFocus.focus()
 })
 </script>
 
 <template>
   <Teleport to="body">
-    <div
-      class="modal-overlay card-detail-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="card-detail-title"
-      @click.self="close"
-    >
-      <div class="modal card-detail-modal">
+    <div class="modal-overlay card-detail-overlay" @click.self="close">
+      <div
+        ref="modal"
+        class="modal card-detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="card-detail-title"
+        tabindex="-1"
+        @keydown="handleModalKeydown"
+      >
         <div class="modal-header card-detail-header">
           <h2 id="card-detail-title" class="modal-title">카드 상세</h2>
           <button
+            ref="closeButton"
             class="close-btn"
             type="button"
             aria-label="닫기"

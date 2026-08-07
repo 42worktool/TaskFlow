@@ -85,6 +85,37 @@
   min-height: 8px;
 }
 
+.card-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-keyboard-move-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.card-keyboard-move-actions button {
+  border: 1px solid #9ca3af;
+  border-radius: 4px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.card-keyboard-move-actions button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.card-keyboard-move-actions button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .card-ghost {
   opacity: 0.4;
 }

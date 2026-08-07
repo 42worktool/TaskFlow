@@ -47,7 +47,9 @@ const lists = ref<ListWithCards[]>([])
 const loading = ref(false)
 const error = ref('')
 const actionError = ref('')
+const boardAnnouncement = ref('')
 const completingCardIds = ref<Set<string>>(new Set())
+const movingCardIds = ref<Set<string>>(new Set())
 const selectedCardId = ref<string | null>(null)
 const cardDetailRefreshToken = ref(0)
 const boardColumns = ref<{ $el: HTMLElement } | null>(null)
@@ -450,6 +452,57 @@ async function onToggleCardCompletion(card: Card) {
   }
 }
 
+async function onKeyboardMoveCard(cardId: string, direction: 'previous' | 'next'): Promise<void> {
+  if (!props.canEditBoard || movingCardIds.value.has(cardId)) return
+  const sourceIndex = lists.value.findIndex((list) => list.cards.some((card) => card.id === cardId))
+  if (sourceIndex < 0) return
+  const source = lists.value[sourceIndex]
+  const cardIndex = source.cards.findIndex((card) => card.id === cardId)
+  const card = source.cards[cardIndex]
+  if (!card) return
+
+  let target = source
+  let targetIndex = cardIndex + (direction === 'previous' ? -1 : 1)
+  if (targetIndex < 0) {
+    target = lists.value[sourceIndex - 1] ?? source
+    targetIndex = target === source ? 0 : target.cards.length
+  } else if (targetIndex >= source.cards.length) {
+    target = lists.value[sourceIndex + 1] ?? source
+    targetIndex = target === source ? source.cards.length - 1 : 0
+  }
+  if (target === source && targetIndex === cardIndex) return
+
+  const targetCards = (target === source ? source.cards : target.cards).filter(
+    (item) => item.id !== cardId,
+  )
+  targetCards.splice(targetIndex, 0, card)
+  const { beforeId, afterId } = neighborIds(targetCards, targetIndex)
+
+  movingCardIds.value = new Set(movingCardIds.value).add(cardId)
+  actionError.value = ''
+  try {
+    if (target.id === source.id) {
+      await CardAPI.reorder(cardId, { before_card_id: beforeId, after_card_id: afterId })
+    } else {
+      await CardAPI.move(cardId, {
+        list_id: target.id,
+        before_card_id: beforeId,
+        after_card_id: afterId,
+      })
+    }
+    boardAnnouncement.value = `${card.title} 카드를 ${target.name} 리스트의 ${targetIndex + 1}번째 위치로 옮겼습니다.`
+    queueFullRefresh()
+  } catch (caught) {
+    actionError.value =
+      caught instanceof Error ? caught.message : '카드를 키보드로 이동하지 못했습니다.'
+    queueFullRefresh()
+  } finally {
+    const next = new Set(movingCardIds.value)
+    next.delete(cardId)
+    movingCardIds.value = next
+  }
+}
+
 function onBoardCardDragStart(card: Card): void {
   if (!props.canEditBoard) return
   startCardDrag(card.id, 'board')
@@ -601,6 +654,9 @@ onUnmounted(() => {
 
 <template>
   <div class="board-page">
+    <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {{ boardAnnouncement }}
+    </p>
     <p v-if="actionError" class="board-action-error" role="alert">
       <span>{{ actionError }}</span>
       <button type="button" aria-label="알림 닫기" @click="actionError = ''">×</button>
@@ -627,6 +683,7 @@ onUnmounted(() => {
           :can-edit="canEditBoard"
           :can-open-details="canViewCardDetails"
           :completing-card-ids="completingCardIds"
+          :moving-card-ids="movingCardIds"
           @open-card="openCard"
           @update-cards="onUpdateCards"
           @card-change="onCardChange"
@@ -635,6 +692,7 @@ onUnmounted(() => {
           @add-card="onAddCard"
           @delete-card="onDeleteCard"
           @toggle-card-completion="onToggleCardCompletion"
+          @move-card="onKeyboardMoveCard"
           @rename-list="onRenameList"
           @delete-list="onDeleteList"
         />
