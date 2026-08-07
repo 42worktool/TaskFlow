@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "typecheck:realtime-tests": "tsc -p src/realtime/tsconfig.test.json",
-    "test": "npm run typecheck:realtime-tests && tsx --test src/app.integration.test.ts src/modules/auth/*.test.ts src/modules/card/*.test.ts src/modules/dashboard/*.test.ts src/modules/friend/*.test.ts src/modules/list/*.test.ts src/modules/notification/*.test.ts src/modules/presence/*.test.ts src/modules/profile/*.test.ts src/modules/workspace/*.test.ts src/lib/*.test.ts src/middleware/*.test.ts src/realtime/*.test.ts",
+    "test": "npm run typecheck:realtime-tests && tsx --test src/app.integration.test.ts src/modules/auth/*.test.ts src/modules/card/*.test.ts src/modules/dashboard/*.test.ts src/modules/friend/*.test.ts src/modules/list/*.test.ts src/modules/notification/*.test.ts src/modules/presence/*.test.ts src/modules/profile/*.test.ts src/modules/search/*.test.ts src/modules/workspace/*.test.ts src/lib/*.test.ts src/middleware/*.test.ts src/realtime/*.test.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --ignore-path ../.prettierignore --write .",

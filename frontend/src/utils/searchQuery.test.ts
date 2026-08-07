@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  compareSearchSortValues,
   criteriaFromRouteQuery,
   criteriaToRouteQuery,
-  matchesSearchText,
   paginationPages,
   parseSearchExpression,
 } from './searchQuery'
@@ -177,42 +175,7 @@ describe('advanced search route state', () => {
   })
 })
 
-describe('advanced search text matching', () => {
-  it('requires every keyword but allows them in different fields', () => {
-    expect(matchesSearchText(['OAuth callback', 'Backend security'], 'oauth backend')).toBe(true)
-    expect(matchesSearchText(['OAuth callback', 'Frontend'], 'oauth backend')).toBe(false)
-  })
-})
-
-describe('advanced search sorting and pagination', () => {
-  const alpha = {
-    name: 'Alpha card',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    searchable: ['Alpha card', 'frontend'],
-  }
-  const beta = {
-    name: 'Beta card',
-    createdAt: '2026-02-01T00:00:00.000Z',
-    searchable: ['Beta card', 'alpha backend'],
-  }
-
-  it('sorts exact title matches ahead of secondary-field matches by relevance', () => {
-    expect(
-      [beta, alpha].sort((left, right) =>
-        compareSearchSortValues(left, right, 'relevance', 'alpha'),
-      ),
-    ).toEqual([alpha, beta])
-  })
-
-  it('supports newest and alphabetical ordering', () => {
-    expect(
-      [alpha, beta].sort((left, right) => compareSearchSortValues(left, right, 'newest', '')),
-    ).toEqual([beta, alpha])
-    expect(
-      [beta, alpha].sort((left, right) => compareSearchSortValues(left, right, 'name', '')),
-    ).toEqual([alpha, beta])
-  })
-
+describe('advanced search pagination', () => {
   it('returns a bounded five-page navigation window', () => {
     expect(paginationPages(1, 9)).toEqual([1, 2, 3, 4, 5])
     expect(paginationPages(5, 9)).toEqual([3, 4, 5, 6, 7])
