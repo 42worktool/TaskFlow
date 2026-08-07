@@ -40,31 +40,124 @@
   font-size: 16px;
 }
 
-.friend-invite-panel {
+.friend-search-panel {
   display: flex;
   align-items: stretch;
   flex-direction: column;
   gap: 14px;
 }
 
-.friend-invite-panel p {
+.friend-search-panel > div > p {
   margin: 6px 0 0;
   font-size: 14px;
 }
 
-.friend-request-form {
+.friend-search-field {
   display: flex;
-  min-width: 0;
-  gap: 10px;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: #64748b;
 }
 
-.friend-request-form input {
+.friend-search-field:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.friend-search-field input {
   min-width: 0;
   flex: 1;
-  padding: 10px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
   font: inherit;
+}
+
+.friend-search-field small {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.friend-search-panel .friend-search-state {
+  margin: -3px 0 0;
+  font-size: 13px;
+}
+
+.friend-search-results {
+  margin: -2px 0 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  list-style: none;
+}
+
+.friend-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.friend-search-row + .friend-search-row {
+  border-top: 1px solid #f1f5f9;
+}
+
+.friend-search-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.friend-search-copy a,
+.friend-search-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-search-copy a {
+  color: #172b4d;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.friend-search-copy a:hover {
+  color: #0c66e4;
+  text-decoration: underline;
+}
+
+.friend-search-copy span {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.friend-search-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.friend-relation-badge {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.friend-relation-badge--friend {
+  background: #ecfdf5;
+  color: #047857;
 }
 
 .primary-button,
@@ -269,13 +362,23 @@ button:disabled {
 }
 
 @media (max-width: 520px) {
-  .friend-request-form {
-    flex-direction: column;
-  }
-
   .person-row {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .friend-search-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .friend-search-copy {
+    width: calc(100% - 52px);
+  }
+
+  .friend-search-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .person-actions,

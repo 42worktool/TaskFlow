@@ -42,6 +42,13 @@ export const FriendAPI = {
       }),
     ),
 
+  sendRequestToUser: (friendUserId: string) =>
+    queueFriendMutation(() =>
+      apiRequest<FriendRequest>(`/api/friends/requests/${friendUserId}`, {
+        method: 'POST',
+      }),
+    ),
+
   acceptRequest: (friendUserId: string) =>
     queueFriendMutation(() =>
       apiRequest<Friend>(`/api/friends/requests/${friendUserId}/accept`, {

@@ -210,6 +210,29 @@ test('friend service keeps pending requests separate from friendships', async (t
     })
   })
 
+  await t.test('creates a pending request from a searched user id', async (t) => {
+    stubTransaction(t, prisma)
+    let userQuery: unknown
+    stubMethod(t, prisma.user, 'findFirst', async (args) => {
+      userQuery = args
+      return { id: USER_B }
+    })
+    stubMethod(t, prisma.friendship, 'findUnique', async () => null)
+    stubMethod(t, prisma.friendRequest, 'upsert', async () => friendRequest(USER_B, USER_A))
+    stubMethod(t, realtime, 'sendToUser', () => undefined)
+
+    const request = await friendService.sendFriendRequestToUser({
+      userId: USER_A,
+      targetUserId: USER_B,
+    })
+
+    assert.equal(request.id, USER_B)
+    assert.deepEqual(userQuery, {
+      where: { id: USER_B, deleted_at: null },
+      select: { id: true },
+    })
+  })
+
   await t.test('rejects a send when the target already requested the caller', async (t) => {
     stubTransaction(t, prisma)
     stubMethod(t, prisma.user, 'findFirst', async () => ({ id: USER_B }))

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { FriendAPI } from '../api/friend'
+import { ProfileAPI, type PublicProfile } from '../api/profile'
 import PersonAvatar from './PersonAvatar.vue'
+import { authState } from '../services/auth'
 import { realtime } from '../services/realtime'
 import {
   parseFriend,
@@ -10,6 +12,7 @@ import {
   parseFriendUserIdEvent,
 } from '../services/realtime/protocol'
 import type { Friend, FriendRequest } from '../types'
+import { resolveFriendRelationship } from '../utils/friendRelationship'
 
 const emit = defineEmits<{
   changed: []
@@ -20,7 +23,10 @@ const friends = ref<Friend[]>([])
 const incomingRequests = ref<FriendRequest[]>([])
 const outgoingRequests = ref<FriendRequest[]>([])
 const activeTab = ref<'incoming' | 'outgoing' | 'friends'>('incoming')
-const friendEmail = ref('')
+const friendSearchQuery = ref('')
+const friendSearchResults = ref<PublicProfile[]>([])
+const friendSearchLoading = ref(false)
+const friendSearchError = ref('')
 const loading = ref(true)
 const hasLoadedData = ref(false)
 const busyAction = ref<string | null>(null)
@@ -30,6 +36,8 @@ const error = ref('')
 let loadGeneration = 0
 let presenceSequence = 0
 let reloadAfterMutation = false
+let friendSearchTimer: ReturnType<typeof setTimeout> | null = null
+let friendSearchVersion = 0
 const livePresence = new Map<string, { online: boolean; sequence: number }>()
 let removePresenceListener: (() => void) | null = null
 let removeRealtimeStateListener: (() => void) | null = null
@@ -37,6 +45,57 @@ let removeRequestCreatedListener: (() => void) | null = null
 let removeRequestAcceptedListener: (() => void) | null = null
 let removeRequestDeletedListener: (() => void) | null = null
 let removeFriendRemovedListener: (() => void) | null = null
+
+const visibleFriendSearchResults = computed(() =>
+  friendSearchResults.value.filter((person) => person.id !== authState.user?.id).slice(0, 8),
+)
+
+watch([friendSearchQuery, loading], ([value, isLoading]) => {
+  const version = ++friendSearchVersion
+  if (friendSearchTimer) clearTimeout(friendSearchTimer)
+  friendSearchResults.value = []
+  friendSearchError.value = ''
+  friendSearchLoading.value = false
+
+  const query = value.trim()
+  if (!query || isLoading) return
+
+  friendSearchLoading.value = true
+  friendSearchTimer = setTimeout(async () => {
+    try {
+      const profiles = await ProfileAPI.search(query)
+      if (version !== friendSearchVersion) return
+      friendSearchResults.value = profiles
+    } catch {
+      if (version !== friendSearchVersion) return
+      friendSearchError.value = '사람을 검색하지 못했습니다.'
+    } finally {
+      if (version === friendSearchVersion) friendSearchLoading.value = false
+    }
+  }, 180)
+})
+
+function relationshipFor(userId: string) {
+  return resolveFriendRelationship(
+    userId,
+    authState.user?.id,
+    friends.value,
+    incomingRequests.value,
+    outgoingRequests.value,
+  )
+}
+
+function incomingRequestFor(userId: string) {
+  return incomingRequests.value.find((request) => request.id === userId)
+}
+
+function outgoingRequestFor(userId: string) {
+  return outgoingRequests.value.find((request) => request.id === userId)
+}
+
+function friendFor(userId: string) {
+  return friends.value.find((friend) => friend.id === userId)
+}
 
 function applyNewerPresence(friend: Friend, presenceAtStart: number): void {
   const live = livePresence.get(friend.id)
@@ -130,26 +189,39 @@ function finishMutation(): void {
   }
 }
 
-async function sendRequest(): Promise<void> {
-  const email = friendEmail.value.trim()
-  if (!email || busyAction.value) return
+async function sendRequestToUser(person: PublicProfile): Promise<void> {
+  if (busyAction.value) return
 
-  busyAction.value = 'send'
+  busyAction.value = `send:${person.id}`
   message.value = ''
   error.value = ''
   try {
-    const request = await FriendAPI.sendRequest(email)
+    const request = await FriendAPI.sendRequestToUser(person.id)
     outgoingRequests.value = [
       request,
       ...outgoingRequests.value.filter((item) => item.id !== request.id),
     ]
-    friendEmail.value = ''
     message.value = `${request.name}님께 친구 요청을 보냈습니다.`
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : '친구 요청을 보내지 못했습니다.'
   } finally {
     finishMutation()
   }
+}
+
+function acceptSearchResult(userId: string): void {
+  const request = incomingRequestFor(userId)
+  if (request) void acceptRequest(request)
+}
+
+function cancelSearchResult(userId: string): void {
+  const request = outgoingRequestFor(userId)
+  if (request) void deleteRequest(request, 'outgoing')
+}
+
+function openSearchResultDm(userId: string): void {
+  const friend = friendFor(userId)
+  if (friend) emit('open-dm', friend)
 }
 
 async function acceptRequest(request: FriendRequest): Promise<void> {
@@ -238,6 +310,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   loadGeneration += 1
+  friendSearchVersion += 1
+  if (friendSearchTimer) clearTimeout(friendSearchTimer)
   removePresenceListener?.()
   removeRequestCreatedListener?.()
   removeRequestAcceptedListener?.()
@@ -250,29 +324,93 @@ onUnmounted(() => {
 
 <template>
   <div class="friends-panel-content">
-    <section class="friend-panel friend-invite-panel">
+    <section class="friend-panel friend-search-panel">
       <div>
-        <h2>친구 요청 보내기</h2>
-        <p>TaskFlow에 가입한 사용자의 이메일을 입력하세요.</p>
+        <h2>사람 찾기</h2>
+        <p>이름, 한줄 소개 또는 이메일로 친구를 찾고 요청을 보내세요.</p>
       </div>
-      <form class="friend-request-form" @submit.prevent="sendRequest">
+
+      <label class="friend-search-field">
+        <span aria-hidden="true">⌕</span>
         <input
-          v-model="friendEmail"
-          type="email"
-          autocomplete="email"
-          placeholder="friend@example.com"
-          aria-label="친구 이메일"
-          :disabled="loading || busyAction !== null"
-          required
+          v-model="friendSearchQuery"
+          type="search"
+          autocomplete="off"
+          placeholder="이름, 소개 또는 이메일로 친구 찾기"
+          aria-label="이름, 소개 또는 이메일로 친구 찾기"
+          :disabled="loading"
         />
-        <button
-          type="submit"
-          class="primary-button"
-          :disabled="loading || busyAction !== null || !friendEmail.trim()"
-        >
-          {{ busyAction === 'send' ? '전송 중…' : '요청 보내기' }}
-        </button>
-      </form>
+        <small v-if="friendSearchLoading">검색 중…</small>
+      </label>
+
+      <p v-if="friendSearchError" class="friend-search-state" role="alert">
+        {{ friendSearchError }}
+      </p>
+      <p
+        v-else-if="
+          friendSearchQuery.trim() &&
+          !friendSearchLoading &&
+          visibleFriendSearchResults.length === 0
+        "
+        class="friend-search-state"
+      >
+        일치하는 사용자가 없습니다.
+      </p>
+
+      <ul v-if="visibleFriendSearchResults.length" class="friend-search-results">
+        <li v-for="person in visibleFriendSearchResults" :key="person.id" class="friend-search-row">
+          <PersonAvatar :name="person.name" :image-url="person.profile_image_url" />
+          <div class="friend-search-copy">
+            <RouterLink :to="`/profiles/${person.id}`">{{ person.name }}</RouterLink>
+            <span>{{ person.headline }}</span>
+          </div>
+
+          <div class="friend-search-actions">
+            <template v-if="relationshipFor(person.id) === 'friend'">
+              <span class="friend-relation-badge friend-relation-badge--friend">친구</span>
+              <button
+                type="button"
+                class="text-button"
+                :disabled="busyAction !== null"
+                @click="openSearchResultDm(person.id)"
+              >
+                메시지
+              </button>
+            </template>
+            <template v-else-if="relationshipFor(person.id) === 'incoming'">
+              <span class="friend-relation-badge">요청 받음</span>
+              <button
+                type="button"
+                class="primary-button primary-button--small"
+                :disabled="busyAction !== null"
+                @click="acceptSearchResult(person.id)"
+              >
+                {{ busyAction === `accept:${person.id}` ? '수락 중…' : '수락' }}
+              </button>
+            </template>
+            <template v-else-if="relationshipFor(person.id) === 'outgoing'">
+              <span class="friend-relation-badge">요청 보냄</span>
+              <button
+                type="button"
+                class="text-button text-button--danger"
+                :disabled="busyAction !== null"
+                @click="cancelSearchResult(person.id)"
+              >
+                {{ busyAction === `outgoing:${person.id}` ? '취소 중…' : '취소' }}
+              </button>
+            </template>
+            <button
+              v-else
+              type="button"
+              class="primary-button primary-button--small"
+              :disabled="busyAction !== null"
+              @click="sendRequestToUser(person)"
+            >
+              {{ busyAction === `send:${person.id}` ? '요청 중…' : '친구 추가' }}
+            </button>
+          </div>
+        </li>
+      </ul>
     </section>
 
     <p v-if="message" class="feedback feedback--success" role="status">

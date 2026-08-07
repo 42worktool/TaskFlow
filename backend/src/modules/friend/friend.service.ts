@@ -129,18 +129,8 @@ export async function listFriendRequests(input: { userId: string }) {
   }
 }
 
-export async function sendFriendRequest(input: { userId: string; email: string }) {
-  const email = normalizeEmail(input.email)
-  const target = await prisma.user.findFirst({
-    where: {
-      email: { equals: email, mode: 'insensitive' },
-      deleted_at: null,
-    },
-    select: { id: true },
-  })
-  if (!target) throw new AppError('USER_NOT_FOUND', 404, 'user not found')
-
-  const pair = canonicalFriendPair(input.userId, target.id)
+async function createFriendRequest(userId: string, targetUserId: string) {
+  const pair = canonicalFriendPair(userId, targetUserId)
   const outcome = await prisma.$transaction(async (tx) => {
     const friendship = await tx.friendship.findUnique({
       where: { user_low_id_user_high_id: pair },
@@ -152,7 +142,7 @@ export async function sendFriendRequest(input: { userId: string; email: string }
       where: { user_low_id_user_high_id: pair },
       create: {
         ...pair,
-        requested_by_id: input.userId,
+        requested_by_id: userId,
       },
       update: {},
       include: friendRequestInclude,
@@ -166,15 +156,39 @@ export async function sendFriendRequest(input: { userId: string; email: string }
       await tx.friendRequest.deleteMany({ where: pair })
       return { request: null }
     }
-    if (pending.requested_by_id !== input.userId) {
+    if (pending.requested_by_id !== userId) {
       throw new FriendRequestAlreadyReceivedError()
     }
     return { request: pending }
   })
 
   if (!outcome.request) throw new AlreadyFriendsError()
-  publishFriendRequestCreated(target.id, outcome.request)
-  return toFriendRequestDto(outcome.request, input.userId)
+  publishFriendRequestCreated(targetUserId, outcome.request)
+  return toFriendRequestDto(outcome.request, userId)
+}
+
+export async function sendFriendRequest(input: { userId: string; email: string }) {
+  const email = normalizeEmail(input.email)
+  const target = await prisma.user.findFirst({
+    where: {
+      email: { equals: email, mode: 'insensitive' },
+      deleted_at: null,
+    },
+    select: { id: true },
+  })
+  if (!target) throw new AppError('USER_NOT_FOUND', 404, 'user not found')
+
+  return createFriendRequest(input.userId, target.id)
+}
+
+export async function sendFriendRequestToUser(input: { userId: string; targetUserId: string }) {
+  const target = await prisma.user.findFirst({
+    where: { id: input.targetUserId, deleted_at: null },
+    select: { id: true },
+  })
+  if (!target) throw new AppError('USER_NOT_FOUND', 404, 'user not found')
+
+  return createFriendRequest(input.userId, target.id)
 }
 
 export async function acceptFriendRequest(input: { userId: string; requesterUserId: string }) {
