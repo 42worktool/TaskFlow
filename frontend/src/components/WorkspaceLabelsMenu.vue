@@ -185,8 +185,8 @@ onUnmounted(() => {
       :aria-expanded="open"
       @click="toggle"
     >
-      <span class="workspace-labels-trigger-icon" aria-hidden="true">◆</span>
-      <span>라벨</span>
+      <span class="mono-emoji">🏷️</span>
+      <span id="aa">라벨</span>
     </button>
 
     <section

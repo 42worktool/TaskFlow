@@ -92,7 +92,7 @@
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 5px 10px;
   color: #fff;
   font-size: 12px;
@@ -171,4 +171,14 @@
 .workspace-labels-error {
   margin-bottom: 10px;
   color: #b91c1c;
+}
+
+.mono-emoji {
+  filter: grayscale(100%);
+}
+
+@media (max-width: 780px) {
+  .workspace-labels-trigger #aa {
+    display: none;
+  }
 }
