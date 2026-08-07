@@ -11,11 +11,15 @@ const props = withDefaults(
     canEdit?: boolean
     canOpenDetails?: boolean
     completingCardIds?: ReadonlySet<string>
+    movingCardIds?: ReadonlySet<string>
+    movingList?: boolean
   }>(),
   {
     canEdit: false,
     canOpenDetails: false,
     completingCardIds: () => new Set<string>(),
+    movingCardIds: () => new Set<string>(),
+    movingList: false,
   },
 )
 
@@ -28,6 +32,8 @@ const emit = defineEmits<{
   'add-card': [listId: string, title: string]
   'delete-card': [cardId: string]
   'toggle-card-completion': [card: Card]
+  'move-card': [cardId: string, direction: 'previous' | 'next']
+  'move-list': [listId: string, direction: 'previous' | 'next']
   'rename-list': [listId: string, name: string]
   'delete-list': [listId: string]
 }>()
@@ -169,6 +175,26 @@ const vFocus = {
         >{{ list.name }}</span
       >
       <div class="list-header-actions flex items-center gap-1.5 shrink-0">
+        <div v-if="canEdit" class="list-keyboard-move-actions flex gap-0.5">
+          <button
+            type="button"
+            :disabled="movingList"
+            class="w-5.5 h-5.5 border border-gray-400 rounded bg-white text-gray-700 cursor-pointer leading-none disabled:cursor-default disabled:opacity-60"
+            :aria-label="`${list.name} 리스트 이전 위치로 이동`"
+            @click.stop="emit('move-list', list.id, 'previous')"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            :disabled="movingList"
+            class="w-5.5 h-5.5 border border-gray-400 rounded bg-white text-gray-700 cursor-pointer leading-none disabled:cursor-default disabled:opacity-60"
+            :aria-label="`${list.name} 리스트 다음 위치로 이동`"
+            @click.stop="emit('move-list', list.id, 'next')"
+          >
+            →
+          </button>
+        </div>
         <span
           class="list-count w-5.5 h-5.5 rounded-full flex items-center justify-center text-xs font-bold text-white"
           :style="{ background: badgeColors[list.name] ?? '#6b7280' }"
@@ -208,17 +234,37 @@ const vFocus = {
       @change="(e: DraggableChange<Card>) => emit('card-change', list.id, e)"
     >
       <template #item="{ element: card }">
-        <TaskCard
-          :card="card"
-          :openable="canOpenDetails"
-          :show-delete-action="canEdit"
-          :show-completion-action="canEdit"
-          :completed="card.is_completed"
-          :completion-pending="completingCardIds.has(card.id)"
-          @open="emit('open-card', card)"
-          @delete="emit('delete-card', card.id)"
-          @toggle-completion="emit('toggle-card-completion', card)"
-        />
+        <div class="card-item">
+          <TaskCard
+            :card="card"
+            :openable="canOpenDetails"
+            :show-delete-action="canEdit"
+            :show-completion-action="canEdit"
+            :completed="card.is_completed"
+            :completion-pending="completingCardIds.has(card.id)"
+            @open="emit('open-card', card)"
+            @delete="emit('delete-card', card.id)"
+            @toggle-completion="emit('toggle-card-completion', card)"
+          />
+          <div v-if="canEdit" class="card-keyboard-move-actions">
+            <button
+              type="button"
+              :disabled="movingCardIds.has(card.id)"
+              :aria-label="`${card.title} 카드 이전 위치로 이동`"
+              @click="emit('move-card', card.id, 'previous')"
+            >
+              이전으로 이동
+            </button>
+            <button
+              type="button"
+              :disabled="movingCardIds.has(card.id)"
+              :aria-label="`${card.title} 카드 다음 위치로 이동`"
+              @click="emit('move-card', card.id, 'next')"
+            >
+              다음으로 이동
+            </button>
+          </div>
+        </div>
       </template>
     </draggable>
 

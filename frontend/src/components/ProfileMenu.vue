@@ -2,6 +2,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authState, logout } from '../services/auth'
+import AccountLink from './AccountLink.vue'
+import ProfileLink from './ProfileLink.vue'
 
 const router = useRouter()
 const open = ref(false)
@@ -88,20 +90,20 @@ onUnmounted(() => {
 
       <div class="h-px my-1.5 bg-gray-200" />
 
-      <RouterLink
+      <ProfileLink
         v-if="user"
-        :to="`/profiles/${user.id}`"
-        class="menu-item w-full block py-2.25 px-2.5 border-none rounded-md bg-transparent text-left text-gray-700 no-underline hover:bg-gray-100 hover:text-gray-900"
+        :user-id="user.id"
+        class="menu-item block w-full rounded-md border-none bg-transparent px-2.5! py-2.25! text-left text-gray-700 no-underline hover:bg-gray-100 hover:text-gray-900"
         @click="open = false"
       >
         내 프로필
-      </RouterLink>
-      <RouterLink
-        to="/account"
+      </ProfileLink>
+      <AccountLink
         class="menu-item w-full block py-2.25 px-2.5 border-none rounded-md bg-transparent text-left text-gray-700 no-underline hover:bg-gray-100 hover:text-gray-900"
         @click="open = false"
-        >계정 설정</RouterLink
       >
+        계정 설정
+      </AccountLink>
       <RouterLink
         to="/terms"
         class="menu-item w-full block py-2.25 px-2.5 border-none rounded-md bg-transparent text-left text-gray-700 no-underline hover:bg-gray-100 hover:text-gray-900"

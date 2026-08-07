@@ -47,7 +47,10 @@ const lists = ref<ListWithCards[]>([])
 const loading = ref(false)
 const error = ref('')
 const actionError = ref('')
+const boardAnnouncement = ref('')
 const completingCardIds = ref<Set<string>>(new Set())
+const movingCardIds = ref<Set<string>>(new Set())
+const movingListIds = ref<Set<string>>(new Set())
 const selectedCardId = ref<string | null>(null)
 const cardDetailRefreshToken = ref(0)
 const boardColumns = ref<{ $el: HTMLElement } | null>(null)
@@ -325,6 +328,35 @@ function onListChange(event: DraggableChange<ListWithCards>) {
   )
 }
 
+async function onKeyboardMoveList(listId: string, direction: 'previous' | 'next'): Promise<void> {
+  if (!props.canEditBoard || movingListIds.value.has(listId)) return
+  const currentIndex = lists.value.findIndex((list) => list.id === listId)
+  const list = lists.value[currentIndex]
+  if (!list) return
+  const targetIndex = currentIndex + (direction === 'previous' ? -1 : 1)
+  if (targetIndex < 0 || targetIndex >= lists.value.length) return
+
+  const reorderedLists = lists.value.filter((item) => item.id !== listId)
+  reorderedLists.splice(targetIndex, 0, list)
+  const { beforeId, afterId } = neighborIds(reorderedLists, targetIndex)
+
+  movingListIds.value = new Set(movingListIds.value).add(listId)
+  actionError.value = ''
+  try {
+    await ListAPI.reorder(listId, { before_list_id: beforeId, after_list_id: afterId })
+    boardAnnouncement.value = `${list.name} 리스트를 ${targetIndex + 1}번째 위치로 옮겼습니다.`
+    queueFullRefresh()
+  } catch (caught) {
+    actionError.value =
+      caught instanceof Error ? caught.message : '리스트를 키보드로 이동하지 못했습니다.'
+    queueFullRefresh()
+  } finally {
+    const next = new Set(movingListIds.value)
+    next.delete(listId)
+    movingListIds.value = next
+  }
+}
+
 function persistCardChange(
   workspaceId: string,
   listId: string,
@@ -447,6 +479,57 @@ async function onToggleCardCompletion(card: Card) {
     const next = new Set(completingCardIds.value)
     next.delete(card.id)
     completingCardIds.value = next
+  }
+}
+
+async function onKeyboardMoveCard(cardId: string, direction: 'previous' | 'next'): Promise<void> {
+  if (!props.canEditBoard || movingCardIds.value.has(cardId)) return
+  const sourceIndex = lists.value.findIndex((list) => list.cards.some((card) => card.id === cardId))
+  if (sourceIndex < 0) return
+  const source = lists.value[sourceIndex]
+  const cardIndex = source.cards.findIndex((card) => card.id === cardId)
+  const card = source.cards[cardIndex]
+  if (!card) return
+
+  let target = source
+  let targetIndex = cardIndex + (direction === 'previous' ? -1 : 1)
+  if (targetIndex < 0) {
+    target = lists.value[sourceIndex - 1] ?? source
+    targetIndex = target === source ? 0 : target.cards.length
+  } else if (targetIndex >= source.cards.length) {
+    target = lists.value[sourceIndex + 1] ?? source
+    targetIndex = target === source ? source.cards.length - 1 : 0
+  }
+  if (target === source && targetIndex === cardIndex) return
+
+  const targetCards = (target === source ? source.cards : target.cards).filter(
+    (item) => item.id !== cardId,
+  )
+  targetCards.splice(targetIndex, 0, card)
+  const { beforeId, afterId } = neighborIds(targetCards, targetIndex)
+
+  movingCardIds.value = new Set(movingCardIds.value).add(cardId)
+  actionError.value = ''
+  try {
+    if (target.id === source.id) {
+      await CardAPI.reorder(cardId, { before_card_id: beforeId, after_card_id: afterId })
+    } else {
+      await CardAPI.move(cardId, {
+        list_id: target.id,
+        before_card_id: beforeId,
+        after_card_id: afterId,
+      })
+    }
+    boardAnnouncement.value = `${card.title} 카드를 ${target.name} 리스트의 ${targetIndex + 1}번째 위치로 옮겼습니다.`
+    queueFullRefresh()
+  } catch (caught) {
+    actionError.value =
+      caught instanceof Error ? caught.message : '카드를 키보드로 이동하지 못했습니다.'
+    queueFullRefresh()
+  } finally {
+    const next = new Set(movingCardIds.value)
+    next.delete(cardId)
+    movingCardIds.value = next
   }
 }
 
@@ -601,6 +684,9 @@ onUnmounted(() => {
 
 <template>
   <div class="board-page relative flex-1 min-w-0 flex overflow-hidden bg-gray-100">
+    <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+      {{ boardAnnouncement }}
+    </p>
     <p
       v-if="actionError"
       class="board-action-error absolute top-3 left-1/2 flex items-center gap-2.5 py-2.25 pr-2.5 pl-3.25 -translate-x-1/2 border border-red-200 bg-white text-red-700 text-xs"
@@ -646,6 +732,8 @@ onUnmounted(() => {
           :can-edit="canEditBoard"
           :can-open-details="canViewCardDetails"
           :completing-card-ids="completingCardIds"
+          :moving-card-ids="movingCardIds"
+          :moving-list="movingListIds.has(col.id)"
           @open-card="openCard"
           @update-cards="onUpdateCards"
           @card-change="onCardChange"
@@ -654,6 +742,8 @@ onUnmounted(() => {
           @add-card="onAddCard"
           @delete-card="onDeleteCard"
           @toggle-card-completion="onToggleCardCompletion"
+          @move-card="onKeyboardMoveCard"
+          @move-list="onKeyboardMoveList"
           @rename-list="onRenameList"
           @delete-list="onDeleteList"
         />

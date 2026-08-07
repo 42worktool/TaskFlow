@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import PageHeader from '../components/PageHeader.vue'
 import { authState } from '../services/auth'
+import { profileModalState } from '../services/profileModal'
 import { AccountAPI } from '../api/account'
 import { AVATAR_MAX_BYTES, AVATAR_MIME_ALLOWLIST } from '../utils/uploadLimits'
+import ProfileLink from '../components/ProfileLink.vue'
 
+const emit = defineEmits<{
+  close: []
+}>()
 const router = useRouter()
 const name = ref(authState.user?.name ?? '')
 const headline = ref(authState.user?.headline ?? '안녕하세요')
@@ -18,6 +22,18 @@ const avatarInput = ref<HTMLInputElement | null>(null)
 const avatarUploading = ref(false)
 const avatarProgress = ref(0)
 const avatarError = ref('')
+
+function closeAccount(): void {
+  emit('close')
+}
+
+function handleKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape') return
+  if (profileModalState.surface && profileModalState.surface !== 'account') return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  closeAccount()
+}
 
 async function saveProfile() {
   saving.value = true
@@ -94,152 +110,185 @@ async function removeAccount() {
     error.value = caught instanceof Error ? caught.message : '계정을 삭제하지 못했습니다.'
   }
 }
+
+onMounted(() => window.addEventListener('keydown', handleKeydown, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown, true))
 </script>
 
 <template>
-  <div class="account-page min-h-screen px-6 pb-8 text-gray-900 max-sm:px-3.5 max-sm:pb-6">
-    <PageHeader />
-
-    <main
-      class="account-card mx-auto mb-7 max-w-170 p-9 border border-gray-200 rounded-2xl bg-white max-sm:px-5 max-sm:py-6"
+  <Teleport to="body">
+    <div
+      class="fixed inset-0 z-[420] flex items-center justify-center overflow-y-auto bg-[rgba(17,24,39,0.28)] p-5! backdrop-blur-[2px]"
+      @click.self="closeAccount"
     >
-      <h1>계정 설정</h1>
-      <div class="flex items-start justify-between gap-4 mb-7 max-sm:flex-col max-sm:gap-1">
-        <p class="mt-2 text-gray-500">로그인 계정과 공개 프로필 정보를 관리합니다.</p>
-        <RouterLink
-          v-if="authState.user"
-          :to="`/profiles/${authState.user.id}`"
-          class="account-public-link shrink-0 mt-2 text-blue-600 font-bold hover:underline"
-        >
-          공개 프로필 보기 ↗
-        </RouterLink>
-      </div>
-
-      <div class="flex items-center gap-3.5 p-4 rounded-xl bg-slate-50 max-sm:items-start">
-        <div class="relative shrink-0 grow-0">
-          <img
-            v-if="authState.user?.profile_image_url"
-            :src="authState.user.profile_image_url"
-            alt=""
-            class="w-12 h-12 rounded-full object-cover"
-            referrerpolicy="no-referrer"
-          />
-          <div
-            v-else
-            class="w-12 h-12 rounded-full grid place-items-center bg-blue-600 text-white font-bold"
+      <main
+        class="relative max-h-[calc(100vh-40px)] w-full max-w-[680px] overflow-y-auto rounded-xl bg-white shadow-[0_16px_48px_rgba(17,24,39,0.22)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="account-dialog-title"
+        @click.stop
+      >
+        <div class="flex items-center justify-between px-6! pt-5!">
+          <h1 id="account-dialog-title" class="text-lg font-bold text-slate-900">프로필 수정</h1>
+          <button
+            type="button"
+            class="border-0 bg-transparent text-slate-500 transition hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="프로필 수정 닫기"
+            @click="closeAccount"
           >
-            {{ authState.user?.name.charAt(0).toUpperCase() }}
-          </div>
-          <input
-            ref="avatarInput"
-            type="file"
-            class="hidden"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            @change="onAvatarSelected"
-          />
+            ✕
+          </button>
         </div>
-        <div>
-          <strong>{{ authState.user?.email }}</strong>
-          <p class="identity-status mt-1 text-green-600">
-            {{
-              authState.user?.auth_provider === 'google'
-                ? 'Google OAuth 연결됨'
-                : '이메일 로그인 사용 중'
-            }}
-          </p>
-          <div class="flex gap-2.5 mt-1.5">
-            <button
-              type="button"
-              class="border-0 bg-transparent p-0 text-blue-600 text-xs font-semibold cursor-pointer disabled:cursor-default disabled:opacity-50"
-              :disabled="avatarUploading"
-              @click="triggerAvatarPicker"
+
+        <div class="px-6! pt-5! pb-6!">
+          <div class="flex items-start justify-between gap-4 max-sm:flex-col max-sm:gap-2">
+            <p class="text-sm text-slate-500">로그인 계정과 공개 프로필 정보를 관리합니다.</p>
+            <ProfileLink
+              v-if="authState.user"
+              :user-id="authState.user.id"
+              class="shrink-0 text-xs font-semibold text-[#0c66e4] hover:underline"
             >
-              {{ avatarUploading ? `업로드 중… ${avatarProgress}%` : '사진 변경' }}
-            </button>
-            <button
-              v-if="authState.user?.profile_image_url"
-              type="button"
-              class="border-0 bg-transparent p-0 text-red-700 text-xs font-semibold cursor-pointer disabled:cursor-default disabled:opacity-50"
-              :disabled="avatarUploading"
-              @click="removeAvatarPhoto"
-            >
-              삭제
-            </button>
+              공개 프로필 보기 ↗
+            </ProfileLink>
           </div>
-          <p v-if="avatarError" class="form-message text-red-700" role="alert">
-            {{ avatarError }}
-          </p>
+
+          <div
+            class="mt-6! flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4! max-sm:items-start"
+          >
+            <div class="relative shrink-0">
+              <img
+                v-if="authState.user?.profile_image_url"
+                :src="authState.user.profile_image_url"
+                alt=""
+                class="h-14 w-14 rounded-full object-cover"
+                referrerpolicy="no-referrer"
+              />
+              <div
+                v-else
+                class="grid h-14 w-14 place-items-center rounded-full bg-[#0c66e4] text-lg font-bold text-white"
+              >
+                {{ authState.user?.name.charAt(0).toUpperCase() }}
+              </div>
+              <input
+                ref="avatarInput"
+                type="file"
+                class="hidden"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                @change="onAvatarSelected"
+              />
+            </div>
+            <div class="min-w-0">
+              <strong class="block truncate text-sm text-slate-800">{{
+                authState.user?.email
+              }}</strong>
+              <p class="mt-1! text-xs font-medium text-emerald-600">
+                {{
+                  authState.user?.auth_provider === 'google'
+                    ? 'Google OAuth 연결됨'
+                    : '이메일 로그인 사용 중'
+                }}
+              </p>
+              <div class="mt-2! flex gap-3">
+                <button
+                  type="button"
+                  class="text-xs font-semibold text-[#0c66e4] hover:underline disabled:cursor-default disabled:opacity-50"
+                  :disabled="avatarUploading"
+                  @click="triggerAvatarPicker"
+                >
+                  {{ avatarUploading ? `업로드 중… ${avatarProgress}%` : '사진 변경' }}
+                </button>
+                <button
+                  v-if="authState.user?.profile_image_url"
+                  type="button"
+                  class="text-xs font-semibold text-rose-600 hover:underline disabled:cursor-default disabled:opacity-50"
+                  :disabled="avatarUploading"
+                  @click="removeAvatarPhoto"
+                >
+                  삭제
+                </button>
+              </div>
+              <p v-if="avatarError" class="mt-2! text-xs text-rose-600" role="alert">
+                {{ avatarError }}
+              </p>
+            </div>
+          </div>
+
+          <form class="mt-6! grid gap-2.5" @submit.prevent="saveProfile">
+            <label for="account-name" class="text-sm font-semibold text-slate-700">표시 이름</label>
+            <input
+              id="account-name"
+              v-model="name"
+              type="text"
+              class="rounded-lg border border-slate-300 px-3.5! py-2.5! outline-none transition focus:border-[#0c66e4] focus:ring-2 focus:ring-blue-100"
+              minlength="2"
+              maxlength="80"
+              required
+            />
+
+            <label for="account-headline" class="mt-2! text-sm font-semibold text-slate-700"
+              >한줄 소개</label
+            >
+            <input
+              id="account-headline"
+              v-model="headline"
+              type="text"
+              class="rounded-lg border border-slate-300 px-3.5! py-2.5! outline-none transition focus:border-[#0c66e4] focus:ring-2 focus:ring-blue-100"
+              minlength="1"
+              maxlength="160"
+              placeholder="어떤 일을 하는 사람인지 소개해 주세요."
+              required
+            />
+            <span class="text-xs text-slate-500"
+              >공개 프로필에 표시됩니다. {{ headline.length }}/160</span
+            >
+
+            <label for="account-linkedin" class="mt-2! text-sm font-semibold text-slate-700"
+              >LinkedIn 주소</label
+            >
+            <input
+              id="account-linkedin"
+              v-model="linkedinUrl"
+              type="text"
+              class="rounded-lg border border-slate-300 px-3.5! py-2.5! outline-none transition focus:border-[#0c66e4] focus:ring-2 focus:ring-blue-100"
+              inputmode="url"
+              maxlength="2048"
+              placeholder="linkedin.com/in/username"
+            />
+            <span class="text-xs text-slate-500"
+              >비워두면 공개 프로필에 링크가 나타나지 않습니다.</span
+            >
+
+            <p v-if="message" class="text-xs font-medium text-emerald-600" role="status">
+              {{ message }}
+            </p>
+            <p v-if="error" class="text-xs font-medium text-rose-600" role="alert">{{ error }}</p>
+            <button
+              type="submit"
+              class="mt-2! w-fit rounded-lg bg-[#0c66e4] px-4! py-2.5! text-sm font-bold text-white transition hover:bg-[#0055cc] focus:outline-none focus:ring-2 focus:ring-[#0c66e4] focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+              :disabled="saving"
+            >
+              {{ saving ? '저장 중…' : '변경사항 저장' }}
+            </button>
+          </form>
+
+          <section class="mt-7! border-t border-slate-200 pt-5!">
+            <h2 class="text-sm font-bold text-slate-800">계정 삭제</h2>
+            <div class="mt-2! flex items-center justify-between gap-4 max-sm:items-start">
+              <p class="text-xs leading-5 text-slate-500">
+                계정과 로그인 정보가 영구적으로 삭제됩니다. 소유한 프로젝트가 있다면 먼저 소유권을
+                위임하거나 프로젝트를 삭제해야 합니다.
+              </p>
+              <button
+                type="button"
+                class="shrink-0 rounded-lg border border-rose-200 px-3! py-2! text-xs font-semibold text-rose-600 transition hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                @click="removeAccount"
+              >
+                계정 삭제
+              </button>
+            </div>
+          </section>
         </div>
-      </div>
-
-      <form class="account-form grid gap-2.5 mt-7" @submit.prevent="saveProfile">
-        <label for="account-name" class="text-sm font-bold">표시 이름</label>
-        <input
-          id="account-name"
-          v-model="name"
-          type="text"
-          minlength="2"
-          maxlength="80"
-          required
-          class="py-3 px-3.5 border border-gray-300 rounded-lg"
-        />
-
-        <label for="account-headline" class="text-sm font-bold">한줄 소개</label>
-        <input
-          id="account-headline"
-          v-model="headline"
-          type="text"
-          minlength="1"
-          maxlength="160"
-          placeholder="어떤 일을 하는 사람인지 소개해 주세요."
-          required
-          class="py-3 px-3.5 border border-gray-300 rounded-lg"
-        />
-        <span class="account-field-hint -mt-1 text-gray-500 text-xs"
-          >공개 프로필에 표시됩니다. {{ headline.length }}/160</span
-        >
-
-        <label for="account-linkedin" class="text-sm font-bold">LinkedIn 주소</label>
-        <input
-          id="account-linkedin"
-          v-model="linkedinUrl"
-          type="text"
-          inputmode="url"
-          maxlength="2048"
-          placeholder="linkedin.com/in/username"
-          class="py-3 px-3.5 border border-gray-300 rounded-lg"
-        />
-        <span class="account-field-hint -mt-1 text-gray-500 text-xs"
-          >비워두면 공개 프로필에 링크가 나타나지 않습니다.</span
-        >
-
-        <p v-if="message" class="form-message text-green-700" role="status">{{ message }}</p>
-        <p v-if="error" class="form-message text-red-700" role="alert">{{ error }}</p>
-        <button
-          type="submit"
-          class="w-fit py-2.5 px-4 border-0 rounded-lg text-white font-bold cursor-pointer bg-blue-600 disabled:cursor-wait disabled:opacity-65"
-          :disabled="saving"
-        >
-          {{ saving ? '저장 중…' : '변경사항 저장' }}
-        </button>
-      </form>
-
-      <section class="mt-9 pt-6 border-t border-gray-200">
-        <h2 class="text-lg">계정 삭제</h2>
-        <p class="mt-2 mb-4 text-gray-500 text-sm">
-          계정과 로그인 정보가 영구적으로 삭제됩니다. 소유한 프로젝트가 있다면 먼저 소유권을
-          위임하거나 프로젝트를 삭제해야 합니다.
-        </p>
-        <button
-          type="button"
-          class="w-fit py-2.5 px-4 border-0 rounded-lg text-white font-bold cursor-pointer bg-red-600"
-          @click="removeAccount"
-        >
-          계정 삭제
-        </button>
-      </section>
-    </main>
-  </div>
+      </main>
+    </div>
+  </Teleport>
 </template>
-
-<style scoped src="../styles/account.css"></style>

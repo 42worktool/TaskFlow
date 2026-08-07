@@ -4,6 +4,7 @@ import { FriendAPI } from '../api/friend'
 import type { PublicProfile } from '../api/profile'
 import { SearchAPI } from '../api/search'
 import PersonAvatar from './PersonAvatar.vue'
+import ProfileLink from './ProfileLink.vue'
 import { authState } from '../services/auth'
 import { realtime } from '../services/realtime'
 import {
@@ -377,10 +378,10 @@ onUnmounted(() => {
         >
           <PersonAvatar :name="person.name" :image-url="person.profile_image_url" />
           <div class="friend-search-copy min-w-0 flex-1">
-            <RouterLink
-              :to="`/profiles/${person.id}`"
+            <ProfileLink
+              :user-id="person.id"
               class="friend-search-name-link block overflow-hidden text-ellipsis whitespace-nowrap"
-              >{{ person.name }}</RouterLink
+              >{{ person.name }}</ProfileLink
             >
             <span
               class="friend-search-headline block overflow-hidden text-ellipsis whitespace-nowrap mt-0.5 text-slate-500"
@@ -550,9 +551,9 @@ onUnmounted(() => {
                 <PersonAvatar :name="request.name" :image-url="request.profile_image_url" />
                 <div class="person-meta min-w-0 flex-1">
                   <strong class="block overflow-hidden text-ellipsis whitespace-nowrap">
-                    <RouterLink :to="`/profiles/${request.id}`" class="person-profile-link">
+                    <ProfileLink :user-id="request.id" class="person-profile-link">
                       {{ request.name }}
-                    </RouterLink>
+                    </ProfileLink>
                   </strong>
                   <span class="block mt-0.75 text-slate-500 text-xs"
                     >{{ formatDate(request.requested_at) }} 요청</span
@@ -593,9 +594,9 @@ onUnmounted(() => {
                 <PersonAvatar :name="request.name" :image-url="request.profile_image_url" />
                 <div class="person-meta min-w-0 flex-1">
                   <strong class="block overflow-hidden text-ellipsis whitespace-nowrap">
-                    <RouterLink :to="`/profiles/${request.id}`" class="person-profile-link">
+                    <ProfileLink :user-id="request.id" class="person-profile-link">
                       {{ request.name }}
-                    </RouterLink>
+                    </ProfileLink>
                   </strong>
                   <span class="block mt-0.75 text-slate-500 text-xs"
                     >{{ formatDate(request.requested_at) }}부터 대기 중</span
@@ -626,9 +627,9 @@ onUnmounted(() => {
                 <PersonAvatar :name="friend.name" :image-url="friend.profile_image_url" />
                 <div class="person-meta min-w-0 flex-1">
                   <strong class="block overflow-hidden text-ellipsis whitespace-nowrap">
-                    <RouterLink :to="`/profiles/${friend.id}`" class="person-profile-link">
+                    <ProfileLink :user-id="friend.id" class="person-profile-link">
                       {{ friend.name }}
-                    </RouterLink>
+                    </ProfileLink>
                   </strong>
                   <span
                     class="friend-presence"

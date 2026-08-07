@@ -2,6 +2,7 @@
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { FriendAPI } from '../api/friend'
 import { authState } from '../services/auth'
+import { openProfileModal } from '../services/profileModal'
 import { realtime } from '../services/realtime'
 import { parseDirectMessage } from '../services/realtime/protocol'
 import type { DirectMessage } from '../types'
@@ -151,13 +152,18 @@ onUnmounted(() => {
 
 <template>
   <section
-    class="direct-message-panel h-full min-h-0 flex flex-col bg-slate-50 text-gray-900"
+    class="direct-message-panel flex h-full min-h-0 flex-col bg-slate-50 text-gray-900"
     aria-label="친구 다이렉트 메시지"
   >
     <header
-      class="direct-message-header min-h-16 py-2.25 px-3.25 border-b border-slate-200 flex items-center justify-between gap-3 bg-white"
+      class="direct-message-header flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white px-3.25! py-2.25!"
     >
-      <div class="direct-message-person min-w-0 flex items-center gap-2.5">
+      <button
+        type="button"
+        class="direct-message-person flex min-w-0 items-center gap-2.5 rounded-lg border-0 bg-transparent p-1! text-left outline-none transition hover:bg-slate-100 focus:ring-2 focus:ring-blue-500"
+        :aria-label="`${friendName || '친구'} 프로필 보기`"
+        @click="openProfileModal(friendId)"
+      >
         <div class="direct-message-avatar-wrap relative shrink-0 grow-0 basis-10">
           <img
             v-if="friendProfileImageUrl"
@@ -191,7 +197,7 @@ onUnmounted(() => {
             {{ friendOnline ? '온라인' : '오프라인' }}
           </span>
         </div>
-      </div>
+      </button>
     </header>
 
     <div
@@ -220,24 +226,37 @@ onUnmounted(() => {
           v-if="message.author.profile_image_url"
           :src="message.author.profile_image_url"
           alt=""
-          class="direct-message-message-avatar w-7.5 h-7.5 shrink-0 grow-0 basis-7.5 rounded-full object-cover"
+          class="direct-message-message-avatar h-7.5 w-7.5 shrink-0 grow-0 basis-7.5 cursor-pointer rounded-full object-cover outline-none transition hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-500"
           referrerpolicy="no-referrer"
+          role="button"
+          tabindex="0"
+          :aria-label="`${message.author.name} 프로필 보기`"
+          @click="openProfileModal(message.author.user_id)"
+          @keydown.enter.space.prevent="openProfileModal(message.author.user_id)"
         />
         <span
           v-else
-          class="direct-message-message-avatar w-7.5 h-7.5 shrink-0 grow-0 basis-7.5 rounded-full grid place-items-center bg-blue-600 text-white font-extrabold text-xs"
-          aria-hidden="true"
+          class="direct-message-message-avatar direct-message-avatar--fallback grid h-7.5 w-7.5 shrink-0 grow-0 basis-7.5 cursor-pointer place-items-center rounded-full bg-blue-600 text-xs font-extrabold text-white outline-none transition hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-500"
+          role="button"
+          tabindex="0"
+          :aria-label="`${message.author.name} 프로필 보기`"
+          @click="openProfileModal(message.author.user_id)"
+          @keydown.enter.space.prevent="openProfileModal(message.author.user_id)"
         >
           {{ message.author.name.charAt(0).toUpperCase() }}
         </span>
         <div class="direct-message-body min-w-0">
           <div
-            class="direct-message-meta flex items-baseline gap-1.5 mx-1 mb-1 text-slate-500"
+            class="direct-message-meta mx-1 mb-1 flex items-baseline gap-1.5 text-slate-500"
             :class="{ 'justify-end': message.author.user_id === authState.user?.id }"
           >
-            <strong class="overflow-hidden text-slate-700 text-ellipsis whitespace-nowrap">{{
-              message.author.name
-            }}</strong>
+            <button
+              type="button"
+              class="min-w-0 overflow-hidden border-0 bg-transparent p-0! text-ellipsis whitespace-nowrap text-slate-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+              @click="openProfileModal(message.author.user_id)"
+            >
+              <strong>{{ message.author.name }}</strong>
+            </button>
             <time class="whitespace-nowrap" :datetime="message.created_at">
               {{ formatMessageTime(message.created_at) }}
             </time>
