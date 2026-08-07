@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue'
-import type { DirectMessage, NotificationEvent, WorkspaceMessage } from '../types'
+import type { DirectMessage, FriendRequest, NotificationEvent, WorkspaceMessage } from '../types'
 
 export interface VisibleMessengerRoom {
   kind: 'workspace' | 'dm'
@@ -9,13 +9,16 @@ export interface VisibleMessengerRoom {
 const messengerUnreadState = reactive({
   workspaces: {} as Record<string, number>,
   directMessages: {} as Record<string, number>,
+  friendRequests: 0,
 })
 
 export const totalMessengerUnreadCount = computed(
   () =>
     Object.values(messengerUnreadState.workspaces).reduce((total, count) => total + count, 0) +
-    Object.values(messengerUnreadState.directMessages).reduce((total, count) => total + count, 0),
+    Object.values(messengerUnreadState.directMessages).reduce((total, count) => total + count, 0) +
+    messengerUnreadState.friendRequests,
 )
+export const friendRequestUnreadCount = computed(() => messengerUnreadState.friendRequests)
 
 export function formatMessengerUnreadCount(count: number): string {
   if (count <= 0) return ''
@@ -38,6 +41,10 @@ export function markDirectConversationRead(friendId: string): void {
   delete messengerUnreadState.directMessages[friendId]
 }
 
+export function markFriendRequestsRead(): void {
+  messengerUnreadState.friendRequests = 0
+}
+
 export function clearMessengerUnread(): void {
   for (const workspaceId of Object.keys(messengerUnreadState.workspaces)) {
     delete messengerUnreadState.workspaces[workspaceId]
@@ -45,6 +52,7 @@ export function clearMessengerUnread(): void {
   for (const friendId of Object.keys(messengerUnreadState.directMessages)) {
     delete messengerUnreadState.directMessages[friendId]
   }
+  markFriendRequestsRead()
 }
 
 export function pruneMessengerUnreadRooms(
@@ -117,6 +125,16 @@ export function receiveWorkspaceActivityUnread(
 ): boolean {
   if (!currentUserId || event.actor.user_id === currentUserId) return false
   return recordWorkspaceUnread(event.workspace_id, visibleRoom)
+}
+
+export function receiveFriendRequestUnread(
+  request: FriendRequest,
+  currentUserId: string | null,
+  friendManagementVisible: boolean,
+): boolean {
+  if (!currentUserId || request.id === currentUserId || friendManagementVisible) return false
+  messengerUnreadState.friendRequests += 1
+  return true
 }
 
 export function parseNotificationEvent(value: unknown): NotificationEvent | null {

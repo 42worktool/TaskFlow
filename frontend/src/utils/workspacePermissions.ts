@@ -27,7 +27,18 @@ export function canChangeWorkspaceMemberRole(
     callerRole !== null &&
     ROLE_RANK[callerRole] >= ROLE_RANK.ADMIN &&
     targetRole !== 'OWNER' &&
-    ROLE_RANK[targetRole] <= ROLE_RANK[callerRole]
+    ROLE_RANK[targetRole] < ROLE_RANK[callerRole]
+  )
+}
+
+export function canAssignWorkspaceRole(
+  callerRole: WorkspaceRole | null,
+  role: WorkspaceRole,
+): boolean {
+  return (
+    callerRole !== null &&
+    ROLE_RANK[callerRole] >= ROLE_RANK.ADMIN &&
+    ROLE_RANK[role] < ROLE_RANK[callerRole]
   )
 }
 

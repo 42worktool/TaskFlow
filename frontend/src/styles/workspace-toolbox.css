@@ -172,6 +172,7 @@
     right: 0;
     bottom: 0;
     height: calc(62px + env(safe-area-inset-bottom, 0px));
+    max-width: 100%;
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0;

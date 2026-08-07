@@ -41,6 +41,16 @@ export const WorkspaceAPI = {
       json: { role },
     }),
 
+  transferOwnership: async (workspaceId: string, userId: string) =>
+    apiRequest<Workspace>(`/api/workspaces/${workspaceId}/ownership/${userId}`, {
+      method: 'PUT',
+    }),
+
+  leave: async (workspaceId: string) =>
+    apiRequest<void>(`/api/workspaces/${workspaceId}/membership`, {
+      method: 'DELETE',
+    }),
+
   acceptInvite: async (token: string) =>
     apiRequest<Workspace>(`/api/workspaces/invite/${token}`, {
       method: 'POST',

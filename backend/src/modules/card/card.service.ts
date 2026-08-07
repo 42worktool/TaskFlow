@@ -632,6 +632,7 @@ export async function updateComment(input: { userId: string; commentId: string; 
     throw commentAlreadyDeletedError()
   }
   const card = await getCardOrThrow(comment.card_id)
+  await requireCardRole(card, input.userId)
   const location = await workspaceLocationForCard(card)
 
   const updated = await prisma.$transaction(async (tx) => {
@@ -671,7 +672,9 @@ export async function deleteComment(input: { userId: string; commentId: string }
   if (!comment) throw new NotFoundError()
   const card = await getCardOrThrow(comment.card_id)
 
-  if (comment.user_id !== input.userId) {
+  if (comment.user_id === input.userId) {
+    await requireCardRole(card, input.userId)
+  } else {
     if (!card.list_id) throw new ForbiddenError()
     const list = await getListOrThrow(card.list_id)
     await requireWorkspaceRole(list.workspace_id, input.userId, 'ADMIN')

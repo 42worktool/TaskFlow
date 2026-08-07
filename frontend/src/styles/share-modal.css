@@ -152,6 +152,8 @@
 .member-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -196,6 +198,24 @@
   font-size: 13px;
   color: #ef4444;
   cursor: pointer;
+}
+
+.transfer-btn {
+  padding: 5px 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.transfer-btn:disabled,
+.remove-btn:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .modal-footer {

@@ -99,7 +99,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', handleDocument
 <template>
   <div
     ref="root"
-    class="relative mb-4 flex min-w-0 flex-col gap-1.5 text-[13px] font-semibold text-slate-700"
+    class="relative mb-4! flex min-w-0 flex-col gap-1.5 text-[13px] font-semibold text-slate-700"
     @keydown.esc.stop="closePicker(true)"
   >
     <label :for="controlId">{{ label }}</label>

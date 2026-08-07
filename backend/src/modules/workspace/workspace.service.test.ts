@@ -497,6 +497,18 @@ test('workspace member role changes preserve the ownership boundary', async (t) 
       targetRole: 'MEMBER',
       newRole: 'OWNER',
     },
+    {
+      name: 'ADMIN cannot promote a member to peer ADMIN',
+      callerRole: 'ADMIN',
+      targetRole: 'MEMBER',
+      newRole: 'ADMIN',
+    },
+    {
+      name: 'ADMIN cannot change a peer ADMIN',
+      callerRole: 'ADMIN',
+      targetRole: 'ADMIN',
+      newRole: 'MEMBER',
+    },
   ] as const) {
     await t.test(scenario.name, async (t) => {
       const current = workspaceForRoleChange(scenario.callerRole, scenario.targetRole)
@@ -521,7 +533,7 @@ test('workspace member role changes preserve the ownership boundary', async (t) 
           typeof error === 'object' &&
           error !== null &&
           'code' in error &&
-          error.code === 'FORBIDDEN',
+          error.code === 'WORKSPACE_ROLE_HIERARCHY',
       )
       assert.equal(updateCount, 0)
     })
@@ -541,6 +553,7 @@ test('workspace member removal protects ADMIN and OWNER targets', async (t) => {
     { callerRole: 'OWNER', targetRole: 'MEMBER' },
     { callerRole: 'ADMIN', targetRole: 'VIEWER' },
     { callerRole: 'OWNER', targetRole: 'VIEWER' },
+    { callerRole: 'OWNER', targetRole: 'ADMIN' },
   ] as const) {
     await t.test(`${scenario.callerRole} can remove a ${scenario.targetRole}`, async (t) => {
       const current = workspaceForRoleChange(scenario.callerRole, scenario.targetRole)
@@ -567,7 +580,6 @@ test('workspace member removal protects ADMIN and OWNER targets', async (t) => {
 
   for (const scenario of [
     { callerRole: 'ADMIN', targetRole: 'ADMIN' },
-    { callerRole: 'OWNER', targetRole: 'ADMIN' },
     { callerRole: 'ADMIN', targetRole: 'OWNER' },
     { callerRole: 'OWNER', targetRole: 'OWNER' },
   ] as const) {
@@ -593,11 +605,169 @@ test('workspace member removal protects ADMIN and OWNER targets', async (t) => {
           typeof error === 'object' &&
           error !== null &&
           'code' in error &&
-          error.code === 'FORBIDDEN',
+          error.code === 'WORKSPACE_ROLE_HIERARCHY',
       )
       assert.equal(updateCount, 0)
     })
   }
+})
+
+test('workspace ownership transfer is separate and atomic', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { transferWorkspaceOwnership }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./workspace.service'),
+  ])
+  const before = workspaceForRoleChange('OWNER', 'MEMBER')
+  const after = workspaceForRoleChange('ADMIN', 'OWNER')
+  const updates: unknown[] = []
+  let workspaceRead = 0
+
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma.workspace, 'findFirst', async () => {
+    workspaceRead += 1
+    return workspaceRead === 1 ? before : after
+  })
+  stubMethod(t, prisma.workspaceMember, 'update', async (args) => {
+    updates.push(args)
+    return {}
+  })
+  stubMethod(t, realtime, 'publish', () => undefined)
+
+  const transferred = await transferWorkspaceOwnership({
+    userId: USER_ID,
+    workspaceId: WORKSPACE_ID,
+    targetUserId: OWNER_ID,
+  })
+
+  assert.equal(transferred.members.find((member) => member.user_id === USER_ID)?.role, 'ADMIN')
+  assert.equal(transferred.members.find((member) => member.user_id === OWNER_ID)?.role, 'OWNER')
+  assert.deepEqual(
+    updates.map((update) => (update as { data: { role: Role } }).data.role),
+    ['ADMIN', 'OWNER'],
+  )
+})
+
+test('workspace leave preserves the single-owner invariant', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { workspaceInvitationStore }, service] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./workspace-invitation.store'),
+    import('./workspace.service'),
+  ])
+
+  await t.test('a regular member can leave', async (t) => {
+    const current = workspaceForRoleChange('MEMBER', 'OWNER')
+    let membershipUpdate: unknown
+    stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+    stubMethod(t, prisma.workspace, 'findFirst', async () => current)
+    stubMethod(t, prisma.workspaceMember, 'update', async (args) => {
+      membershipUpdate = args
+      return {}
+    })
+    stubMethod(t, realtime, 'publish', () => undefined)
+    stubMethod(t, realtime, 'leaveUserChannel', () => undefined)
+
+    await service.leaveWorkspace({ userId: USER_ID, workspaceId: WORKSPACE_ID })
+
+    assert.equal(
+      (membershipUpdate as { where: { workspace_id_user_id: { user_id: string } } }).where
+        .workspace_id_user_id.user_id,
+      USER_ID,
+    )
+  })
+
+  await t.test('an owner with other members must transfer first', async (t) => {
+    const current = workspaceForRoleChange('OWNER', 'MEMBER')
+    stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+    stubMethod(t, prisma.workspace, 'findFirst', async () => current)
+
+    await assert.rejects(
+      service.leaveWorkspace({ userId: USER_ID, workspaceId: WORKSPACE_ID }),
+      (error: unknown) =>
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'WORKSPACE_OWNERSHIP_TRANSFER_REQUIRED',
+    )
+  })
+
+  await t.test('a sole owner leaves by deleting the workspace', async (t) => {
+    let workspaceUpdate: unknown
+    let discardedWorkspaceId: string | undefined
+    stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+    stubMethod(t, prisma.workspace, 'findFirst', async () => workspace())
+    stubMethod(t, prisma.workspace, 'update', async (args) => {
+      workspaceUpdate = args
+      return {}
+    })
+    stubMethod(t, workspaceInvitationStore, 'discardWorkspace', async (workspaceId) => {
+      discardedWorkspaceId = workspaceId
+    })
+    stubMethod(t, realtime, 'publish', () => undefined)
+    stubMethod(t, realtime, 'clearChannel', () => undefined)
+
+    await service.leaveWorkspace({ userId: OWNER_ID, workspaceId: WORKSPACE_ID })
+
+    assert.equal((workspaceUpdate as { data: { deleted_by: string } }).data.deleted_by, OWNER_ID)
+    assert.equal(discardedWorkspaceId, WORKSPACE_ID)
+  })
+})
+
+test('workspace deletion is blocked while another active member remains', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { deleteWorkspace }] = await Promise.all([
+    import('../../db'),
+    import('./workspace.service'),
+  ])
+  let workspaceUpdateCount = 0
+
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  stubMethod(t, prisma.workspace, 'findFirst', async () =>
+    workspaceForRoleChange('OWNER', 'MEMBER'),
+  )
+  stubMethod(t, prisma.workspace, 'update', async () => {
+    workspaceUpdateCount += 1
+    return {}
+  })
+
+  await assert.rejects(
+    deleteWorkspace({ userId: USER_ID, workspaceId: WORKSPACE_ID }),
+    (error: unknown) =>
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'WORKSPACE_HAS_OTHER_MEMBERS',
+  )
+  assert.equal(workspaceUpdateCount, 0)
+})
+
+test('workspace invitations cannot create a peer role', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { inviteWorkspaceMember }] = await Promise.all([
+    import('../../db'),
+    import('./workspace.service'),
+  ])
+  stubMethod(t, prisma.workspace, 'findFirst', async () =>
+    workspaceForRoleChange('ADMIN', 'MEMBER'),
+  )
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'ADMIN' }))
+
+  await assert.rejects(
+    inviteWorkspaceMember({
+      userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
+      email: 'peer@example.com',
+      role: 'ADMIN',
+    }),
+    (error: unknown) =>
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'WORKSPACE_ROLE_HIERARCHY',
+  )
 })
 
 test('workspace invitations are one-time bearer invitations', async (t) => {

@@ -1,14 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { DirectMessage, NotificationEvent, WorkspaceMessage } from '../types'
+import type { DirectMessage, FriendRequest, NotificationEvent, WorkspaceMessage } from '../types'
 import {
   clearMessengerUnread,
   directMessageUnreadCount,
   formatMessengerUnreadCount,
+  friendRequestUnreadCount,
   markDirectConversationRead,
+  markFriendRequestsRead,
   markWorkspaceConversationRead,
   parseNotificationEvent,
   pruneMessengerUnreadRooms,
   receiveDirectMessageUnread,
+  receiveFriendRequestUnread,
   receiveWorkspaceActivityUnread,
   receiveWorkspaceMessageUnread,
   totalMessengerUnreadCount,
@@ -71,6 +74,15 @@ function workspaceActivity(id: string): NotificationEvent {
       name: 'Member',
       profile_image_url: null,
     },
+  }
+}
+
+function friendRequest(id = FRIEND_ID): FriendRequest {
+  return {
+    id,
+    name: 'Friend',
+    profile_image_url: null,
+    requested_at: '2026-07-30T00:00:00.000Z',
   }
 }
 
@@ -148,6 +160,42 @@ describe('messenger unread state', () => {
 
     expect(workspaceUnreadCount(WORKSPACE_ID)).toBe(2)
     expect(totalMessengerUnreadCount.value).toBe(2)
+  })
+
+  it('adds incoming friend requests to the total unread count', () => {
+    expect(receiveFriendRequestUnread(friendRequest(), CURRENT_USER_ID, false)).toBe(true)
+    expect(receiveFriendRequestUnread(friendRequest(OTHER_FRIEND_ID), CURRENT_USER_ID, false)).toBe(
+      true,
+    )
+
+    expect(friendRequestUnreadCount.value).toBe(2)
+    expect(totalMessengerUnreadCount.value).toBe(2)
+  })
+
+  it('does not count friend requests without a recipient session or while friends are visible', () => {
+    expect(receiveFriendRequestUnread(friendRequest(), null, false)).toBe(false)
+    expect(receiveFriendRequestUnread(friendRequest(CURRENT_USER_ID), CURRENT_USER_ID, false)).toBe(
+      false,
+    )
+    expect(receiveFriendRequestUnread(friendRequest(), CURRENT_USER_ID, true)).toBe(false)
+
+    expect(friendRequestUnreadCount.value).toBe(0)
+    expect(totalMessengerUnreadCount.value).toBe(0)
+  })
+
+  it('clears friend request unread without discarding conversation unread', () => {
+    receiveFriendRequestUnread(friendRequest(), CURRENT_USER_ID, false)
+    receiveDirectMessageUnread(
+      directMessage('00000000-0000-4000-8000-000000000022'),
+      CURRENT_USER_ID,
+      null,
+    )
+
+    markFriendRequestsRead()
+
+    expect(friendRequestUnreadCount.value).toBe(0)
+    expect(directMessageUnreadCount(FRIEND_ID)).toBe(1)
+    expect(totalMessengerUnreadCount.value).toBe(1)
   })
 
   it('clears only the room that was opened', () => {

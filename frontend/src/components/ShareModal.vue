@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { WorkspaceAPI } from '../api/workspace'
 import type { Workspace, WorkspaceMember, WorkspaceRole } from '../types'
-import { canChangeWorkspaceMemberRole } from '../utils/workspacePermissions'
+import { canAssignWorkspaceRole, canChangeWorkspaceMemberRole } from '../utils/workspacePermissions'
 
 const props = defineProps<{
   workspaceName: string
@@ -25,6 +25,7 @@ const memberError = ref('')
 const memberSuccess = ref('')
 const removing = ref<string | null>(null)
 const updatingRole = ref<string | null>(null)
+const transferringOwnership = ref<string | null>(null)
 
 const roleLabels: Record<string, string> = {
   OWNER: '소유자',
@@ -33,7 +34,7 @@ const roleLabels: Record<string, string> = {
   VIEWER: '뷰어',
 }
 
-const manageableRoles: {
+const workspaceRoles: {
   value: ManageableWorkspaceRole
   label: string
 }[] = [
@@ -42,12 +43,26 @@ const manageableRoles: {
   { value: 'VIEWER', label: '뷰어' },
 ]
 
+const assignableRoles = computed(() =>
+  workspaceRoles.filter((role) => canAssignWorkspaceRole(props.managerRole, role.value)),
+)
+
+watch(assignableRoles, (roles) => {
+  if (!roles.some((role) => role.value === inviteRole.value) && roles[0]) {
+    inviteRole.value = roles[0].value
+  }
+})
+
 function isManageableRole(value: string): value is ManageableWorkspaceRole {
-  return manageableRoles.some((role) => role.value === value)
+  return workspaceRoles.some((role) => role.value === value)
 }
 
 async function sendInvite() {
   if (sending.value || !inviteEmail.value.trim()) return
+  if (!canAssignWorkspaceRole(props.managerRole, inviteRole.value)) {
+    inviteError.value = '자신보다 낮은 역할로만 초대할 수 있습니다.'
+    return
+  }
   sending.value = true
   inviteError.value = ''
   inviteSuccess.value = ''
@@ -71,7 +86,8 @@ async function handleRoleChange(member: WorkspaceMember, event: Event): Promise<
     updatingRole.value ||
     !isManageableRole(role) ||
     role === member.role ||
-    !canChangeWorkspaceMemberRole(props.managerRole, member.role)
+    !canChangeWorkspaceMemberRole(props.managerRole, member.role) ||
+    !canAssignWorkspaceRole(props.managerRole, role)
   ) {
     select.value = member.role
     return
@@ -109,6 +125,30 @@ async function handleRemoveMember(userId: string) {
     removing.value = null
   }
 }
+
+async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
+  if (props.managerRole !== 'OWNER' || transferringOwnership.value) return
+  if (
+    !window.confirm(
+      `${member.user.name}님에게 소유권을 위임하시겠습니까? 위임 후에는 관리자 권한으로 변경됩니다.`,
+    )
+  ) {
+    return
+  }
+
+  transferringOwnership.value = member.user_id
+  memberError.value = ''
+  memberSuccess.value = ''
+  try {
+    const updated = await WorkspaceAPI.transferOwnership(props.workspaceId, member.user_id)
+    emit('workspaceUpdated', updated)
+    memberSuccess.value = `${member.user.name}님에게 소유권을 위임했습니다.`
+  } catch (caught) {
+    memberError.value = caught instanceof Error ? caught.message : '소유권을 위임하지 못했습니다.'
+  } finally {
+    transferringOwnership.value = null
+  }
+}
 </script>
 
 <template>
@@ -135,7 +175,7 @@ async function handleRemoveMember(userId: string) {
             @keyup.enter="sendInvite"
           />
           <select v-model="inviteRole" class="role-btn">
-            <option v-for="r in manageableRoles" :key="r.value" :value="r.value">
+            <option v-for="r in assignableRoles" :key="r.value" :value="r.value">
               {{ r.label }}
             </option>
           </select>
@@ -174,10 +214,12 @@ async function handleRemoveMember(userId: string) {
                 class="member-role-select"
                 :value="m.role"
                 :aria-label="`${m.user.name} 권한 변경`"
-                :disabled="updatingRole !== null || removing === m.user_id"
+                :disabled="
+                  updatingRole !== null || removing === m.user_id || transferringOwnership !== null
+                "
                 @change="handleRoleChange(m, $event)"
               >
-                <option v-for="role in manageableRoles" :key="role.value" :value="role.value">
+                <option v-for="role in assignableRoles" :key="role.value" :value="role.value">
                   {{ role.label }}
                 </option>
               </select>
@@ -186,9 +228,26 @@ async function handleRemoveMember(userId: string) {
                 저장 중...
               </span>
               <button
-                v-if="m.role !== 'OWNER'"
+                v-if="managerRole === 'OWNER' && m.role !== 'OWNER'"
+                type="button"
+                class="transfer-btn"
+                :disabled="
+                  transferringOwnership !== null ||
+                  removing === m.user_id ||
+                  updatingRole === m.user_id
+                "
+                @click="handleOwnershipTransfer(m)"
+              >
+                {{ transferringOwnership === m.user_id ? '위임 중...' : '소유권 위임' }}
+              </button>
+              <button
+                v-if="canChangeWorkspaceMemberRole(managerRole, m.role)"
                 class="remove-btn"
-                :disabled="removing === m.user_id || updatingRole === m.user_id"
+                :disabled="
+                  removing === m.user_id ||
+                  updatingRole === m.user_id ||
+                  transferringOwnership !== null
+                "
                 @click="handleRemoveMember(m.user_id)"
               >
                 {{ removing === m.user_id ? '제거 중...' : '제거' }}

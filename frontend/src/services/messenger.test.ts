@@ -29,7 +29,9 @@ import {
 } from './messenger'
 import {
   directMessageUnreadCount,
+  friendRequestUnreadCount,
   receiveDirectMessageUnread,
+  receiveFriendRequestUnread,
   receiveWorkspaceMessageUnread,
   workspaceUnreadCount,
 } from './messengerUnread'
@@ -157,6 +159,23 @@ describe('messenger state', () => {
       online: false,
     })
     expect(directMessageUnreadCount('friend-1')).toBe(0)
+  })
+
+  it('marks friend requests read whenever friend management is opened', () => {
+    const request = {
+      id: 'friend-1',
+      name: 'Jamie',
+      profile_image_url: null,
+      requested_at: '2026-07-30T00:00:00.000Z',
+    }
+
+    receiveFriendRequestUnread(request, 'current-user', false)
+    showFriendManagement()
+    expect(friendRequestUnreadCount.value).toBe(0)
+
+    receiveFriendRequestUnread(request, 'current-user', false)
+    openMessenger('friends')
+    expect(friendRequestUnreadCount.value).toBe(0)
   })
 
   it('returns to the directory without discarding the selected conversation', () => {
