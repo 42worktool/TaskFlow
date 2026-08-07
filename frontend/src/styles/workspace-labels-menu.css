@@ -92,7 +92,7 @@
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 5px 10px;
   color: #fff;
   font-size: 12px;
