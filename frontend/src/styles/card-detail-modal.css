@@ -296,7 +296,7 @@
   margin-bottom: 12px;
 }
 
-.card-detail-comment-composer>label {
+.card-detail-comment-composer > label {
   color: #475569;
   font-size: 12px;
   font-weight: 600;
@@ -385,7 +385,7 @@
   border-bottom: 0;
 }
 
-.card-detail-comment>img,
+.card-detail-comment > img,
 .card-detail-comment-avatar {
   width: 28px;
   height: 28px;
@@ -393,7 +393,7 @@
   border-radius: 50%;
 }
 
-.card-detail-comment>img {
+.card-detail-comment > img {
   object-fit: cover;
 }
 
@@ -406,7 +406,7 @@
   font-weight: 700;
 }
 
-.card-detail-comment>div {
+.card-detail-comment > div {
   min-width: 0;
   flex: 1;
 }
@@ -448,7 +448,7 @@
   color: #b91c1c;
 }
 
-.card-detail-comment time+.card-detail-comment-delete {
+.card-detail-comment time + .card-detail-comment-delete {
   margin-left: auto;
 }
 
