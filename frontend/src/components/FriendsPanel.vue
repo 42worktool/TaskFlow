@@ -23,7 +23,6 @@ const friends = ref<Friend[]>([])
 const incomingRequests = ref<FriendRequest[]>([])
 const outgoingRequests = ref<FriendRequest[]>([])
 const activeTab = ref<'incoming' | 'outgoing' | 'friends'>('incoming')
-const friendEmail = ref('')
 const friendSearchQuery = ref('')
 const friendSearchResults = ref<PublicProfile[]>([])
 const friendSearchLoading = ref(false)
@@ -190,28 +189,6 @@ function finishMutation(): void {
   }
 }
 
-async function sendRequest(): Promise<void> {
-  const email = friendEmail.value.trim()
-  if (!email || busyAction.value) return
-
-  busyAction.value = 'send'
-  message.value = ''
-  error.value = ''
-  try {
-    const request = await FriendAPI.sendRequest(email)
-    outgoingRequests.value = [
-      request,
-      ...outgoingRequests.value.filter((item) => item.id !== request.id),
-    ]
-    friendEmail.value = ''
-    message.value = `${request.name}님께 친구 요청을 보냈습니다.`
-  } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : '친구 요청을 보내지 못했습니다.'
-  } finally {
-    finishMutation()
-  }
-}
-
 async function sendRequestToUser(person: PublicProfile): Promise<void> {
   if (busyAction.value) return
 
@@ -350,7 +327,7 @@ onUnmounted(() => {
     <section class="friend-panel friend-search-panel">
       <div>
         <h2>사람 찾기</h2>
-        <p>이름이나 한줄 소개로 검색하고 바로 친구 요청을 보내세요.</p>
+        <p>이름, 한줄 소개 또는 이메일로 친구를 찾고 요청을 보내세요.</p>
       </div>
 
       <label class="friend-search-field">
@@ -359,8 +336,8 @@ onUnmounted(() => {
           v-model="friendSearchQuery"
           type="search"
           autocomplete="off"
-          placeholder="이름 또는 소개로 친구 찾기"
-          aria-label="친구 검색"
+          placeholder="이름, 소개 또는 이메일로 친구 찾기"
+          aria-label="이름, 소개 또는 이메일로 친구 찾기"
           :disabled="loading"
         />
         <small v-if="friendSearchLoading">검색 중…</small>
@@ -434,28 +411,6 @@ onUnmounted(() => {
           </div>
         </li>
       </ul>
-
-      <details class="friend-email-invite">
-        <summary>이메일로 요청 보내기</summary>
-        <form class="friend-request-form" @submit.prevent="sendRequest">
-          <input
-            v-model="friendEmail"
-            type="email"
-            autocomplete="email"
-            placeholder="friend@example.com"
-            aria-label="친구 이메일"
-            :disabled="loading || busyAction !== null"
-            required
-          />
-          <button
-            type="submit"
-            class="primary-button"
-            :disabled="loading || busyAction !== null || !friendEmail.trim()"
-          >
-            {{ busyAction === 'send' ? '전송 중…' : '요청 보내기' }}
-          </button>
-        </form>
-      </details>
     </section>
 
     <p v-if="message" class="feedback feedback--success" role="status">

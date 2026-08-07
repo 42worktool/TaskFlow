@@ -1,5 +1,6 @@
 import { prisma } from '../../db'
 import { NotFoundError } from '../../errors'
+import { normalizedEmailSchema } from '../../lib/validation'
 import { toPublicProfileDto } from './profile.dto'
 
 const publicProfileSelect = {
@@ -26,7 +27,9 @@ export async function searchPublicProfiles(input: {
   limit: number
   workspaceId?: string
 }) {
-  const terms = input.query.trim().split(/\s+/).filter(Boolean)
+  const normalizedQuery = input.query.trim()
+  const parsedEmail = normalizedEmailSchema.safeParse(normalizedQuery)
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean)
   const profiles = await prisma.user.findMany({
     where: {
       deleted_at: null,
@@ -41,12 +44,16 @@ export async function searchPublicProfiles(input: {
             },
           }
         : {}),
-      AND: terms.map((term) => ({
-        OR: [
-          { name: { contains: term, mode: 'insensitive' as const } },
-          { headline: { contains: term, mode: 'insensitive' as const } },
-        ],
-      })),
+      ...(parsedEmail.success
+        ? { email: { equals: parsedEmail.data, mode: 'insensitive' as const } }
+        : {
+            AND: terms.map((term) => ({
+              OR: [
+                { name: { contains: term, mode: 'insensitive' as const } },
+                { headline: { contains: term, mode: 'insensitive' as const } },
+              ],
+            })),
+          }),
     },
     select: publicProfileSelect,
     orderBy: [{ name: 'asc' }, { created_at: 'desc' }],

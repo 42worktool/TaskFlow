@@ -40,7 +40,6 @@
   font-size: 16px;
 }
 
-.friend-invite-panel,
 .friend-search-panel {
   display: flex;
   align-items: stretch;
@@ -48,7 +47,6 @@
   gap: 14px;
 }
 
-.friend-invite-panel p,
 .friend-search-panel > div > p {
   margin: 6px 0 0;
   font-size: 14px;
@@ -160,37 +158,6 @@
 .friend-relation-badge--friend {
   background: #ecfdf5;
   color: #047857;
-}
-
-.friend-email-invite {
-  border-top: 1px solid #f1f5f9;
-  padding-top: 12px;
-}
-
-.friend-email-invite summary {
-  color: #475569;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.friend-email-invite .friend-request-form {
-  margin-top: 11px;
-}
-
-.friend-request-form {
-  display: flex;
-  min-width: 0;
-  gap: 10px;
-}
-
-.friend-request-form input {
-  min-width: 0;
-  flex: 1;
-  padding: 10px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font: inherit;
 }
 
 .primary-button,
@@ -395,10 +362,6 @@ button:disabled {
 }
 
 @media (max-width: 520px) {
-  .friend-request-form {
-    flex-direction: column;
-  }
-
   .person-row {
     align-items: flex-start;
     flex-wrap: wrap;

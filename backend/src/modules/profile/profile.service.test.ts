@@ -79,7 +79,7 @@ test('public profile service exposes profile fields without private account data
   })
 })
 
-test('public profile search matches public fields without selecting email', async (t) => {
+test('public profile search matches public fields or an exact email without exposing it', async (t) => {
   const [{ prisma }, profileService] = await Promise.all([
     import('../../db'),
     import('./profile.service'),
@@ -143,5 +143,26 @@ test('public profile search matches public fields without selecting email', asyn
     },
     orderBy: [{ name: 'asc' }, { created_at: 'desc' }],
     take: 20,
+  })
+
+  await profileService.searchPublicProfiles({
+    query: '  Person@Example.COM ',
+    limit: 8,
+  })
+  assert.deepEqual(query, {
+    where: {
+      deleted_at: null,
+      email: { equals: 'person@example.com', mode: 'insensitive' },
+    },
+    select: {
+      id: true,
+      name: true,
+      profile_image_url: true,
+      headline: true,
+      linkedin_url: true,
+      created_at: true,
+    },
+    orderBy: [{ name: 'asc' }, { created_at: 'desc' }],
+    take: 8,
   })
 })
