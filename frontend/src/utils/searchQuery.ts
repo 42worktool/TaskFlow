@@ -10,12 +10,6 @@ export interface AdvancedSearchCriteria {
   page: number
 }
 
-export interface SearchSortValue {
-  name: string
-  createdAt: string
-  searchable: Array<string | null | undefined>
-}
-
 type RouteQueryValue = string | null | Array<string | null> | undefined
 
 const SCOPED_COMMAND = /(^|\s)\/(type|workspace|in|label|sort):(?:"([^"]*)"|([^\s]+))/gi
@@ -157,67 +151,6 @@ export function criteriaToRouteQuery(criteria: AdvancedSearchCriteria): Record<s
     ...(criteria.sort !== 'relevance' ? { sort: criteria.sort } : {}),
     ...(criteria.page > 1 ? { page: String(criteria.page) } : {}),
   }
-}
-
-export function matchesSearchText(
-  values: Array<string | null | undefined>,
-  query: string,
-): boolean {
-  const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean)
-  if (terms.length === 0) return true
-
-  const searchable = values
-    .filter((value): value is string => Boolean(value))
-    .join(' ')
-    .toLocaleLowerCase()
-  return terms.every((term) => searchable.includes(term))
-}
-
-function normalized(value: string): string {
-  return value.trim().toLocaleLowerCase()
-}
-
-function relevanceScore(value: SearchSortValue, query: string): number {
-  const terms = normalized(query).split(/\s+/).filter(Boolean)
-  if (terms.length === 0) return 0
-
-  const name = normalized(value.name)
-  const searchable = normalized(
-    value.searchable.filter((item): item is string => Boolean(item)).join(' '),
-  )
-  let score = 0
-
-  if (name === normalized(query)) score += 1_000
-  else if (name.startsWith(normalized(query))) score += 400
-
-  for (const term of terms) {
-    if (name === term) score += 200
-    else if (name.startsWith(term)) score += 100
-    else if (name.includes(term)) score += 50
-
-    if (searchable.includes(term)) score += 10
-  }
-
-  return score
-}
-
-export function compareSearchSortValues(
-  left: SearchSortValue,
-  right: SearchSortValue,
-  sort: SearchSort,
-  query: string,
-): number {
-  if (sort === 'relevance') {
-    const scoreDifference = relevanceScore(right, query) - relevanceScore(left, query)
-    if (scoreDifference !== 0) return scoreDifference
-  }
-
-  if (sort === 'newest' || sort === 'relevance') {
-    const dateDifference = Date.parse(right.createdAt) - Date.parse(left.createdAt)
-    if (Number.isFinite(dateDifference) && dateDifference !== 0) return dateDifference
-  }
-
-  return left.name.localeCompare(right.name, 'ko', { sensitivity: 'base' })
 }
 
 export function paginationPages(currentPage: number, totalPages: number): number[] {

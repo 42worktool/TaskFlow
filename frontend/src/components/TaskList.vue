@@ -149,24 +149,37 @@ const vFocus = {
 </script>
 
 <template>
-  <section class="task-list" :class="{ 'task-list--readonly': !canEdit }">
-    <div class="list-header">
+  <section
+    class="task-list w-70 shrink-0 flex flex-col border border-transparent p-3 max-h-full"
+    :class="{ 'task-list--readonly': !canEdit }"
+  >
+    <div
+      class="list-header flex items-center justify-between mb-3"
+      :class="canEdit ? 'cursor-grab' : 'cursor-default'"
+    >
       <input
         v-if="renaming"
         v-model="renameValue"
         v-focus
-        class="list-name-input"
+        class="list-name-input text-sm font-semibold text-gray-700 border border-blue-600 rounded py-0.5 px-1 min-w-0 flex-1 mr-2"
         type="text"
         @keyup.enter="submitRename"
         @keyup.esc="cancelRename"
         @blur="submitRename"
       />
-      <span v-else class="list-name" @click="startRename">{{ list.name }}</span>
-      <div class="list-header-actions">
-        <div v-if="canEdit" class="list-keyboard-move-actions">
+      <span
+        v-else
+        class="list-name text-sm font-semibold text-gray-700"
+        :class="canEdit ? 'cursor-text' : 'cursor-default'"
+        @click="startRename"
+        >{{ list.name }}</span
+      >
+      <div class="list-header-actions flex items-center gap-1.5 shrink-0">
+        <div v-if="canEdit" class="list-keyboard-move-actions flex gap-0.5">
           <button
             type="button"
             :disabled="movingList"
+            class="w-5.5 h-5.5 border border-gray-400 rounded bg-white text-gray-700 cursor-pointer leading-none disabled:cursor-default disabled:opacity-60"
             :aria-label="`${list.name} 리스트 이전 위치로 이동`"
             @click.stop="emit('move-list', list.id, 'previous')"
           >
@@ -175,18 +188,22 @@ const vFocus = {
           <button
             type="button"
             :disabled="movingList"
+            class="w-5.5 h-5.5 border border-gray-400 rounded bg-white text-gray-700 cursor-pointer leading-none disabled:cursor-default disabled:opacity-60"
             :aria-label="`${list.name} 리스트 다음 위치로 이동`"
             @click.stop="emit('move-list', list.id, 'next')"
           >
             →
           </button>
         </div>
-        <span class="list-count" :style="{ background: badgeColors[list.name] ?? '#6b7280' }">
+        <span
+          class="list-count w-5.5 h-5.5 rounded-full flex items-center justify-center text-xs font-bold text-white"
+          :style="{ background: badgeColors[list.name] ?? '#6b7280' }"
+        >
           {{ list.cards.length }}
         </span>
         <button
           v-if="canEdit"
-          class="list-delete-btn"
+          class="list-delete-btn border-none bg-transparent text-gray-400 text-base leading-none cursor-pointer hover:text-red-500"
           type="button"
           aria-label="리스트 삭제"
           @click="emit('delete-list', list.id)"
@@ -202,7 +219,7 @@ const vFocus = {
       group="board-cards"
       :disabled="!canEdit"
       :move="canMoveCard"
-      class="card-list"
+      class="card-list list-none flex flex-col gap-2 overflow-y-auto flex-1 mb-2 min-h-2"
       ghost-class="card-ghost"
       fallback-class="card-drag-preview"
       :force-fallback="true"
@@ -251,22 +268,35 @@ const vFocus = {
       </template>
     </draggable>
 
-    <form v-if="canEdit && showAddCard" class="add-card-form" @submit.prevent="submitAddCard">
+    <form
+      v-if="canEdit && showAddCard"
+      class="add-card-form mt-1 flex gap-1.5"
+      @submit.prevent="submitAddCard"
+    >
       <input
         v-model="newCardTitle"
         v-focus
         type="text"
-        class="add-card-input"
+        class="add-card-input flex-1 min-w-0 p-2 border border-blue-600 rounded-md"
         placeholder="카드 제목 입력"
         required
         @keyup.esc="cancelAddCard"
         @blur="submitAddCard"
       />
-      <button type="submit" class="add-card-submit-btn" :disabled="!newCardTitle.trim()">
+      <button
+        type="submit"
+        class="add-card-submit-btn shrink-0 px-3 bg-blue-600 border-none rounded-md font-semibold text-white cursor-pointer disabled:cursor-default disabled:opacity-55"
+        :disabled="!newCardTitle.trim()"
+      >
         추가
       </button>
     </form>
-    <button v-else-if="canEdit" class="add-card-btn" type="button" @click="showAddCard = true">
+    <button
+      v-else-if="canEdit"
+      class="add-card-btn w-full p-2 bg-transparent border-none rounded-md text-gray-500 cursor-pointer text-left mt-1 hover:bg-black/5 hover:text-gray-700"
+      type="button"
+      @click="showAddCard = true"
+    >
       + 카드 추가
     </button>
   </section>

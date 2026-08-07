@@ -304,26 +304,47 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
 </script>
 
 <template>
-  <div class="calendar-page">
-    <div class="cal-header">
-      <button type="button" class="nav-arrow" aria-label="이전 달" @click="prevMonth">&lt;</button>
-      <h2 class="month-label">{{ monthLabel }}</h2>
-      <button type="button" class="nav-arrow" aria-label="다음 달" @click="nextMonth">&gt;</button>
+  <div class="calendar-page flex-1 flex flex-col overflow-hidden bg-white py-4 px-5">
+    <div class="cal-header flex items-center justify-between mb-4">
+      <button
+        type="button"
+        class="nav-arrow w-8 h-8 border border-gray-200 rounded-md bg-white text-sm text-gray-500 cursor-pointer flex items-center justify-center hover:bg-gray-100"
+        aria-label="이전 달"
+        @click="prevMonth"
+      >
+        &lt;
+      </button>
+      <h2 class="month-label text-lg font-bold text-gray-900">{{ monthLabel }}</h2>
+      <button
+        type="button"
+        class="nav-arrow w-8 h-8 border border-gray-200 rounded-md bg-white text-sm text-gray-500 cursor-pointer flex items-center justify-center hover:bg-gray-100"
+        aria-label="다음 달"
+        @click="nextMonth"
+      >
+        &gt;
+      </button>
     </div>
 
-    <p v-if="loading" class="cal-status" role="status">일정을 불러오는 중…</p>
-    <p v-else-if="error" class="cal-status cal-status--error" role="alert">
+    <p v-if="loading" class="cal-status mb-3 text-gray-500 text-sm" role="status">
+      일정을 불러오는 중…
+    </p>
+    <p v-else-if="error" class="cal-status mb-3 text-sm text-red-700" role="alert">
       {{ error }}
     </p>
-    <p v-else-if="!hasCardsThisMonth" class="cal-empty">이 달에 일정이 있는 카드가 없습니다.</p>
+    <p v-else-if="!hasCardsThisMonth" class="cal-empty mb-3 text-gray-500 text-sm">
+      이 달에 일정이 있는 카드가 없습니다.
+    </p>
 
-    <div v-if="!loading && !error" class="cal-grid">
-      <div class="cal-weekdays">
+    <div
+      v-if="!loading && !error"
+      class="cal-grid flex-1 min-h-0 border-l border-t border-gray-200 overflow-auto"
+    >
+      <div class="cal-weekdays grid grid-cols-7 sticky top-0">
         <div
           v-for="day in weekDays"
           :key="day"
-          class="weekday-header"
-          :class="{ 'weekday-sun': day === '일' }"
+          class="weekday-header py-2 px-2.5 font-semibold text-gray-500 text-center border-r border-b border-gray-200 bg-gray-50"
+          :class="{ 'text-red-500': day === '일' }"
         >
           {{ day }}
         </div>
@@ -332,27 +353,29 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
       <div
         v-for="(week, weekIndex) in calendarWeeks"
         :key="weekIndex"
-        class="cal-week"
+        class="cal-week relative grid"
         :style="weekStyle(week.laneCount)"
       >
-        <div class="cal-week-days">
+        <div class="cal-week-days grid grid-cols-7 row-start-1 col-start-1 z-0">
           <div
             v-for="(day, dayIndex) in week.days"
             :key="dayIndex"
-            class="cal-cell"
-            :class="{ 'cal-cell--today': isToday(day.date) }"
+            class="cal-cell min-w-0 border-r border-b border-gray-200 py-1.5 px-2 overflow-hidden"
+            :class="{ 'bg-blue-50': isToday(day.date) }"
           >
             <span
               v-if="day.date"
-              class="cell-date"
-              :class="{ 'cell-date--today': isToday(day.date) }"
+              class="cell-date text-gray-700 font-medium self-start"
+              :class="{ 'text-blue-600 font-bold': isToday(day.date) }"
             >
               {{ day.date }}
             </span>
           </div>
         </div>
 
-        <div class="cal-week-ranges">
+        <div
+          class="cal-week-ranges grid grid-cols-7 row-start-1 col-start-1 relative content-start auto-rows-5.5 gap-x-0 gap-y-0.75 pt-7.75 pb-2 pointer-events-none"
+        >
           <button
             v-for="segment in week.segments"
             :key="segment.card.id"
@@ -368,7 +391,7 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
             :disabled="!canViewCardDetails"
             @click="openCard(segment.card.id)"
           >
-            <span class="cal-range-label">{{ segment.card.title }}</span>
+            <span class="block overflow-hidden text-ellipsis">{{ segment.card.title }}</span>
           </button>
         </div>
       </div>

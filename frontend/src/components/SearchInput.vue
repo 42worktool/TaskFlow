@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ProfileAPI, type PublicProfile } from '../api/profile'
+import type { PublicProfile } from '../api/profile'
+import { SearchAPI } from '../api/search'
 import {
   criteriaFromRouteQuery,
   criteriaToRouteQuery,
@@ -26,7 +27,7 @@ let peopleSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const commands = [
   { command: '/card', insert: '/card ', label: '카드만', description: '카드 결과만 검색' },
-  { command: '/user', insert: '/user ', label: '사람', description: '이름과 소개로 검색' },
+  { command: '/user', insert: '/user ', label: '사람', description: '이름 또는 이메일로 검색' },
   {
     command: '/workspace',
     insert: '/workspace ',
@@ -194,7 +195,7 @@ watch(
     peopleLoading.value = true
     peopleSearchTimer = setTimeout(async () => {
       try {
-        const users = await ProfileAPI.search(text, workspaceId)
+        const users = await SearchAPI.users(text, workspaceId, 5)
         if (requestVersion !== peopleRequestVersion) return
         peopleSuggestions.value = users
       } catch {
@@ -274,12 +275,16 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <form class="search-form" role="search" @submit.prevent="submitSearch">
-    <div class="search-input-wrap">
+  <form
+    class="search-form flex-1 max-w-120 flex items-center min-w-45 max-sm:min-w-0"
+    role="search"
+    @submit.prevent="submitSearch"
+  >
+    <div class="search-input-wrap relative w-full min-w-0">
       <input
         ref="input"
         v-model="query"
-        class="search-input"
+        class="w-full h-8.5 pt-1.75 pr-9 pb-1.75 pl-3.5 bg-white/15 border border-white/20 rounded-lg text-sm text-white outline-none placeholder:text-white/55 focus:border-white/55"
         placeholder="검색 또는 @사람, /명령어"
         autocomplete="off"
         aria-label="전체 검색"
@@ -380,7 +385,13 @@ function handleKeydown(event: KeyboardEvent) {
         </button>
       </div>
     </div>
-    <button type="submit" class="search-button" aria-label="검색">⌕</button>
+    <button
+      type="submit"
+      class="search-button w-7.5 h-7.5 -ml-8 border-none rounded-md bg-transparent text-white/80 leading-none hover:text-white hover:bg-white/12"
+      aria-label="검색"
+    >
+      ⌕
+    </button>
   </form>
 </template>
 

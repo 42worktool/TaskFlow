@@ -263,7 +263,7 @@ onBeforeUnmount(() => {
       {{ toolboxDropError }}
     </p>
     <div
-      class="workspace-toolbox__group workspace-toolbox__group--workspace"
+      class="workspace-toolbox__group workspace-toolbox__group--workspace relative flex items-stretch gap-0.75"
       role="group"
       aria-label="워크스페이스"
     >
@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div
-      class="workspace-toolbox__group workspace-toolbox__group--functions"
+      class="workspace-toolbox__group workspace-toolbox__group--functions relative flex items-stretch gap-0.75"
       role="group"
       aria-label="워크스페이스 기능"
     >
@@ -405,7 +405,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div
-      class="workspace-toolbox__group workspace-toolbox__group--messenger"
+      class="workspace-toolbox__group workspace-toolbox__group--messenger relative flex items-stretch gap-0.75"
       role="group"
       aria-label="메신저"
     >

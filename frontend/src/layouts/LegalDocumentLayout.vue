@@ -7,11 +7,11 @@ withDefaults(defineProps<{ title: string; effectiveDate?: string }>(), {
 </script>
 
 <template>
-  <div class="legal-page-shell">
+  <div class="min-h-screen px-6 pb-12 bg-slate-50 text-gray-800">
     <PageHeader />
-    <main class="legal-document">
-      <h1>{{ title }}</h1>
-      <p class="effective-date">시행일: {{ effectiveDate }}</p>
+    <main class="legal-document mx-auto py-10 px-11 border border-gray-200 rounded-2xl bg-white">
+      <h1 class="text-3xl text-gray-900">{{ title }}</h1>
+      <p class="effective-date text-gray-500">시행일: {{ effectiveDate }}</p>
       <slot />
     </main>
   </div>

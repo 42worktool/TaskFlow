@@ -266,7 +266,7 @@ onUnmounted(() => {
         <h1>활동 대시보드</h1>
         <p>활동 로그를 기준으로 이슈 흐름과 현재 진행 상태를 확인합니다.</p>
       </div>
-      <div class="dashboard-header__actions">
+      <div class="dashboard-header__actions flex items-center gap-3 shrink-0">
         <label class="dashboard-period-picker">
           <span>기간</span>
           <select v-model.number="periodDays">

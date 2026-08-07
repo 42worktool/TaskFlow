@@ -1,60 +1,11 @@
-.workspace-members-menu {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.workspace-members-trigger {
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 3px 8px 3px 6px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-
-.workspace-members-trigger:hover,
-.workspace-members-trigger[aria-expanded='true'] {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-.workspace-members-trigger:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
-}
-
-.workspace-members-preview {
-  display: inline-flex;
-  align-items: center;
-  padding-left: 6px;
-}
-
 .workspace-member-preview {
-  position: relative;
-  width: 28px;
-  height: 28px;
-  margin-left: -6px;
-  border: 2px solid #1a3a6b;
-  border-radius: 50%;
+  border-color: #1a3a6b;
   background: #dfe1e6;
 }
 
 .workspace-member-avatar-image,
 .workspace-member-avatar-fallback {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border-radius: inherit;
-}
-
-.workspace-member-avatar-image {
-  object-fit: cover;
 }
 
 .workspace-member-avatar-fallback {
@@ -64,13 +15,7 @@
 }
 
 .workspace-member-status-dot {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  width: 8px;
-  height: 8px;
-  border: 2px solid #1a3a6b;
-  border-radius: 50%;
+  border-color: #1a3a6b;
   background: #9fadbc;
 }
 
@@ -80,14 +25,7 @@
 
 .workspace-members-more,
 .workspace-members-empty-icon {
-  width: 28px;
-  height: 28px;
-  margin-left: -6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   border: 2px solid #1a3a6b;
-  border-radius: 50%;
   background: #dfe1e6;
   color: #172b4d;
   font-size: 10px;
@@ -100,11 +38,7 @@
 }
 
 .workspace-members-trigger-count {
-  min-width: 31px;
   font-size: 11px;
-  font-weight: 700;
-  text-align: right;
-  white-space: nowrap;
 }
 
 .workspace-members-panel {
@@ -125,22 +59,10 @@
 }
 
 .workspace-members-panel-header {
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px 10px 16px;
   border-bottom: 1px solid #dcdfe4;
 }
 
-.workspace-members-title,
-.workspace-members-summary {
-  margin: 0;
-}
-
 .workspace-members-title {
-  font-size: 14px;
   line-height: 1.3;
 }
 
@@ -151,35 +73,15 @@
 }
 
 .workspace-members-close {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
   color: #44546f;
   font-size: 22px;
-  line-height: 1;
 }
 
 .workspace-members-close:hover {
   background: #f1f2f4;
 }
 
-.workspace-members-list {
-  min-height: 0;
-  margin: 0;
-  padding: 6px;
-  overflow-y: auto;
-  list-style: none;
-}
-
 .workspace-members-list-item {
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 8px;
   border-radius: 7px;
 }
 
@@ -188,27 +90,12 @@
 }
 
 .workspace-member-list-avatar {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  border-radius: 50%;
   background: #dfe1e6;
 }
 
-.workspace-member-copy {
-  min-width: 0;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-}
-
 .workspace-member-name {
-  overflow: hidden;
   color: #172b4d;
   font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .workspace-member-name:hover {
@@ -223,10 +110,6 @@
 }
 
 .workspace-member-presence {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
   color: #626f86;
   font-size: 11px;
 }
@@ -248,27 +131,16 @@
 }
 
 .workspace-members-list-empty {
-  padding: 28px 12px;
   color: #626f86;
-  font-size: 12px;
-  text-align: center;
 }
 
 .workspace-members-panel-footer {
-  padding: 8px;
   border-top: 1px solid #dcdfe4;
 }
 
 .workspace-members-manage {
-  width: 100%;
-  padding: 9px 12px;
-  border: 0;
   border-radius: 7px;
   background: #0c66e4;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
 }
 
 .workspace-members-manage:hover {

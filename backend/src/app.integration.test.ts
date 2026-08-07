@@ -133,7 +133,7 @@ test('feature routes reject requests without a bearer token', async () => {
   for (const path of [
     '/api/friends',
     '/api/inbox',
-    '/api/users/search?q=profile',
+    '/api/search?q=profile',
     '/api/lists/00000000-0000-4000-8000-000000000001',
     '/api/workspaces/00000000-0000-4000-8000-000000000001/dashboard',
     '/api/workspaces/00000000-0000-4000-8000-000000000001/messages',
