@@ -150,8 +150,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="direct-message-panel h-full min-h-0 flex flex-col bg-slate-50 text-gray-900" aria-label="친구 다이렉트 메시지">
-    <header class="direct-message-header min-h-16 py-2.25 px-3.25 border-b border-slate-200 flex items-center justify-between gap-3 bg-white">
+  <section
+    class="direct-message-panel h-full min-h-0 flex flex-col bg-slate-50 text-gray-900"
+    aria-label="친구 다이렉트 메시지"
+  >
+    <header
+      class="direct-message-header min-h-16 py-2.25 px-3.25 border-b border-slate-200 flex items-center justify-between gap-3 bg-white"
+    >
       <div class="direct-message-person min-w-0 flex items-center gap-2.5">
         <div class="direct-message-avatar-wrap relative shrink-0 grow-0 basis-10">
           <img
@@ -175,9 +180,10 @@ onUnmounted(() => {
           />
         </div>
         <div class="min-w-0">
-          <strong class="block overflow-hidden text-gray-900 text-sm text-ellipsis whitespace-nowrap">{{
-            friendName || '친구'
-          }}</strong>
+          <strong
+            class="block overflow-hidden text-gray-900 text-sm text-ellipsis whitespace-nowrap"
+            >{{ friendName || '친구' }}</strong
+          >
           <span
             class="direct-message-status block mt-0.5 text-slate-500"
             :class="{ 'text-green-700': friendOnline }"
@@ -188,9 +194,18 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <div ref="messageList" class="direct-message-list min-h-0 flex-1 overflow-y-auto p-3.5" aria-live="polite">
-      <p v-if="loading" class="direct-message-state my-6 text-slate-500 text-center">대화 내용을 불러오는 중…</p>
-      <p v-else-if="!error && messages.length === 0" class="direct-message-state my-6 text-slate-500 text-center">
+    <div
+      ref="messageList"
+      class="direct-message-list min-h-0 flex-1 overflow-y-auto p-3.5"
+      aria-live="polite"
+    >
+      <p v-if="loading" class="direct-message-state my-6 text-slate-500 text-center">
+        대화 내용을 불러오는 중…
+      </p>
+      <p
+        v-else-if="!error && messages.length === 0"
+        class="direct-message-state my-6 text-slate-500 text-center"
+      >
         아직 메시지가 없습니다. 먼저 인사를 건네 보세요.
       </p>
       <article
@@ -232,11 +247,18 @@ onUnmounted(() => {
       </article>
     </div>
 
-    <p v-if="error" class="direct-message-error mt-0 py-2 px-3.25 border-t border-red-200 bg-red-50 text-red-700 text-xs" role="alert">
+    <p
+      v-if="error"
+      class="direct-message-error mt-0 py-2 px-3.25 border-t border-red-200 bg-red-50 text-red-700 text-xs"
+      role="alert"
+    >
       {{ error }}
     </p>
 
-    <form class="direct-message-composer p-2.5 border-t border-slate-200 flex items-end gap-2 bg-white" @submit.prevent="sendMessage">
+    <form
+      class="direct-message-composer p-2.5 border-t border-slate-200 flex items-end gap-2 bg-white"
+      @submit.prevent="sendMessage"
+    >
       <textarea
         ref="composerInput"
         v-model="content"

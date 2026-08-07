@@ -111,11 +111,21 @@ function getLabelTextColor(hex: string): string {
         @pointerdown.stop
         @click.stop="emit('toggle-completion', card)"
       >
-        <svg v-if="!completed" class="w-3.5 h-3.5 fill-none stroke-current" viewBox="0 0 20 20" aria-hidden="true">
+        <svg
+          v-if="!completed"
+          class="w-3.5 h-3.5 fill-none stroke-current"
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+        >
           <circle cx="10" cy="10" r="7.5" />
           <path d="m6.5 10 2.2 2.2 4.8-5" />
         </svg>
-        <svg v-else class="w-3.5 h-3.5 fill-none stroke-current" viewBox="0 0 20 20" aria-hidden="true">
+        <svg
+          v-else
+          class="w-3.5 h-3.5 fill-none stroke-current"
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+        >
           <path d="M6.4 6.8H3.5V3.9" />
           <path d="M3.8 6.4a6.5 6.5 0 1 1-.2 6.8" />
         </svg>

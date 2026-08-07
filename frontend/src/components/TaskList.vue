@@ -147,7 +147,10 @@ const vFocus = {
     class="task-list w-70 shrink-0 flex flex-col border border-transparent p-3 max-h-full"
     :class="{ 'task-list--readonly': !canEdit }"
   >
-    <div class="list-header flex items-center justify-between mb-3" :class="canEdit ? 'cursor-grab' : 'cursor-default'">
+    <div
+      class="list-header flex items-center justify-between mb-3"
+      :class="canEdit ? 'cursor-grab' : 'cursor-default'"
+    >
       <input
         v-if="renaming"
         v-model="renameValue"

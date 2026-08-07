@@ -407,19 +407,33 @@ onUnmounted(() => {
     @dragleave="handleCardDragLeave"
     @drop.capture="handleCardDrop"
   >
-    <div class="workspace-chat-room min-h-13.5 py-2.25 px-3.5 border-b border-gray-200 flex items-center justify-between gap-3 bg-white">
+    <div
+      class="workspace-chat-room min-h-13.5 py-2.25 px-3.5 border-b border-gray-200 flex items-center justify-between gap-3 bg-white"
+    >
       <div>
         <strong class="block text-gray-900 text-sm"># {{ workspaceName || '워크스페이스' }}</strong>
-        <span class="workspace-chat-room-subtitle block mt-0.5 text-slate-500">구성원 공용 대화방</span>
+        <span class="workspace-chat-room-subtitle block mt-0.5 text-slate-500"
+          >구성원 공용 대화방</span
+        >
       </div>
     </div>
 
     <div class="workspace-chat-messages-region relative min-h-45 flex-1 overflow-hidden">
-      <div ref="messageList" class="workspace-chat-messages h-full min-h-0 py-4 px-3.5 overflow-y-auto" aria-live="polite">
-        <p v-if="loading" class="workspace-chat-state grid min-h-full m-0 place-items-center text-slate-400">
+      <div
+        ref="messageList"
+        class="workspace-chat-messages h-full min-h-0 py-4 px-3.5 overflow-y-auto"
+        aria-live="polite"
+      >
+        <p
+          v-if="loading"
+          class="workspace-chat-state grid min-h-full m-0 place-items-center text-slate-400"
+        >
           메시지를 불러오는 중…
         </p>
-        <p v-else-if="!error && messages.length === 0" class="workspace-chat-state grid min-h-full m-0 place-items-center text-slate-400">
+        <p
+          v-else-if="!error && messages.length === 0"
+          class="workspace-chat-state grid min-h-full m-0 place-items-center text-slate-400"
+        >
           아직 메시지가 없습니다.
         </p>
         <article
@@ -427,7 +441,8 @@ onUnmounted(() => {
           :key="message.id"
           class="workspace-chat-message flex items-start gap-2 mb-3.5"
           :class="{
-            'workspace-chat-message--mine ml-auto flex-row-reverse': message.author.user_id === authState.user?.id,
+            'workspace-chat-message--mine ml-auto flex-row-reverse':
+              message.author.user_id === authState.user?.id,
           }"
         >
           <img
@@ -473,11 +488,18 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <p v-if="error" class="workspace-chat-error mt-0 py-1.75 px-3.5 bg-red-50 text-red-700" role="alert">
+    <p
+      v-if="error"
+      class="workspace-chat-error mt-0 py-1.75 px-3.5 bg-red-50 text-red-700"
+      role="alert"
+    >
       {{ error }}
     </p>
 
-    <form class="workspace-chat-composer relative pt-2.5 px-3 pb-3 border-t border-gray-200 bg-white" @submit.prevent="sendMessage">
+    <form
+      class="workspace-chat-composer relative pt-2.5 px-3 pb-3 border-t border-gray-200 bg-white"
+      @submit.prevent="sendMessage"
+    >
       <p v-if="cardLinkError" class="workspace-chat-card-link-error text-red-700" role="alert">
         {{ cardLinkError }}
       </p>
@@ -485,7 +507,9 @@ onUnmounted(() => {
         v-if="selectedCard"
         class="workspace-chat-selected-card flex items-center gap-1.5 mb-1.75 py-1.75 px-2.25 rounded-lg bg-blue-50 text-blue-700 font-bold"
       >
-        <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">▣ {{ selectedCard.title }}</span>
+        <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+          >▣ {{ selectedCard.title }}</span
+        >
         <button
           type="button"
           class="border-0 bg-transparent text-blue-700 text-base"
@@ -494,7 +518,9 @@ onUnmounted(() => {
         >
           ×
         </button>
-        <small class="workspace-chat-selected-card-hint ml-auto text-slate-500 font-medium whitespace-nowrap">
+        <small
+          class="workspace-chat-selected-card-hint ml-auto text-slate-500 font-medium whitespace-nowrap"
+        >
           이 메시지는 카드 댓글에도 기록됩니다.
         </small>
       </div>
@@ -548,12 +574,14 @@ onUnmounted(() => {
               class="workspace-chat-card-option-btn w-full py-2 px-2.25 border-0 bg-transparent text-left hover:bg-blue-50"
               @click="chooseCard(card.id)"
             >
-              <span class="block overflow-hidden text-ellipsis whitespace-nowrap text-gray-800 text-xs font-semibold">{{
-                card.title
-              }}</span>
-              <small class="workspace-chat-card-option-list block overflow-hidden text-ellipsis whitespace-nowrap mt-0.5 text-slate-400">{{
-                card.listName
-              }}</small>
+              <span
+                class="block overflow-hidden text-ellipsis whitespace-nowrap text-gray-800 text-xs font-semibold"
+                >{{ card.title }}</span
+              >
+              <small
+                class="workspace-chat-card-option-list block overflow-hidden text-ellipsis whitespace-nowrap mt-0.5 text-slate-400"
+                >{{ card.listName }}</small
+              >
             </button>
           </div>
         </div>

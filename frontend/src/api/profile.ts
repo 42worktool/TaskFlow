@@ -1,4 +1,4 @@
-import { apiRequest, authRequestError } from '../services/auth'
+import { authRequestError } from '../services/auth'
 
 export interface PublicProfile {
   id: string
@@ -19,11 +19,4 @@ export const ProfileAPI = {
     }
     return response.json() as Promise<PublicProfile>
   },
-
-  search: (query: string, workspaceId?: string) =>
-    apiRequest<PublicProfile[]>(
-      `/api/users/search?q=${encodeURIComponent(query)}${
-        workspaceId ? `&workspace_id=${encodeURIComponent(workspaceId)}` : ''
-      }`,
-    ),
 }

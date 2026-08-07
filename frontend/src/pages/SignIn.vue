@@ -56,7 +56,11 @@ async function loginWithEmail() {
   <AuthLayout>
     <AppLogo tagline="팀 업무를 한눈에 관리하세요" />
 
-    <p v-if="oauthError" class="auth-message mb-3 py-2.5 px-3 rounded-lg bg-red-50 text-red-700" role="alert">
+    <p
+      v-if="oauthError"
+      class="auth-message mb-3 py-2.5 px-3 rounded-lg bg-red-50 text-red-700"
+      role="alert"
+    >
       {{ oauthError }}
     </p>
 
@@ -67,7 +71,11 @@ async function loginWithEmail() {
         :disabled="submitting"
         @click="loginWithGoogle"
       >
-        <svg class="google-icon w-4.5 h-4.5 shrink-0 grow-0 basis-4.5" viewBox="0 0 18 18" aria-hidden="true">
+        <svg
+          class="google-icon w-4.5 h-4.5 shrink-0 grow-0 basis-4.5"
+          viewBox="0 0 18 18"
+          aria-hidden="true"
+        >
           <path
             fill="#4285F4"
             d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62Z"
@@ -108,7 +116,11 @@ async function loginWithEmail() {
         placeholder="비밀번호"
         :disabled="submitting"
       />
-      <p v-if="formError" class="auth-message mb-3 py-2.5 px-3 rounded-lg bg-red-50 text-red-700" role="alert">
+      <p
+        v-if="formError"
+        class="auth-message mb-3 py-2.5 px-3 rounded-lg bg-red-50 text-red-700"
+        role="alert"
+      >
         {{ formError }}
       </p>
       <button

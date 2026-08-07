@@ -206,7 +206,9 @@ onMounted(refreshList)
           >
             <div class="project-section-heading flex items-start justify-between gap-4 mb-5">
               <div>
-                <h2 class="section-title text-xl font-bold text-gray-900 mb-1">{{ section.title }}</h2>
+                <h2 class="section-title text-xl font-bold text-gray-900 mb-1">
+                  {{ section.title }}
+                </h2>
                 <p class="section-desc mb-0 text-gray-500">{{ section.description }}</p>
               </div>
               <span
@@ -224,13 +226,18 @@ onMounted(refreshList)
                   :to="`/workspaces/${ws.id}/board`"
                   class="project-card bg-white overflow-hidden border border-gray-200 no-underline text-inherit flex min-w-0 min-h-39 h-full flex-col transition hover:border-gray-300 hover:-translate-y-px"
                 >
-                  <div class="card-color-bar h-1.25 shrink-0 grow-0 basis-1.25" :style="{ background: workspaceColor(ws.id) }" />
+                  <div
+                    class="card-color-bar h-1.25 shrink-0 grow-0 basis-1.25"
+                    :style="{ background: workspaceColor(ws.id) }"
+                  />
                   <div class="card-body flex min-h-0 flex-1 flex-col items-start py-4 px-4.5">
                     <h3 class="card-name">{{ ws.name }}</h3>
                     <div class="card-badges flex flex-wrap gap-1.5">
                       <span
                         class="card-badge inline-flex min-h-6 items-center py-0.5 px-2 rounded text-xs font-medium leading-none"
-                        :class="ws.is_public ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'"
+                        :class="
+                          ws.is_public ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500'
+                        "
                         >{{ ws.is_public ? '공개' : '비공개' }}</span
                       >
                       <span
@@ -293,7 +300,9 @@ onMounted(refreshList)
                 type="button"
                 @click="showCreate = true"
               >
-                <div class="new-card-inner w-full h-full min-h-38 flex flex-col items-center justify-center gap-1.5 text-gray-400">
+                <div
+                  class="new-card-inner w-full h-full min-h-38 flex flex-col items-center justify-center gap-1.5 text-gray-400"
+                >
                   <span class="new-icon leading-none">+</span>
                   <span class="new-label">새 프로젝트 추가</span>
                 </div>

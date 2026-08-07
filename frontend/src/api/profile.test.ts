@@ -1,17 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/auth', () => ({
-  apiRequest: vi.fn(),
   authRequestError: vi.fn(async () => new Error('프로필을 불러오지 못했습니다.')),
 }))
 
-import { apiRequest } from '../services/auth'
 import { ProfileAPI } from './profile'
 
 describe('ProfileAPI', () => {
   beforeEach(() => {
     vi.unstubAllGlobals()
-    vi.mocked(apiRequest).mockReset()
   })
 
   it('loads a public profile without an authenticated API wrapper', async () => {
@@ -35,14 +32,5 @@ describe('ProfileAPI', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/users/user-1/profile', {
       headers: { Accept: 'application/json' },
     })
-  })
-
-  it('searches public profiles through the authenticated API', async () => {
-    vi.mocked(apiRequest).mockResolvedValue([])
-
-    await expect(ProfileAPI.search('product developer', 'workspace-1')).resolves.toEqual([])
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/api/users/search?q=product%20developer&workspace_id=workspace-1',
-    )
   })
 })

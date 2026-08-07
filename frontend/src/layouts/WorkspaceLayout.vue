@@ -469,7 +469,10 @@ onUnmounted(() => {
   </div>
   <div v-else class="app-shell">
     <AppHeader />
-    <main class="workspace-load-state grid place-items-center text-slate-500" :role="loadError ? 'alert' : 'status'">
+    <main
+      class="workspace-load-state grid place-items-center text-slate-500"
+      :role="loadError ? 'alert' : 'status'"
+    >
       {{ loadError || '워크스페이스를 불러오는 중…' }}
     </main>
   </div>

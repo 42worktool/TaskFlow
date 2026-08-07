@@ -200,7 +200,9 @@ onUnmounted(() => {
       <header class="workspace-labels-panel-header flex items-start justify-between gap-3 mb-3.5">
         <div>
           <h2 :id="titleId" class="text-slate-900 text-base">라벨</h2>
-          <p class="workspace-labels-panel-desc mt-1 text-slate-500">카드에 사용할 라벨을 관리하세요.</p>
+          <p class="workspace-labels-panel-desc mt-1 text-slate-500">
+            카드에 사용할 라벨을 관리하세요.
+          </p>
         </div>
         <button
           type="button"
@@ -283,7 +285,9 @@ onUnmounted(() => {
             </button>
           </template>
         </li>
-        <li v-if="sortedLabels.length === 0" class="text-slate-500 text-xs">아직 라벨이 없습니다.</li>
+        <li v-if="sortedLabels.length === 0" class="text-slate-500 text-xs">
+          아직 라벨이 없습니다.
+        </li>
       </ul>
 
       <form

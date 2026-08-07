@@ -61,7 +61,9 @@ async function submit() {
           />
         </label>
 
-        <label class="field-check flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-4">
+        <label
+          class="field-check flex items-center gap-2 text-sm text-gray-700 cursor-pointer mb-4"
+        >
           <input v-model="isPublic" type="checkbox" />
           <span>{{ editing ? '공개 프로젝트' : '공개 프로젝트로 생성' }}</span>
         </label>

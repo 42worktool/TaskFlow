@@ -191,7 +191,9 @@ async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
           {{ sending ? '전송 중...' : '초대 메일 보내기' }}
         </button>
         <p v-if="inviteError" class="error-text mt-2 text-red-600">{{ inviteError }}</p>
-        <p v-if="inviteSuccess" class="success-text mt-2 text-emerald-700" role="status">{{ inviteSuccess }}</p>
+        <p v-if="inviteSuccess" class="success-text mt-2 text-emerald-700" role="status">
+          {{ inviteSuccess }}
+        </p>
       </div>
 
       <div class="section">
@@ -217,7 +219,9 @@ async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
             </div>
             <div class="member-info flex-1">
               <p class="member-name text-sm font-medium text-gray-900">{{ m.user.name }}</p>
-              <p v-if="m.user.email" class="member-email text-xs text-gray-500">{{ m.user.email }}</p>
+              <p v-if="m.user.email" class="member-email text-xs text-gray-500">
+                {{ m.user.email }}
+              </p>
             </div>
             <div class="member-actions flex items-center justify-end flex-wrap gap-2">
               <select
@@ -234,9 +238,11 @@ async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
                   {{ role.label }}
                 </option>
               </select>
-              <span v-else class="role-badge py-1 px-2.5 border border-gray-200 rounded-md text-gray-700">{{
-                roleLabels[m.role]
-              }}</span>
+              <span
+                v-else
+                class="role-badge py-1 px-2.5 border border-gray-200 rounded-md text-gray-700"
+                >{{ roleLabels[m.role] }}</span
+              >
               <span
                 v-if="updatingRole === m.user_id"
                 class="member-action-status text-xs text-gray-500 whitespace-nowrap"

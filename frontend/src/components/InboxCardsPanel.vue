@@ -146,21 +146,32 @@ onUnmounted(() => {
 
 <template>
   <section class="inbox-cards-panel w-full h-full bg-white flex flex-col min-h-0">
-    <div class="inbox-panel-header flex items-start justify-between pt-4.5 px-5 pb-3 border-b border-gray-200">
+    <div
+      class="inbox-panel-header flex items-start justify-between pt-4.5 px-5 pb-3 border-b border-gray-200"
+    >
       <div>
         <h2 class="inbox-panel-title text-lg font-bold text-gray-900">인박스</h2>
         <p class="inbox-panel-subtitle mt-0.75 text-gray-500">보드 밖에 보관 중인 내 카드</p>
       </div>
     </div>
 
-    <div class="inbox-panel-toolbar flex items-center justify-between py-3 px-5 border-b border-gray-200">
+    <div
+      class="inbox-panel-toolbar flex items-center justify-between py-3 px-5 border-b border-gray-200"
+    >
       <span class="card-count text-gray-500 font-semibold">카드 {{ cards.length }}개</span>
-      <span v-if="allowDrag && destinationLists.length" class="inbox-drag-hint text-blue-600 font-semibold text-right">
+      <span
+        v-if="allowDrag && destinationLists.length"
+        class="inbox-drag-hint text-blue-600 font-semibold text-right"
+      >
         카드를 보드 리스트로 드래그하세요
       </span>
     </div>
 
-    <p v-if="error" class="mt-0 py-4.5 px-5 text-gray-500 text-sm bg-red-50 text-red-700" role="alert">
+    <p
+      v-if="error"
+      class="mt-0 py-4.5 px-5 text-gray-500 text-sm bg-red-50 text-red-700"
+      role="alert"
+    >
       {{ error }}
     </p>
     <draggable

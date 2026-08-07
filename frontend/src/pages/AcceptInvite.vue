@@ -92,7 +92,11 @@ async function switchAccount() {
           <strong class="mt-1 text-sm text-slate-900">{{ authState.user?.name }}</strong>
           <small class="text-xs text-slate-500">{{ authState.user?.email }}</small>
         </div>
-        <p v-if="error" class="error mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-left text-red-700" role="alert">
+        <p
+          v-if="error"
+          class="error mt-4 rounded-lg bg-red-50 px-3 py-2.5 text-left text-red-700"
+          role="alert"
+        >
           {{ error }}
         </p>
         <div class="mt-6 flex flex-col gap-3">

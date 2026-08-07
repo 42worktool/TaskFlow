@@ -3,21 +3,17 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import { LabelAPI } from '../api/label'
-import { ListAPI } from '../api/list'
-import { ProfileAPI, type PublicProfile } from '../api/profile'
+import { SearchAPI, type SearchResult } from '../api/search'
 import { WorkspaceAPI } from '../api/workspace'
 import { workspaceColor } from '../types'
-import type { Label, ListWithCards, Workspace } from '../types'
+import type { Label, Workspace } from '../types'
 import {
-  compareSearchSortValues,
   criteriaFromRouteQuery,
   criteriaToRouteQuery,
-  matchesSearchText,
   paginationPages,
   type AdvancedSearchCriteria,
   type SearchCategory,
   type SearchSort,
-  type SearchSortValue,
 } from '../utils/searchQuery'
 
 const PAGE_SIZE = 10
@@ -25,17 +21,18 @@ const PAGE_SIZE = 10
 const route = useRoute()
 const router = useRouter()
 const allWorkspaces = ref<Workspace[]>([])
-const lists = ref<ListWithCards[]>([])
 const workspaceLabels = ref<Label[]>([])
-const searchedUsers = ref<PublicProfile[]>([])
+const searchResults = ref<SearchResult[]>([])
+const totalResults = ref(0)
+const totalPages = ref(1)
 const loading = ref(true)
 const labelsLoading = ref(false)
-const usersLoading = ref(false)
+const searchLoading = ref(false)
 const loadError = ref('')
 const labelLoadError = ref('')
-const userLoadError = ref('')
+const searchError = ref('')
 let labelRequestVersion = 0
-let userRequestVersion = 0
+let searchRequestVersion = 0
 
 const criteria = computed(() =>
   criteriaFromRouteQuery({
@@ -53,12 +50,6 @@ const hasSearchIntent = computed(
     Boolean(criteria.value.text || criteria.value.workspace || criteria.value.label) ||
     criteria.value.category !== 'all',
 )
-
-function matchesScope(scope: string | null, id: string, name: string): boolean {
-  if (!scope) return true
-  const normalized = scope.toLocaleLowerCase()
-  return id === scope || name.toLocaleLowerCase().includes(normalized)
-}
 
 function resolveWorkspace(scope: string | null): Workspace | null {
   if (!scope) return null
@@ -97,163 +88,29 @@ const labelFilterUnavailable = computed(
   () => criteria.value.category === 'workspace' || criteria.value.category === 'user',
 )
 
-const workspaceResults = computed(() => {
-  if (
-    criteria.value.category === 'card' ||
-    criteria.value.category === 'user' ||
-    hasLabelScope.value
-  )
-    return []
-  return allWorkspaces.value.filter(
-    (workspace) =>
-      matchesScope(criteria.value.workspace, workspace.id, workspace.name) &&
-      matchesSearchText(
-        [workspace.name, ...workspace.members.map((member) => member.user.name)],
-        criteria.value.text,
-      ),
-  )
-})
+const workspaceResults = computed(() =>
+  searchResults.value.flatMap((item) => (item.kind === 'workspace' ? [item] : [])),
+)
+const cardResults = computed(() =>
+  searchResults.value.flatMap((item) =>
+    item.kind === 'card'
+      ? [
+          {
+            card: item,
+            list: item.list,
+            workspace: item.workspace,
+          },
+        ]
+      : [],
+  ),
+)
+const userResults = computed(() =>
+  searchResults.value.flatMap((item) => (item.kind === 'user' ? [item] : [])),
+)
 
-const cardResults = computed(() => {
-  if (criteria.value.category === 'workspace' || criteria.value.category === 'user') return []
-
-  return lists.value.flatMap((list) => {
-    const workspace = allWorkspaces.value.find((item) => item.id === list.workspace_id)
-    if (!workspace) return []
-
-    const workspaceMatches = selectedWorkspace.value
-      ? workspace.id === selectedWorkspace.value.id
-      : matchesScope(criteria.value.workspace, workspace.id, workspace.name)
-    if (!workspaceMatches) return []
-
-    return list.cards
-      .filter((card) => {
-        const labels = card.labels ?? []
-        const labelMatches = hasLabelScope.value
-          ? Boolean(
-              selectedLabel.value &&
-              labels.some((label) => label.label_id === selectedLabel.value?.id),
-            )
-          : true
-        if (!labelMatches) return false
-
-        return matchesSearchText(
-          [
-            card.title,
-            card.description,
-            list.name,
-            workspace.name,
-            ...labels.map((label) => label.label_name),
-          ],
-          criteria.value.text,
-        )
-      })
-      .map((card) => ({ card, list, workspace }))
-  })
-})
-
-const userResults = computed(() => {
-  if (
-    criteria.value.category === 'workspace' ||
-    criteria.value.category === 'card' ||
-    hasLabelScope.value
-  )
-    return []
-  if (criteria.value.workspace && !selectedWorkspace.value) return []
-  if (!selectedWorkspace.value) return searchedUsers.value
-
-  const memberIds = new Set(selectedWorkspace.value.members.map((member) => member.user_id))
-  return searchedUsers.value.filter((user) => memberIds.has(user.id))
-})
-
-type SearchResultItem =
-  | {
-      kind: 'workspace'
-      key: string
-      workspace: Workspace
-      sortValue: SearchSortValue
-    }
-  | {
-      kind: 'card'
-      key: string
-      result: (typeof cardResults.value)[number]
-      sortValue: SearchSortValue
-    }
-  | {
-      kind: 'user'
-      key: string
-      user: PublicProfile
-      sortValue: SearchSortValue
-    }
-
-const sortedResults = computed<SearchResultItem[]>(() => {
-  const results: SearchResultItem[] = [
-    ...workspaceResults.value.map((workspace): SearchResultItem => ({
-      kind: 'workspace',
-      key: `workspace:${workspace.id}`,
-      workspace,
-      sortValue: {
-        name: workspace.name,
-        createdAt: workspace.updated_at,
-        searchable: [workspace.name, ...workspace.members.map((member) => member.user.name)],
-      },
-    })),
-    ...cardResults.value.map((result): SearchResultItem => ({
-      kind: 'card',
-      key: `card:${result.card.id}`,
-      result,
-      sortValue: {
-        name: result.card.title,
-        createdAt: result.card.created_at,
-        searchable: [
-          result.card.title,
-          result.card.description,
-          result.list.name,
-          result.workspace.name,
-          ...(result.card.labels ?? []).map((label) => label.label_name),
-        ],
-      },
-    })),
-    ...userResults.value.map((user): SearchResultItem => ({
-      kind: 'user',
-      key: `user:${user.id}`,
-      user,
-      sortValue: {
-        name: user.name,
-        createdAt: user.created_at,
-        searchable: [user.name, user.headline],
-      },
-    })),
-  ]
-
-  return results.sort(
-    (left, right) =>
-      compareSearchSortValues(
-        left.sortValue,
-        right.sortValue,
-        criteria.value.sort,
-        criteria.value.text,
-      ) || left.key.localeCompare(right.key),
-  )
-})
-
-const totalResults = computed(() => sortedResults.value.length)
-const pageCount = computed(() => Math.max(1, Math.ceil(totalResults.value / PAGE_SIZE)))
+const pageCount = computed(() => totalPages.value)
 const currentPage = computed(() => Math.min(criteria.value.page, pageCount.value))
 const pageNumbers = computed(() => paginationPages(currentPage.value, pageCount.value))
-const pagedResults = computed(() => {
-  const start = (currentPage.value - 1) * PAGE_SIZE
-  return sortedResults.value.slice(start, start + PAGE_SIZE)
-})
-const pagedWorkspaceResults = computed(() =>
-  pagedResults.value.flatMap((item) => (item.kind === 'workspace' ? [item.workspace] : [])),
-)
-const pagedCardResults = computed(() =>
-  pagedResults.value.flatMap((item) => (item.kind === 'card' ? [item.result] : [])),
-)
-const pagedUserResults = computed(() =>
-  pagedResults.value.flatMap((item) => (item.kind === 'user' ? [item.user] : [])),
-)
 const firstResultNumber = computed(() =>
   totalResults.value === 0 ? 0 : (currentPage.value - 1) * PAGE_SIZE + 1,
 )
@@ -329,10 +186,6 @@ async function loadSearchData() {
   try {
     const workspaces = await WorkspaceAPI.list()
     allWorkspaces.value = [...workspaces.my, ...workspaces.public]
-    const workspaceLists = await Promise.all(
-      allWorkspaces.value.map((workspace) => ListAPI.listByWorkspace(workspace.id)),
-    )
-    lists.value = workspaceLists.flat()
   } catch (caught) {
     loadError.value =
       caught instanceof Error ? caught.message : '검색 데이터를 불러오지 못했습니다.'
@@ -376,46 +229,75 @@ watch([loading, () => criteria.value.label, selectedWorkspace], ([isLoading, lab
 
 watch(
   [
+    loading,
+    labelsLoading,
+    hasSearchIntent,
     query,
     () => criteria.value.category,
-    hasLabelScope,
+    () => criteria.value.sort,
+    () => criteria.value.page,
     () => selectedWorkspace.value?.id ?? null,
+    () => selectedLabel.value?.id ?? null,
     () => criteria.value.workspace,
+    () => criteria.value.label,
   ],
-  async ([text, category, labelScoped, workspaceId, workspaceScope]) => {
-    const requestVersion = ++userRequestVersion
-    searchedUsers.value = []
-    userLoadError.value = ''
+  async ([
+    metadataLoading,
+    currentLabelsLoading,
+    searchIntent,
+    text,
+    category,
+    sort,
+    page,
+    workspaceId,
+    labelId,
+    workspaceScope,
+    labelScope,
+  ]) => {
+    const requestVersion = ++searchRequestVersion
+    searchResults.value = []
+    totalResults.value = 0
+    totalPages.value = 1
+    searchError.value = ''
     if (
-      !text ||
-      (category !== 'all' && category !== 'user') ||
-      labelScoped ||
-      (workspaceScope && !workspaceId)
+      metadataLoading ||
+      !searchIntent ||
+      (workspaceScope && !workspaceId) ||
+      (labelScope && (currentLabelsLoading || !labelId))
     ) {
-      usersLoading.value = false
+      searchLoading.value = false
       return
     }
 
-    usersLoading.value = true
+    searchLoading.value = true
     try {
-      const users = await ProfileAPI.search(text, workspaceId ?? undefined)
-      if (requestVersion !== userRequestVersion) return
-      searchedUsers.value = users
+      const response = await SearchAPI.search({
+        query: text,
+        type: category,
+        workspaceId: workspaceId ?? undefined,
+        labelId: labelId ?? undefined,
+        sort,
+        page,
+        limit: PAGE_SIZE,
+      })
+      if (requestVersion !== searchRequestVersion) return
+      searchResults.value = response.items
+      totalResults.value = response.total
+      totalPages.value = response.total_pages
     } catch (caught) {
-      if (requestVersion !== userRequestVersion) return
-      userLoadError.value =
-        caught instanceof Error ? caught.message : '사용자를 검색하지 못했습니다.'
+      if (requestVersion !== searchRequestVersion) return
+      searchError.value = caught instanceof Error ? caught.message : '검색하지 못했습니다.'
     } finally {
-      if (requestVersion === userRequestVersion) usersLoading.value = false
+      if (requestVersion === searchRequestVersion) searchLoading.value = false
     }
   },
   { immediate: true },
 )
 
 watch(
-  [loading, usersLoading, pageCount, () => criteria.value.page],
-  ([searchLoading, peopleLoading, availablePages, requestedPage]) => {
-    if (!searchLoading && !peopleLoading && requestedPage > availablePages) {
+  [loading, searchLoading, pageCount, () => criteria.value.page],
+  ([metadataLoading, resultsLoading, availablePages, requestedPage]) => {
+    if (!metadataLoading && !resultsLoading && requestedPage > availablePages) {
       updateCriteria({ page: availablePages })
     }
   },
@@ -460,7 +342,9 @@ onMounted(() => {
       </div>
 
       <section class="search-filter-panel" aria-label="검색 필터">
-        <div class="search-filter-group search-filter-group--category min-w-0 flex flex-col gap-1.75">
+        <div
+          class="search-filter-group search-filter-group--category min-w-0 flex flex-col gap-1.75"
+        >
           <span class="search-filter-label text-gray-500 font-extrabold">카테고리</span>
           <div class="flex min-h-9 p-0.75 rounded-lg bg-slate-100">
             <button
@@ -473,7 +357,10 @@ onMounted(() => {
               :key="option.value"
               type="button"
               class="search-category-button flex-1 py-1.5 px-2.25 border-0 rounded-md bg-transparent text-slate-500 text-xs font-bold hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
-              :class="{ 'search-category-button--active bg-white text-blue-700': criteria.category === option.value }"
+              :class="{
+                'search-category-button--active bg-white text-blue-700':
+                  criteria.category === option.value,
+              }"
               :aria-pressed="criteria.category === option.value"
               @click="setCategory(option.value as SearchCategory)"
             >
@@ -542,7 +429,9 @@ onMounted(() => {
             <option value="newest">최신순</option>
             <option value="name">이름순</option>
           </select>
-          <small class="search-filter-hint text-slate-500">모든 결과 유형에 같은 정렬 기준을 적용합니다.</small>
+          <small class="search-filter-hint text-slate-500"
+            >모든 결과 유형에 같은 정렬 기준을 적용합니다.</small
+          >
         </label>
       </section>
 
@@ -591,46 +480,52 @@ onMounted(() => {
         </button>
       </div>
 
-      <div v-if="loadError" class="empty-state p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm" role="alert">
+      <div
+        v-if="loadError"
+        class="empty-state p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm"
+        role="alert"
+      >
         {{ loadError }}
       </div>
       <div
-        v-else-if="loading || usersLoading"
+        v-else-if="loading || searchLoading"
         class="empty-state p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm"
         role="status"
       >
         검색 데이터를 불러오는 중…
       </div>
       <div
-        v-else-if="userLoadError && !hasResults"
+        v-else-if="searchError && !hasResults"
         class="empty-state p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm"
         role="alert"
       >
-        {{ userLoadError }}
+        {{ searchError }}
       </div>
-      <div v-else-if="!hasSearchIntent" class="empty-state p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm">
+      <div
+        v-else-if="!hasSearchIntent"
+        class="empty-state p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm"
+      >
         상단 검색창에 키워드를 입력하거나 카테고리·범위 필터를 선택하세요.
       </div>
-      <div v-else-if="!hasResults" class="empty-state p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm">
+      <div
+        v-else-if="!hasResults"
+        class="empty-state p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm"
+      >
         {{
           criteria.category === 'user' && !query
-            ? '검색할 사용자 이름이나 한 줄 소개를 입력하세요.'
+            ? '검색할 사용자 이름 또는 이메일을 입력하세요.'
             : '조건에 맞는 검색 결과가 없습니다.'
         }}
       </div>
 
       <template v-else>
-        <section v-if="pagedWorkspaceResults.length" class="result-section mb-7">
+        <section v-if="workspaceResults.length" class="result-section mb-7">
           <div class="section-header flex items-center gap-2 mb-2.5">
             <h2 class="section-title text-base font-bold text-gray-900">워크스페이스</h2>
-            <span
-              class="result-count min-w-6 h-5.5 px-1.75 rounded-full bg-gray-200 text-gray-700 text-xs font-bold inline-flex items-center justify-center"
-              >{{ workspaceResults.length }}</span
-            >
           </div>
           <div class="result-list flex flex-col gap-2">
             <RouterLink
-              v-for="workspace in pagedWorkspaceResults"
+              v-for="workspace in workspaceResults"
               :key="workspace.id"
               :to="`/workspaces/${workspace.id}/board`"
               class="result-row min-h-17.5 flex items-center gap-3 py-3.5 px-4 bg-white border border-gray-200 rounded-lg text-inherit hover:border-blue-200"
@@ -640,12 +535,14 @@ onMounted(() => {
                 :style="{ background: workspaceColor(workspace.id) }"
               />
               <div class="result-content flex-1 min-w-0">
-                <p class="result-title text-sm font-bold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
+                <p
+                  class="result-title text-sm font-bold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap"
+                >
                   {{ workspace.name }}
                 </p>
                 <p class="result-meta mt-1 text-gray-500">
                   {{ workspace.is_public ? '공개 워크스페이스' : '비공개 워크스페이스' }} · 멤버
-                  {{ workspace.members.length }}명
+                  {{ workspace.member_count }}명
                 </p>
               </div>
               <span class="result-arrow text-gray-400">→</span>
@@ -653,17 +550,13 @@ onMounted(() => {
           </div>
         </section>
 
-        <section v-if="pagedCardResults.length" class="result-section mb-7">
+        <section v-if="cardResults.length" class="result-section mb-7">
           <div class="section-header flex items-center gap-2 mb-2.5">
             <h2 class="section-title text-base font-bold text-gray-900">카드</h2>
-            <span
-              class="result-count min-w-6 h-5.5 px-1.75 rounded-full bg-gray-200 text-gray-700 text-xs font-bold inline-flex items-center justify-center"
-              >{{ cardResults.length }}</span
-            >
           </div>
           <div class="result-list flex flex-col gap-2">
             <RouterLink
-              v-for="result in pagedCardResults"
+              v-for="result in cardResults"
               :key="result.card.id"
               :to="{
                 path: `/workspaces/${result.workspace.id}/board`,
@@ -671,26 +564,37 @@ onMounted(() => {
               }"
               class="result-row min-h-17.5 flex items-center gap-3 py-3.5 px-4 bg-white border border-gray-200 rounded-lg text-inherit hover:border-blue-200"
             >
-              <span class="card-marker w-8.5 h-8.5 rounded-lg shrink-0 bg-blue-50 border border-blue-200" />
+              <span
+                class="card-marker w-8.5 h-8.5 rounded-lg shrink-0 bg-blue-50 border border-blue-200"
+              />
               <div class="result-content flex-1 min-w-0">
-                <p class="result-title text-sm font-bold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
+                <p
+                  class="result-title text-sm font-bold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap"
+                >
                   {{ result.card.title }}
                 </p>
                 <p class="result-meta mt-1 text-gray-500">
                   {{ result.workspace.name }} · {{ result.list?.name ?? '목록 없음' }}
                 </p>
-                <span v-if="result.card.description" class="result-description mt-1.75 overflow-hidden text-gray-600 text-xs line-clamp-2">
+                <span
+                  v-if="result.card.description"
+                  class="result-description mt-1.75 overflow-hidden text-gray-600 text-xs line-clamp-2"
+                >
                   {{ result.card.description }}
                 </span>
-                <span v-if="result.card.labels?.length" class="result-labels flex flex-wrap gap-1.25 mt-2">
+                <span
+                  v-if="result.card.labels?.length"
+                  class="result-labels flex flex-wrap gap-1.25 mt-2"
+                >
                   <span
                     v-for="label in result.card.labels"
                     :key="label.label_id"
                     class="result-label inline-flex items-center gap-1.25 py-0.75 px-1.75 rounded-full bg-gray-100 text-gray-600 font-bold"
                   >
-                    <i class="w-1.75 h-1.75 rounded-full" :style="{ background: label.label_color }" />{{
-                      label.label_name
-                    }}
+                    <i
+                      class="w-1.75 h-1.75 rounded-full"
+                      :style="{ background: label.label_color }"
+                    />{{ label.label_name }}
                   </span>
                 </span>
               </div>
@@ -699,24 +603,17 @@ onMounted(() => {
           </div>
         </section>
 
-        <section v-if="pagedUserResults.length" class="result-section mb-7">
+        <section v-if="userResults.length" class="result-section mb-7">
           <div class="section-header flex items-center gap-2 mb-2.5">
             <h2 class="section-title text-base font-bold text-gray-900">사람</h2>
-            <span
-              class="result-count min-w-6 h-5.5 px-1.75 rounded-full bg-gray-200 text-gray-700 text-xs font-bold inline-flex items-center justify-center"
-              >{{ userResults.length }}</span
-            >
           </div>
+          <div v-if="searchError" class="section-empty" role="alert">{{ searchError }}</div>
           <div
-            v-if="userLoadError"
-            class="section-empty p-4.5 bg-white border border-gray-200 rounded-lg text-gray-500 text-sm"
-            role="alert"
+            v-else
+            class="result-list result-list--people overflow-hidden gap-0 border border-gray-200 bg-white"
           >
-            {{ userLoadError }}
-          </div>
-          <div v-else class="result-list result-list--people overflow-hidden gap-0 border border-gray-200 bg-white">
             <RouterLink
-              v-for="user in pagedUserResults"
+              v-for="user in userResults"
               :key="user.id"
               :to="`/profiles/${user.id}`"
               class="result-row result-person-row flex items-center gap-3 py-3.5 px-4 min-h-19.5 border-0 rounded-none text-inherit"
@@ -735,19 +632,29 @@ onMounted(() => {
               </span>
               <div class="result-content flex-1 min-w-0">
                 <div class="result-person-name-line flex items-center gap-1.75">
-                  <p class="result-title text-sm font-bold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap">
+                  <p
+                    class="result-title text-sm font-bold text-gray-900 overflow-hidden text-ellipsis whitespace-nowrap"
+                  >
                     {{ user.name }}
                   </p>
-                  <span class="py-0.5 px-1.25 rounded bg-slate-100 text-slate-500 font-bold">사람</span>
+                  <span class="py-0.5 px-1.25 rounded bg-slate-100 text-slate-500 font-bold"
+                    >사람</span
+                  >
                 </div>
-                <p class="result-person-headline mt-0.75 text-slate-600 text-xs overflow-hidden text-ellipsis whitespace-nowrap">
+                <p
+                  class="result-person-headline mt-0.75 text-slate-600 text-xs overflow-hidden text-ellipsis whitespace-nowrap"
+                >
                   {{ user.headline }}
                 </p>
-                <p class="result-person-context mt-0.75 text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                <p
+                  class="result-person-context mt-0.75 text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap"
+                >
                   {{ userWorkspaceSummary(user.id) }}
                 </p>
               </div>
-              <span class="result-person-action shrink-0 py-1.5 px-2.25 border border-gray-300 rounded-md text-slate-700 font-bold">
+              <span
+                class="result-person-action shrink-0 py-1.5 px-2.25 border border-gray-300 rounded-md text-slate-700 font-bold"
+              >
                 프로필 보기
               </span>
             </RouterLink>
@@ -778,7 +685,8 @@ onMounted(() => {
               type="button"
               class="search-pagination__page min-w-8.5 h-8.5 px-2.25 border border-gray-300 bg-white text-slate-700 text-xs font-bold focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
               :class="{
-                'search-pagination__page--active border-blue-600 bg-blue-600 text-white': page === currentPage,
+                'search-pagination__page--active border-blue-600 bg-blue-600 text-white':
+                  page === currentPage,
               }"
               :aria-current="page === currentPage ? 'page' : undefined"
               :aria-label="`${page}페이지`"

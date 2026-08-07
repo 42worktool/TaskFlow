@@ -3,7 +3,9 @@ import LegalFooter from '../components/LegalFooter.vue'
 </script>
 
 <template>
-  <div class="auth-bg min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+  <div
+    class="auth-bg min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
+  >
     <div class="circle absolute rounded-full pointer-events-none w-105 h-105 -left-30 top-20" />
     <div class="circle absolute rounded-full pointer-events-none w-80 h-80 -right-15 bottom-15" />
     <main class="auth-card bg-white rounded-2xl py-10 px-11 w-full max-w-105">

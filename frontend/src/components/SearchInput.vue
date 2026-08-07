@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ProfileAPI, type PublicProfile } from '../api/profile'
+import type { PublicProfile } from '../api/profile'
+import { SearchAPI } from '../api/search'
 import {
   criteriaFromRouteQuery,
   criteriaToRouteQuery,
@@ -26,7 +27,7 @@ let peopleSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const commands = [
   { command: '/card', insert: '/card ', label: '카드만', description: '카드 결과만 검색' },
-  { command: '/user', insert: '/user ', label: '사람', description: '이름과 소개로 검색' },
+  { command: '/user', insert: '/user ', label: '사람', description: '이름 또는 이메일로 검색' },
   {
     command: '/workspace',
     insert: '/workspace ',
@@ -194,7 +195,7 @@ watch(
     peopleLoading.value = true
     peopleSearchTimer = setTimeout(async () => {
       try {
-        const users = await ProfileAPI.search(text, workspaceId)
+        const users = await SearchAPI.users(text, workspaceId, 5)
         if (requestVersion !== peopleRequestVersion) return
         peopleSuggestions.value = users
       } catch {

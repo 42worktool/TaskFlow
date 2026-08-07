@@ -31,7 +31,10 @@ withDefaults(
     <div class="app-topbar-main flex-1 min-w-0 flex items-center gap-2.5">
       <SearchInput :initial-query="initialQuery" />
       <div class="flex items-center gap-2.5 ml-auto min-w-0 max-sm:gap-1.5">
-        <div v-if="$slots['workspace-actions']" class="app-topbar-workspace-actions min-w-0 flex items-center gap-2">
+        <div
+          v-if="$slots['workspace-actions']"
+          class="app-topbar-workspace-actions min-w-0 flex items-center gap-2"
+        >
           <slot name="workspace-actions" />
         </div>
         <ProfileMenu />

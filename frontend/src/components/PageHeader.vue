@@ -17,8 +17,14 @@ function goBack() {
 
 <template>
   <header class="max-w-190 mx-auto py-6 flex items-center justify-between">
-    <RouterLink :to="fallback" class="text-blue-700 text-xl font-extrabold no-underline">TaskFlow</RouterLink>
-    <button type="button" class="border-none bg-transparent p-0 text-blue-700 text-sm cursor-pointer" @click="goBack">
+    <RouterLink :to="fallback" class="text-blue-700 text-xl font-extrabold no-underline"
+      >TaskFlow</RouterLink
+    >
+    <button
+      type="button"
+      class="border-none bg-transparent p-0 text-blue-700 text-sm cursor-pointer"
+      @click="goBack"
+    >
       ← 돌아가기
     </button>
   </header>

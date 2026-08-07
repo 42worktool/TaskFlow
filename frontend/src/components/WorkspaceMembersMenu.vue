@@ -141,7 +141,9 @@ onUnmounted(() => {
           >＋</span
         >
       </span>
-      <span class="workspace-members-trigger-count min-w-7.75 font-bold text-right whitespace-nowrap">
+      <span
+        class="workspace-members-trigger-count min-w-7.75 font-bold text-right whitespace-nowrap"
+      >
         {{ onlineCount }}/{{ members.length }}
       </span>
     </button>
@@ -154,7 +156,9 @@ onUnmounted(() => {
       aria-modal="false"
       :aria-labelledby="titleId"
     >
-      <header class="workspace-members-panel-header min-h-14.5 flex items-center justify-between gap-3 py-2.5 pr-3 pl-4">
+      <header
+        class="workspace-members-panel-header min-h-14.5 flex items-center justify-between gap-3 py-2.5 pr-3 pl-4"
+      >
         <div>
           <h2 :id="titleId" class="workspace-members-title text-sm">팀원</h2>
           <p class="workspace-members-summary">
@@ -172,7 +176,10 @@ onUnmounted(() => {
       </header>
 
       <ul class="workspace-members-list min-h-0 m-0 p-1.5 overflow-y-auto list-none">
-        <li v-if="members.length === 0" class="workspace-members-list-empty py-7 px-3 text-xs text-center">
+        <li
+          v-if="members.length === 0"
+          class="workspace-members-list-empty py-7 px-3 text-xs text-center"
+        >
           아직 등록된 팀원이 없습니다.
         </li>
         <li
@@ -180,7 +187,10 @@ onUnmounted(() => {
           :key="member.user_id"
           class="workspace-members-list-item min-h-12 flex items-center gap-2.5 py-1.75 px-2"
         >
-          <span class="workspace-member-list-avatar w-8 h-8 shrink-0 rounded-full" aria-hidden="true">
+          <span
+            class="workspace-member-list-avatar w-8 h-8 shrink-0 rounded-full"
+            aria-hidden="true"
+          >
             <img
               v-if="member.user.profile_image_url"
               :src="member.user.profile_image_url"

@@ -616,10 +616,16 @@ onUnmounted(() => {
         ×
       </button>
     </p>
-    <div v-if="loading" class="board-status flex-1 flex items-center justify-center text-gray-500 text-sm">
+    <div
+      v-if="loading"
+      class="board-status flex-1 flex items-center justify-center text-gray-500 text-sm"
+    >
       불러오는 중...
     </div>
-    <div v-else-if="error" class="board-status flex-1 flex items-center justify-center text-sm text-red-500">
+    <div
+      v-else-if="error"
+      class="board-status flex-1 flex items-center justify-center text-sm text-red-500"
+    >
       {{ error }}
     </div>
     <draggable
@@ -653,7 +659,10 @@ onUnmounted(() => {
         />
       </template>
       <template #footer>
-        <div v-if="loading" class="board-inline-status w-70 shrink-0 grow-0 basis-70 grid place-items-center text-gray-500">
+        <div
+          v-if="loading"
+          class="board-inline-status w-70 shrink-0 grow-0 basis-70 grid place-items-center text-gray-500"
+        >
           보드를 불러오는 중…
         </div>
         <div
@@ -663,7 +672,11 @@ onUnmounted(() => {
           {{ error }}
         </div>
         <div v-else-if="canEditBoard" class="add-list-column w-70 shrink-0">
-          <form v-if="showAddList" class="add-list-form flex gap-1.5" @submit.prevent="submitAddList">
+          <form
+            v-if="showAddList"
+            class="add-list-form flex gap-1.5"
+            @submit.prevent="submitAddList"
+          >
             <input
               v-model="newListName"
               type="text"

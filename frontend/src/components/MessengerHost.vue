@@ -456,7 +456,9 @@ onUnmounted(() => {
             :inert="!directoryVisible"
             aria-label="메신저 대화 목록"
           >
-            <div class="messenger-directory-heading flex items-center justify-between pt-0.5 px-1 pb-2.5">
+            <div
+              class="messenger-directory-heading flex items-center justify-between pt-0.5 px-1 pb-2.5"
+            >
               <strong>대화</strong>
             </div>
 

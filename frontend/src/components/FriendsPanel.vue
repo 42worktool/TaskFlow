@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { FriendAPI } from '../api/friend'
-import { ProfileAPI, type PublicProfile } from '../api/profile'
+import type { PublicProfile } from '../api/profile'
+import { SearchAPI } from '../api/search'
 import PersonAvatar from './PersonAvatar.vue'
 import { authState } from '../services/auth'
 import { realtime } from '../services/realtime'
@@ -63,7 +64,7 @@ watch([friendSearchQuery, loading], ([value, isLoading]) => {
   friendSearchLoading.value = true
   friendSearchTimer = setTimeout(async () => {
     try {
-      const profiles = await ProfileAPI.search(query)
+      const profiles = await SearchAPI.users(query)
       if (version !== friendSearchVersion) return
       friendSearchResults.value = profiles
     } catch {
@@ -324,24 +325,30 @@ onUnmounted(() => {
 
 <template>
   <div class="friends-panel-content h-full overflow-y-auto p-4.5 text-gray-900">
-    <section class="friend-panel friend-search-panel p-4 border border-slate-200 rounded-xl bg-white flex items-stretch flex-col gap-3.5">
+    <section
+      class="friend-panel friend-search-panel p-4 border border-slate-200 rounded-xl bg-white flex items-stretch flex-col gap-3.5"
+    >
       <div>
         <h2 class="text-base">사람 찾기</h2>
-        <p class="mt-1.5 text-sm text-slate-500">이름, 한줄 소개 또는 이메일로 친구를 찾고 요청을 보내세요.</p>
+        <p class="mt-1.5 text-sm text-slate-500">이름 또는 이메일로 친구를 찾고 요청을 보내세요.</p>
       </div>
 
-      <label class="friend-search-field flex items-center gap-2.25 min-h-10.5 px-3 bg-white text-slate-500 focus-within:border-blue-600">
+      <label
+        class="friend-search-field flex items-center gap-2.25 min-h-10.5 px-3 bg-white text-slate-500 focus-within:border-blue-600"
+      >
         <span aria-hidden="true">⌕</span>
         <input
           v-model="friendSearchQuery"
           type="search"
           autocomplete="off"
-          placeholder="이름, 소개 또는 이메일로 친구 찾기"
-          aria-label="이름, 소개 또는 이메일로 친구 찾기"
+          placeholder="이름 또는 이메일로 친구 찾기"
+          aria-label="이름 또는 이메일로 친구 찾기"
           :disabled="loading"
           class="friend-search-input min-w-0 flex-1 border-0 outline-none bg-transparent text-gray-900"
         />
-        <small v-if="friendSearchLoading" class="friend-search-loading-label shrink-0 grow-0">검색 중…</small>
+        <small v-if="friendSearchLoading" class="friend-search-loading-label shrink-0 grow-0"
+          >검색 중…</small
+        >
       </label>
 
       <p v-if="friendSearchError" class="friend-search-state -mt-0.75" role="alert">
@@ -370,17 +377,23 @@ onUnmounted(() => {
         >
           <PersonAvatar :name="person.name" :image-url="person.profile_image_url" />
           <div class="friend-search-copy min-w-0 flex-1">
-            <RouterLink :to="`/profiles/${person.id}`" class="friend-search-name-link block overflow-hidden text-ellipsis whitespace-nowrap">{{
-              person.name
-            }}</RouterLink>
-            <span class="friend-search-headline block overflow-hidden text-ellipsis whitespace-nowrap mt-0.5 text-slate-500">{{
-              person.headline
-            }}</span>
+            <RouterLink
+              :to="`/profiles/${person.id}`"
+              class="friend-search-name-link block overflow-hidden text-ellipsis whitespace-nowrap"
+              >{{ person.name }}</RouterLink
+            >
+            <span
+              class="friend-search-headline block overflow-hidden text-ellipsis whitespace-nowrap mt-0.5 text-slate-500"
+              >{{ person.headline }}</span
+            >
           </div>
 
           <div class="friend-search-actions flex items-center gap-1.25">
             <template v-if="relationshipFor(person.id) === 'friend'">
-              <span class="friend-relation-badge py-1 px-1.75 rounded-full bg-slate-100 text-slate-500 font-extrabold whitespace-nowrap">친구</span>
+              <span
+                class="friend-relation-badge py-1 px-1.75 rounded-full bg-slate-100 text-slate-500 font-extrabold whitespace-nowrap"
+                >친구</span
+              >
               <button
                 type="button"
                 class="text-button border-0 rounded-lg py-1.75 px-2 bg-transparent text-slate-600 font-bold cursor-pointer whitespace-nowrap disabled:cursor-wait disabled:opacity-60"
@@ -391,7 +404,10 @@ onUnmounted(() => {
               </button>
             </template>
             <template v-else-if="relationshipFor(person.id) === 'incoming'">
-              <span class="friend-relation-badge py-1 px-1.75 rounded-full bg-slate-100 text-slate-500 font-extrabold whitespace-nowrap">요청 받음</span>
+              <span
+                class="friend-relation-badge py-1 px-1.75 rounded-full bg-slate-100 text-slate-500 font-extrabold whitespace-nowrap"
+                >요청 받음</span
+              >
               <button
                 type="button"
                 class="primary-button border-0 rounded-lg py-1.75 px-2.5 bg-blue-600 text-white font-bold cursor-pointer whitespace-nowrap disabled:cursor-wait disabled:opacity-60"
@@ -402,7 +418,10 @@ onUnmounted(() => {
               </button>
             </template>
             <template v-else-if="relationshipFor(person.id) === 'outgoing'">
-              <span class="friend-relation-badge py-1 px-1.75 rounded-full bg-slate-100 text-slate-500 font-extrabold whitespace-nowrap">요청 보냄</span>
+              <span
+                class="friend-relation-badge py-1 px-1.75 rounded-full bg-slate-100 text-slate-500 font-extrabold whitespace-nowrap"
+                >요청 보냄</span
+              >
               <button
                 type="button"
                 class="text-button border-0 rounded-lg py-1.75 px-2 bg-transparent text-red-600 font-bold cursor-pointer whitespace-nowrap disabled:cursor-wait disabled:opacity-60"
@@ -426,32 +445,52 @@ onUnmounted(() => {
       </ul>
     </section>
 
-    <p v-if="message" class="feedback mt-4 py-2.75 px-3.25 rounded-lg text-sm bg-emerald-50 text-emerald-700" role="status">
+    <p
+      v-if="message"
+      class="feedback mt-4 py-2.75 px-3.25 rounded-lg text-sm bg-emerald-50 text-emerald-700"
+      role="status"
+    >
       {{ message }}
     </p>
-    <p v-if="error" class="feedback mt-4 py-2.75 px-3.25 rounded-lg text-sm bg-red-50 text-red-700" role="alert">
+    <p
+      v-if="error"
+      class="feedback mt-4 py-2.75 px-3.25 rounded-lg text-sm bg-red-50 text-red-700"
+      role="alert"
+    >
       {{ error }}
     </p>
 
-    <p v-if="loading" class="friends-loading mt-4 py-2.75 px-3.25 rounded-lg text-sm bg-white text-slate-500" role="status">
+    <p
+      v-if="loading"
+      class="friends-loading mt-4 py-2.75 px-3.25 rounded-lg text-sm bg-white text-slate-500"
+      role="status"
+    >
       친구 정보를 불러오는 중…
     </p>
 
     <template v-else-if="hasLoadedData">
-      <section class="friend-panel friend-tabs-panel border border-slate-200 rounded-xl bg-white my-3.5 p-0 overflow-hidden">
+      <section
+        class="friend-panel friend-tabs-panel border border-slate-200 rounded-xl bg-white my-3.5 p-0 overflow-hidden"
+      >
         <div class="friend-tabs flex border-b border-slate-200" role="tablist">
           <button
             type="button"
             role="tab"
             class="friend-tab flex flex-1 items-center justify-center gap-1.75 py-3.25 px-2.5 border-0 border-b-2 border-transparent bg-transparent text-slate-500 cursor-pointer"
-            :class="{ 'friend-tab--active border-b-blue-600 text-blue-600': activeTab === 'incoming' }"
+            :class="{
+              'friend-tab--active border-b-blue-600 text-blue-600': activeTab === 'incoming',
+            }"
             :aria-selected="activeTab === 'incoming'"
             @click="activeTab = 'incoming'"
           >
             받은 요청
             <span
               class="friend-tab-count grid min-w-5.5 h-5.5 px-1 place-items-center rounded-full font-extrabold"
-              :class="activeTab === 'incoming' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'"
+              :class="
+                activeTab === 'incoming'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'bg-slate-100 text-slate-500'
+              "
               >{{ incomingRequests.length }}</span
             >
           </button>
@@ -459,14 +498,20 @@ onUnmounted(() => {
             type="button"
             role="tab"
             class="friend-tab flex flex-1 items-center justify-center gap-1.75 py-3.25 px-2.5 border-0 border-b-2 border-transparent bg-transparent text-slate-500 cursor-pointer"
-            :class="{ 'friend-tab--active border-b-blue-600 text-blue-600': activeTab === 'outgoing' }"
+            :class="{
+              'friend-tab--active border-b-blue-600 text-blue-600': activeTab === 'outgoing',
+            }"
             :aria-selected="activeTab === 'outgoing'"
             @click="activeTab = 'outgoing'"
           >
             보낸 요청
             <span
               class="friend-tab-count grid min-w-5.5 h-5.5 px-1 place-items-center rounded-full font-extrabold"
-              :class="activeTab === 'outgoing' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'"
+              :class="
+                activeTab === 'outgoing'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'bg-slate-100 text-slate-500'
+              "
               >{{ outgoingRequests.length }}</span
             >
           </button>
@@ -474,14 +519,18 @@ onUnmounted(() => {
             type="button"
             role="tab"
             class="friend-tab flex flex-1 items-center justify-center gap-1.75 py-3.25 px-2.5 border-0 border-b-2 border-transparent bg-transparent text-slate-500 cursor-pointer"
-            :class="{ 'friend-tab--active border-b-blue-600 text-blue-600': activeTab === 'friends' }"
+            :class="{
+              'friend-tab--active border-b-blue-600 text-blue-600': activeTab === 'friends',
+            }"
             :aria-selected="activeTab === 'friends'"
             @click="activeTab = 'friends'"
           >
             친구 목록
             <span
               class="friend-tab-count grid min-w-5.5 h-5.5 px-1 place-items-center rounded-full font-extrabold"
-              :class="activeTab === 'friends' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'"
+              :class="
+                activeTab === 'friends' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'
+              "
               >{{ friends.length }}</span
             >
           </button>
@@ -505,7 +554,9 @@ onUnmounted(() => {
                       {{ request.name }}
                     </RouterLink>
                   </strong>
-                  <span class="block mt-0.75 text-slate-500 text-xs">{{ formatDate(request.requested_at) }} 요청</span>
+                  <span class="block mt-0.75 text-slate-500 text-xs"
+                    >{{ formatDate(request.requested_at) }} 요청</span
+                  >
                 </div>
                 <div class="person-actions flex items-center gap-1">
                   <button
@@ -546,7 +597,9 @@ onUnmounted(() => {
                       {{ request.name }}
                     </RouterLink>
                   </strong>
-                  <span class="block mt-0.75 text-slate-500 text-xs">{{ formatDate(request.requested_at) }}부터 대기 중</span>
+                  <span class="block mt-0.75 text-slate-500 text-xs"
+                    >{{ formatDate(request.requested_at) }}부터 대기 중</span
+                  >
                 </div>
                 <button
                   type="button"
@@ -561,7 +614,9 @@ onUnmounted(() => {
           </template>
 
           <template v-else>
-            <p v-if="friends.length === 0" class="empty-state mt-0 text-sm">아직 수락된 친구가 없습니다.</p>
+            <p v-if="friends.length === 0" class="empty-state mt-0 text-sm">
+              아직 수락된 친구가 없습니다.
+            </p>
             <ul v-else class="people-list friend-list mt-0 p-0 list-none">
               <li
                 v-for="friend in friends"
@@ -581,7 +636,9 @@ onUnmounted(() => {
                   >
                     {{ friend.online ? '온라인' : '오프라인' }}
                   </span>
-                  <span class="block mt-0.75 text-slate-500 text-xs">{{ formatDate(friend.friends_since) }}부터 친구</span>
+                  <span class="block mt-0.75 text-slate-500 text-xs"
+                    >{{ formatDate(friend.friends_since) }}부터 친구</span
+                  >
                 </div>
                 <div class="person-actions flex items-center gap-1">
                   <button
@@ -608,7 +665,10 @@ onUnmounted(() => {
       </section>
     </template>
 
-    <p v-else class="friends-loading mt-4 py-2.75 px-3.25 rounded-lg text-sm bg-white text-slate-500">
+    <p
+      v-else
+      class="friends-loading mt-4 py-2.75 px-3.25 rounded-lg text-sm bg-white text-slate-500"
+    >
       친구 정보를 표시할 수 없습니다. 새로고침해 다시 시도해 주세요.
     </p>
   </div>

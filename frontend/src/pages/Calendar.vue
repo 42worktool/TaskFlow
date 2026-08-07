@@ -325,7 +325,9 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
       </button>
     </div>
 
-    <p v-if="loading" class="cal-status mb-3 text-gray-500 text-sm" role="status">일정을 불러오는 중…</p>
+    <p v-if="loading" class="cal-status mb-3 text-gray-500 text-sm" role="status">
+      일정을 불러오는 중…
+    </p>
     <p v-else-if="error" class="cal-status mb-3 text-sm text-red-700" role="alert">
       {{ error }}
     </p>
@@ -333,7 +335,10 @@ const weekDays = ['일', '월', '화', '수', '목', '금', '토']
       이 달에 일정이 있는 카드가 없습니다.
     </p>
 
-    <div v-if="!loading && !error" class="cal-grid flex-1 min-h-0 border-l border-t border-gray-200 overflow-auto">
+    <div
+      v-if="!loading && !error"
+      class="cal-grid flex-1 min-h-0 border-l border-t border-gray-200 overflow-auto"
+    >
       <div class="cal-weekdays grid grid-cols-7 sticky top-0">
         <div
           v-for="day in weekDays"
