@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import draggable from 'vuedraggable'
 import TaskCard from './TaskCard.vue'
 import { isExternalCardDropClaimed } from '../services/messenger'
@@ -47,6 +47,15 @@ const badgeColors: Record<string, string> = {
 
 const showAddCard = ref(false)
 const newCardTitle = ref('')
+type MoveTarget = {
+  kind: 'card' | 'list'
+  id: string
+  label: string
+  anchor: HTMLElement
+}
+const moveMenu = ref<MoveTarget | null>(null)
+const moveMenuElement = ref<HTMLElement | null>(null)
+const moveMenuStyle = ref<Record<string, string>>({ visibility: 'hidden' })
 let originPlaceholder: HTMLElement | null = null
 const cards = computed({
   get: () => props.list.cards,
@@ -141,7 +150,125 @@ function canMoveCard(event: { draggedContext?: { element?: Card } }): boolean {
   return !cardId || !isExternalCardDropClaimed(cardId)
 }
 
-onUnmounted(removeOriginPlaceholder)
+function isMoveMenuOpen(kind: MoveTarget['kind'], id: string): boolean {
+  return moveMenu.value?.kind === kind && moveMenu.value.id === id
+}
+
+function closeMoveMenu(restoreFocus = false): void {
+  const anchor = moveMenu.value?.anchor
+  moveMenu.value = null
+  moveMenuStyle.value = { visibility: 'hidden' }
+  if (restoreFocus && anchor) void nextTick(() => anchor.focus())
+}
+
+function positionMoveMenu(): void {
+  const target = moveMenu.value
+  const menu = moveMenuElement.value
+  if (!target || !menu) return
+
+  const gap = 8
+  const margin = 8
+  const anchorBounds = target.anchor.getBoundingClientRect()
+  const menuBounds = menu.getBoundingClientRect()
+  let left = anchorBounds.right + gap
+  if (left + menuBounds.width > window.innerWidth - margin) {
+    left = anchorBounds.left - menuBounds.width - gap
+  }
+  left = Math.max(margin, Math.min(left, window.innerWidth - menuBounds.width - margin))
+  const top = Math.max(
+    margin,
+    Math.min(anchorBounds.top, window.innerHeight - menuBounds.height - margin),
+  )
+  moveMenuStyle.value = { top: `${top}px`, left: `${left}px` }
+}
+
+function openMoveMenu(kind: MoveTarget['kind'], id: string, label: string, event: Event): void {
+  if (!props.canEdit) return
+  const anchor = event.currentTarget
+  if (!(anchor instanceof HTMLElement)) return
+  if (isMoveMenuOpen(kind, id)) {
+    closeMoveMenu(true)
+    return
+  }
+
+  moveMenu.value = { kind, id, label, anchor }
+  moveMenuStyle.value = { visibility: 'hidden' }
+  void nextTick(async () => {
+    positionMoveMenu()
+    await nextTick()
+    moveMenuElement.value?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+  })
+}
+
+function moveSelectedTarget(direction: 'previous' | 'next'): void {
+  const target = moveMenu.value
+  if (!target) return
+  if (target.kind === 'card') emit('move-card', target.id, direction)
+  else emit('move-list', target.id, direction)
+  closeMoveMenu(true)
+}
+
+function handleMoveMenuFocusOut(): void {
+  void nextTick(() => {
+    const target = moveMenu.value
+    const active = document.activeElement
+    if (
+      !target ||
+      !(active instanceof Node) ||
+      moveMenuElement.value?.contains(active) ||
+      target.anchor.contains(active)
+    ) {
+      return
+    }
+    closeMoveMenu()
+  })
+}
+
+function handleMoveMenuKeydown(event: KeyboardEvent): void {
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  const buttons = [
+    ...(moveMenuElement.value?.querySelectorAll<HTMLButtonElement>('button') ?? []),
+  ].filter((button) => !button.disabled)
+  if (buttons.length === 0) return
+
+  event.preventDefault()
+  const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement)
+  if (event.key === 'Home') buttons[0]?.focus()
+  else if (event.key === 'End') buttons.at(-1)?.focus()
+  else if (event.key === 'ArrowDown') buttons[(currentIndex + 1) % buttons.length]?.focus()
+  else buttons[(currentIndex - 1 + buttons.length) % buttons.length]?.focus()
+}
+
+function handleOutsidePointerDown(event: PointerEvent): void {
+  const target = moveMenu.value
+  const clicked = event.target
+  if (
+    !target ||
+    !(clicked instanceof Node) ||
+    moveMenuElement.value?.contains(clicked) ||
+    target.anchor.contains(clicked)
+  ) {
+    return
+  }
+  closeMoveMenu()
+}
+
+function handleViewportChange(): void {
+  if (moveMenu.value) closeMoveMenu()
+}
+
+onMounted(() => {
+  window.addEventListener('pointerdown', handleOutsidePointerDown, true)
+  window.addEventListener('resize', handleViewportChange)
+  window.addEventListener('scroll', handleViewportChange, true)
+})
+
+onUnmounted(() => {
+  removeOriginPlaceholder()
+  window.removeEventListener('pointerdown', handleOutsidePointerDown, true)
+  window.removeEventListener('resize', handleViewportChange)
+  window.removeEventListener('scroll', handleViewportChange, true)
+})
 
 const vFocus = {
   mounted: (el: HTMLInputElement) => el.focus(),
@@ -150,8 +277,15 @@ const vFocus = {
 
 <template>
   <section
-    class="task-list w-70 shrink-0 flex flex-col border border-transparent p-3 max-h-full"
-    :class="{ 'task-list--readonly': !canEdit }"
+    class="task-list w-70 shrink-0 flex flex-col border border-transparent p-3 max-h-full focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-2"
+    :class="{
+      'task-list--readonly': !canEdit,
+      'outline-2 outline-blue-600 outline-offset-2': isMoveMenuOpen('list', list.id),
+    }"
+    :tabindex="canEdit ? 0 : undefined"
+    :aria-label="canEdit ? `${list.name} 리스트. Enter 키로 이동 메뉴 열기` : undefined"
+    @keydown.enter.self.prevent="openMoveMenu('list', list.id, list.name, $event)"
+    @keydown.space.self.prevent="openMoveMenu('list', list.id, list.name, $event)"
   >
     <div
       class="list-header flex items-center justify-between mb-3"
@@ -175,26 +309,6 @@ const vFocus = {
         >{{ list.name }}</span
       >
       <div class="list-header-actions flex items-center gap-1.5 shrink-0">
-        <div v-if="canEdit" class="list-keyboard-move-actions flex gap-0.5">
-          <button
-            type="button"
-            :disabled="movingList"
-            class="w-5.5 h-5.5 border border-gray-400 rounded bg-white text-gray-700 cursor-pointer leading-none disabled:cursor-default disabled:opacity-60"
-            :aria-label="`${list.name} 리스트 이전 위치로 이동`"
-            @click.stop="emit('move-list', list.id, 'previous')"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            :disabled="movingList"
-            class="w-5.5 h-5.5 border border-gray-400 rounded bg-white text-gray-700 cursor-pointer leading-none disabled:cursor-default disabled:opacity-60"
-            :aria-label="`${list.name} 리스트 다음 위치로 이동`"
-            @click.stop="emit('move-list', list.id, 'next')"
-          >
-            →
-          </button>
-        </div>
         <span
           class="list-count w-5.5 h-5.5 rounded-full flex items-center justify-center text-xs font-bold text-white"
           :style="{ background: badgeColors[list.name] ?? '#6b7280' }"
@@ -234,7 +348,16 @@ const vFocus = {
       @change="(e: DraggableChange<Card>) => emit('card-change', list.id, e)"
     >
       <template #item="{ element: card }">
-        <div class="card-item">
+        <div
+          class="card-item relative rounded-lg focus-visible:outline-2 focus-visible:outline-blue-600 focus-visible:outline-offset-[-2px]"
+          :class="{
+            'outline-2 outline-blue-600 outline-offset-[-2px]': isMoveMenuOpen('card', card.id),
+          }"
+          :tabindex="canEdit ? 0 : undefined"
+          :aria-label="canEdit ? `${card.title} 카드. Enter 키로 이동 메뉴 열기` : undefined"
+          @keydown.enter.self.prevent="openMoveMenu('card', card.id, card.title, $event)"
+          @keydown.space.self.prevent="openMoveMenu('card', card.id, card.title, $event)"
+        >
           <TaskCard
             :card="card"
             :openable="canOpenDetails"
@@ -246,24 +369,6 @@ const vFocus = {
             @delete="emit('delete-card', card.id)"
             @toggle-completion="emit('toggle-card-completion', card)"
           />
-          <div v-if="canEdit" class="card-keyboard-move-actions">
-            <button
-              type="button"
-              :disabled="movingCardIds.has(card.id)"
-              :aria-label="`${card.title} 카드 이전 위치로 이동`"
-              @click="emit('move-card', card.id, 'previous')"
-            >
-              이전으로 이동
-            </button>
-            <button
-              type="button"
-              :disabled="movingCardIds.has(card.id)"
-              :aria-label="`${card.title} 카드 다음 위치로 이동`"
-              @click="emit('move-card', card.id, 'next')"
-            >
-              다음으로 이동
-            </button>
-          </div>
         </div>
       </template>
     </draggable>
@@ -299,6 +404,45 @@ const vFocus = {
     >
       + 카드 추가
     </button>
+
+    <Teleport to="body">
+      <div
+        v-if="moveMenu"
+        ref="moveMenuElement"
+        class="fixed z-200 grid min-w-39 p-1.5 border border-slate-200 rounded-xl bg-white shadow-xl"
+        :style="moveMenuStyle"
+        role="menu"
+        :aria-label="`${moveMenu.label} 이동`"
+        @keydown.esc.stop.prevent="closeMoveMenu(true)"
+        @keydown="handleMoveMenuKeydown"
+        @focusout="handleMoveMenuFocusOut"
+      >
+        <strong
+          class="max-w-48 py-1.75 px-2 overflow-hidden text-xs text-slate-500 text-ellipsis whitespace-nowrap"
+          >{{ moveMenu.label }}</strong
+        >
+        <button
+          type="button"
+          role="menuitem"
+          class="flex w-full items-center gap-2 py-2 px-2.5 border-0 rounded-lg bg-transparent text-left text-xs font-semibold text-slate-700 cursor-pointer hover:bg-blue-50 hover:text-blue-700 focus-visible:bg-blue-50 focus-visible:text-blue-700 focus-visible:outline-none disabled:cursor-default disabled:opacity-55"
+          :disabled="moveMenu.kind === 'card' ? movingCardIds.has(moveMenu.id) : movingList"
+          @click="moveSelectedTarget('previous')"
+        >
+          <span aria-hidden="true">←</span>
+          이전으로 이동
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          class="flex w-full items-center gap-2 py-2 px-2.5 border-0 rounded-lg bg-transparent text-left text-xs font-semibold text-slate-700 cursor-pointer hover:bg-blue-50 hover:text-blue-700 focus-visible:bg-blue-50 focus-visible:text-blue-700 focus-visible:outline-none disabled:cursor-default disabled:opacity-55"
+          :disabled="moveMenu.kind === 'card' ? movingCardIds.has(moveMenu.id) : movingList"
+          @click="moveSelectedTarget('next')"
+        >
+          <span aria-hidden="true">→</span>
+          다음으로 이동
+        </button>
+      </div>
+    </Teleport>
   </section>
 </template>
 
