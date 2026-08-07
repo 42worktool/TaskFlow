@@ -13,7 +13,7 @@ import {
   takePendingChatCardAttachment,
 } from '../services/messenger'
 import { realtime } from '../services/realtime'
-import { parseWorkspaceMessage } from '../services/realtime/protocol'
+import { parseWorkspaceChangedEvent, parseWorkspaceMessage } from '../services/realtime/protocol'
 import type { Card, WorkspaceMessage } from '../types'
 import { findDroppedCard, getBoardCardDropId } from '../utils/chatCardDrop'
 import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
@@ -39,6 +39,7 @@ const selectedCardId = ref<string | null>(null)
 const pickerOpen = ref(false)
 const loading = ref(true)
 const cardsLoading = ref(false)
+const cardsLoaded = ref(false)
 const sending = ref(false)
 const error = ref('')
 const panelElement = ref<HTMLElement | null>(null)
@@ -119,12 +120,12 @@ async function loadCards(): Promise<CardOption[] | null> {
       return null
     }
     cards.value = loadedCards
+    cardsLoaded.value = true
     if (selectedCardId.value && !cards.value.some((card) => card.id === selectedCardId.value)) {
       selectedCardId.value = null
     }
     return loadedCards
   } catch {
-    if (generation === cardLoadGeneration) cards.value = []
     return null
   } finally {
     if (generation === cardLoadGeneration) cardsLoading.value = false
@@ -315,6 +316,23 @@ const removeMessageListener = realtime.on('workspace.message_created', (value) =
   mergeMessages([message])
 })
 
+const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) => {
+  const event = parseWorkspaceChangedEvent(value)
+  if (
+    !event ||
+    event.workspace_id !== props.workspaceId ||
+    (event.entity !== 'card' && event.entity !== 'list')
+  ) {
+    return
+  }
+
+  if (event.entity === 'card' && event.action === 'deleted') {
+    cards.value = cards.value.filter((card) => card.id !== event.entity_id)
+    if (selectedCardId.value === event.entity_id) selectedCardId.value = null
+  }
+  void loadCards()
+})
+
 watch(
   () => props.workspaceId,
   (workspaceId) => {
@@ -322,6 +340,7 @@ watch(
     cardLoadGeneration += 1
     messages.value = []
     cards.value = []
+    cardsLoaded.value = false
     content.value = ''
     selectedCardId.value = null
     pickerOpen.value = false
@@ -385,6 +404,7 @@ onUnmounted(() => {
   composerSubmitter.reset()
   if (retryTimer) clearTimeout(retryTimer)
   removeMessageListener()
+  removeWorkspaceChangeListener()
   const cardId = getBoardCardDropId(messengerState.cardDrag)
   if (cardId) clearExternalCardDropHover(cardId, 'chat-panel')
   window.removeEventListener('pointermove', handleFallbackCardPointerMove, true)
@@ -495,7 +515,7 @@ onUnmounted(() => {
               ▣ {{ cardTitles.get(message.card_id) }}
             </button>
             <span
-              v-else
+              v-else-if="message.card_id && cardsLoaded"
               class="workspace-chat-card-link workspace-chat-card-link-error inline-block max-w-full mt-1.25 py-1 px-2 overflow-hidden border border-blue-200 rounded-full bg-blue-50 text-red-700 font-bold text-ellipsis whitespace-nowrap"
             >
               ▣ 카드 삭제됨
