@@ -2,6 +2,7 @@
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { FriendAPI } from '../api/friend'
 import { authState } from '../services/auth'
+import { openProfileModal } from '../services/profileModal'
 import { realtime } from '../services/realtime'
 import { parseDirectMessage } from '../services/realtime/protocol'
 import type { DirectMessage } from '../types'
@@ -152,7 +153,12 @@ onUnmounted(() => {
 <template>
   <section class="direct-message-panel" aria-label="친구 다이렉트 메시지">
     <header class="direct-message-header">
-      <div class="direct-message-person">
+      <button
+        type="button"
+        class="direct-message-person rounded-lg border-0 bg-transparent text-left outline-none transition hover:bg-slate-100 focus:ring-2 focus:ring-blue-500"
+        :aria-label="`${friendName || '친구'} 프로필 보기`"
+        @click="openProfileModal(friendId)"
+      >
         <div class="direct-message-avatar-wrap">
           <img
             v-if="friendProfileImageUrl"
@@ -180,7 +186,7 @@ onUnmounted(() => {
             {{ friendOnline ? '온라인' : '오프라인' }}
           </span>
         </div>
-      </div>
+      </button>
     </header>
 
     <div ref="messageList" class="direct-message-list" aria-live="polite">
@@ -200,19 +206,34 @@ onUnmounted(() => {
           v-if="message.author.profile_image_url"
           :src="message.author.profile_image_url"
           alt=""
-          class="direct-message-message-avatar"
+          class="direct-message-message-avatar cursor-pointer outline-none transition hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-500"
           referrerpolicy="no-referrer"
+          role="button"
+          tabindex="0"
+          :aria-label="`${message.author.name} 프로필 보기`"
+          @click="openProfileModal(message.author.user_id)"
+          @keydown.enter.space.prevent="openProfileModal(message.author.user_id)"
         />
         <span
           v-else
-          class="direct-message-message-avatar direct-message-avatar--fallback"
-          aria-hidden="true"
+          class="direct-message-message-avatar direct-message-avatar--fallback cursor-pointer outline-none transition hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-500"
+          role="button"
+          tabindex="0"
+          :aria-label="`${message.author.name} 프로필 보기`"
+          @click="openProfileModal(message.author.user_id)"
+          @keydown.enter.space.prevent="openProfileModal(message.author.user_id)"
         >
           {{ message.author.name.charAt(0).toUpperCase() }}
         </span>
         <div class="direct-message-body">
           <div class="direct-message-meta">
-            <strong>{{ message.author.name }}</strong>
+            <button
+              type="button"
+              class="border-0 bg-transparent p-0 text-inherit hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+              @click="openProfileModal(message.author.user_id)"
+            >
+              <strong>{{ message.author.name }}</strong>
+            </button>
             <time :datetime="message.created_at">
               {{ formatMessageTime(message.created_at) }}
             </time>

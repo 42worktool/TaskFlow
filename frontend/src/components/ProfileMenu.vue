@@ -2,6 +2,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authState, logout } from '../services/auth'
+import AccountLink from './AccountLink.vue'
+import ProfileLink from './ProfileLink.vue'
 
 const router = useRouter()
 const open = ref(false)
@@ -84,10 +86,10 @@ onUnmounted(() => {
 
       <div class="menu-divider" />
 
-      <RouterLink v-if="user" :to="`/profiles/${user.id}`" class="menu-item" @click="open = false">
+      <ProfileLink v-if="user" :user-id="user.id" class="menu-item" @click="open = false">
         내 프로필
-      </RouterLink>
-      <RouterLink to="/account" class="menu-item" @click="open = false">계정 설정</RouterLink>
+      </ProfileLink>
+      <AccountLink class="menu-item" @click="open = false">계정 설정</AccountLink>
       <RouterLink to="/terms" class="menu-item" @click="open = false">이용약관</RouterLink>
       <RouterLink to="/privacy" class="menu-item" @click="open = false"
         >개인정보처리방침</RouterLink

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ChatAPI } from '../api/chat'
 import { ListAPI } from '../api/list'
 import { authState } from '../services/auth'
+import { openProfileModal } from '../services/profileModal'
 import {
   clearExternalCardDropHover,
   messengerState,
@@ -432,15 +433,34 @@ onUnmounted(() => {
             v-if="message.author.profile_image_url"
             :src="message.author.profile_image_url"
             alt=""
-            class="workspace-chat-avatar"
+            class="workspace-chat-avatar cursor-pointer outline-none transition hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-500"
             referrerpolicy="no-referrer"
+            role="button"
+            tabindex="0"
+            :aria-label="`${message.author.name} 프로필 보기`"
+            @click="openProfileModal(message.author.user_id)"
+            @keydown.enter.space.prevent="openProfileModal(message.author.user_id)"
           />
-          <div v-else class="workspace-chat-avatar workspace-chat-avatar--fallback">
+          <div
+            v-else
+            class="workspace-chat-avatar workspace-chat-avatar--fallback cursor-pointer outline-none transition hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-500"
+            role="button"
+            tabindex="0"
+            :aria-label="`${message.author.name} 프로필 보기`"
+            @click="openProfileModal(message.author.user_id)"
+            @keydown.enter.space.prevent="openProfileModal(message.author.user_id)"
+          >
             {{ message.author.name.charAt(0).toUpperCase() }}
           </div>
           <div class="workspace-chat-message-body">
             <div class="workspace-chat-message-meta">
-              <strong>{{ message.author.name }}</strong>
+              <button
+                type="button"
+                class="border-0 bg-transparent p-0 font-bold text-inherit hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+                @click="openProfileModal(message.author.user_id)"
+              >
+                {{ message.author.name }}
+              </button>
               <time :datetime="message.created_at">
                 {{ formatMessageTime(message.created_at) }}
               </time>

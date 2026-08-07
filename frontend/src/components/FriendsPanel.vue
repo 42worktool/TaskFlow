@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { FriendAPI } from '../api/friend'
 import { ProfileAPI, type PublicProfile } from '../api/profile'
 import PersonAvatar from './PersonAvatar.vue'
+import ProfileLink from './ProfileLink.vue'
 import { authState } from '../services/auth'
 import { realtime } from '../services/realtime'
 import {
@@ -384,7 +385,7 @@ onUnmounted(() => {
         <li v-for="person in visibleFriendSearchResults" :key="person.id" class="friend-search-row">
           <PersonAvatar :name="person.name" :image-url="person.profile_image_url" />
           <div class="friend-search-copy">
-            <RouterLink :to="`/profiles/${person.id}`">{{ person.name }}</RouterLink>
+            <ProfileLink :user-id="person.id">{{ person.name }}</ProfileLink>
             <span>{{ person.headline }}</span>
           </div>
 
@@ -515,9 +516,9 @@ onUnmounted(() => {
                 <PersonAvatar :name="request.name" :image-url="request.profile_image_url" />
                 <div class="person-meta">
                   <strong>
-                    <RouterLink :to="`/profiles/${request.id}`" class="person-profile-link">
+                    <ProfileLink :user-id="request.id" class="person-profile-link">
                       {{ request.name }}
-                    </RouterLink>
+                    </ProfileLink>
                   </strong>
                   <span>{{ formatDate(request.requested_at) }} 요청</span>
                 </div>
@@ -552,9 +553,9 @@ onUnmounted(() => {
                 <PersonAvatar :name="request.name" :image-url="request.profile_image_url" />
                 <div class="person-meta">
                   <strong>
-                    <RouterLink :to="`/profiles/${request.id}`" class="person-profile-link">
+                    <ProfileLink :user-id="request.id" class="person-profile-link">
                       {{ request.name }}
-                    </RouterLink>
+                    </ProfileLink>
                   </strong>
                   <span>{{ formatDate(request.requested_at) }}부터 대기 중</span>
                 </div>
@@ -577,9 +578,9 @@ onUnmounted(() => {
                 <PersonAvatar :name="friend.name" :image-url="friend.profile_image_url" />
                 <div class="person-meta">
                   <strong>
-                    <RouterLink :to="`/profiles/${friend.id}`" class="person-profile-link">
+                    <ProfileLink :user-id="friend.id" class="person-profile-link">
                       {{ friend.name }}
-                    </RouterLink>
+                    </ProfileLink>
                   </strong>
                   <span
                     class="friend-presence"

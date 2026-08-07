@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
+import ProfileLink from '../components/ProfileLink.vue'
 import { LabelAPI } from '../api/label'
 import { ListAPI } from '../api/list'
 import { ProfileAPI, type PublicProfile } from '../api/profile'
@@ -659,10 +660,10 @@ onMounted(() => {
           </div>
           <div v-if="userLoadError" class="section-empty" role="alert">{{ userLoadError }}</div>
           <div v-else class="result-list result-list--people">
-            <RouterLink
+            <ProfileLink
               v-for="user in pagedUserResults"
               :key="user.id"
-              :to="`/profiles/${user.id}`"
+              :user-id="user.id"
               class="result-row result-person-row"
             >
               <img
@@ -683,7 +684,7 @@ onMounted(() => {
                 <p class="result-person-context">{{ userWorkspaceSummary(user.id) }}</p>
               </div>
               <span class="result-person-action">프로필 보기</span>
-            </RouterLink>
+            </ProfileLink>
           </div>
         </section>
 
