@@ -6,7 +6,7 @@ RUN apt-get update \
 
 FROM base AS development
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY . .
 RUN npx prisma generate --schema ./prisma
 RUN chmod +x /app/docker-entrypoint.sh
@@ -20,7 +20,7 @@ FROM base AS production
 ENV NODE_ENV=production
 COPY package*.json ./
 COPY prisma ./prisma
-RUN npm ci --omit=dev \
+RUN npm install --omit=dev \
     && npx prisma generate --schema ./prisma
 COPY --from=build /app/dist ./dist
 COPY docker-entrypoint.sh ./docker-entrypoint.sh

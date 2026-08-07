@@ -210,12 +210,12 @@ exact public HTTPS domain. Never enable `ALLOW_DB_SEED` in production.
 
 ```bash
 cd backend
-npm ci
+npm install
 npm run typecheck
 npm test
 
 cd ../frontend
-npm ci
+npm install
 npm test
 npm run build
 ```
