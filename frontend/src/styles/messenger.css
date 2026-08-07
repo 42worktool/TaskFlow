@@ -125,7 +125,6 @@
   white-space: nowrap;
 }
 
-.messenger-header .messenger-header__unread-badge,
 .messenger-room-unread-badge {
   min-width: 17px;
   height: 17px;
@@ -141,10 +140,6 @@
   line-height: 1;
   overflow: visible;
   white-space: nowrap;
-}
-
-.messenger-header .messenger-header__unread-badge {
-  flex: 0 0 auto;
 }
 
 .messenger-close:hover,
@@ -261,7 +256,7 @@
   color: #1d4ed8;
 }
 
-.messenger-directory-action > span:last-child,
+.messenger-directory-action__content,
 .messenger-directory-item > span:last-child {
   min-width: 0;
   flex: 1;

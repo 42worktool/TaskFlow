@@ -23,11 +23,14 @@ import {
 import {
   directMessageUnreadCount,
   formatMessengerUnreadCount,
+  friendRequestUnreadCount,
   markDirectConversationRead,
+  markFriendRequestsRead,
   markWorkspaceConversationRead,
   parseNotificationEvent,
   pruneMessengerUnreadRooms,
   receiveDirectMessageUnread,
+  receiveFriendRequestUnread,
   receiveWorkspaceActivityUnread,
   receiveWorkspaceMessageUnread,
   totalMessengerUnreadCount,
@@ -39,6 +42,7 @@ import {
   parseDirectMessage,
   parseFriend,
   parseFriendPresenceEvent,
+  parseFriendRequest,
   parseFriendUserIdEvent,
   parseWorkspaceMessage,
 } from '../services/realtime/protocol'
@@ -74,7 +78,6 @@ const activeRoomTitle = computed(() => {
   }
   return '대화 목록'
 })
-const totalUnreadLabel = computed(() => formatMessengerUnreadCount(totalMessengerUnreadCount.value))
 const directoryVisible = computed(() =>
   compactViewport.value ? messengerState.pane === 'directory' : !messengerState.directoryCollapsed,
 )
@@ -217,13 +220,29 @@ function visibleMessengerRoom(): VisibleMessengerRoom | null {
   return null
 }
 
+function friendManagementVisible(): boolean {
+  return (
+    messengerState.open &&
+    messengerState.pane === 'friends' &&
+    document.visibilityState === 'visible'
+  )
+}
+
 function markVisibleConversationRead(): void {
   const room = visibleMessengerRoom()
   if (room?.kind === 'workspace') {
     markWorkspaceConversationRead(room.id)
   } else if (room?.kind === 'dm') {
     markDirectConversationRead(room.id)
+  } else if (friendManagementVisible()) {
+    markFriendRequestsRead()
   }
+}
+
+function receiveFriendRequestCreated(value: unknown): void {
+  const request = parseFriendRequest(value)
+  if (!request) return
+  receiveFriendRequestUnread(request, authState.user?.id ?? null, friendManagementVisible())
 }
 
 function receiveWorkspaceMessage(value: unknown): void {
@@ -276,6 +295,7 @@ function returnToDirectory(): void {
 }
 
 let removeFriendPresenceListener: (() => void) | null = null
+let removeFriendRequestCreatedListener: (() => void) | null = null
 let removeFriendRequestAcceptedListener: (() => void) | null = null
 let removeFriendRemovedListener: (() => void) | null = null
 let removeWorkspaceMessageListener: (() => void) | null = null
@@ -335,6 +355,10 @@ watch(
 onMounted(() => {
   compactViewport.value = window.matchMedia('(max-width: 760px)').matches
   removeFriendPresenceListener = realtime.on('friend.presence_changed', receiveFriendPresence)
+  removeFriendRequestCreatedListener = realtime.on(
+    'friend.request_created',
+    receiveFriendRequestCreated,
+  )
   removeFriendRequestAcceptedListener = realtime.on(
     'friend.request_accepted',
     receiveFriendRequestAccepted,
@@ -351,6 +375,7 @@ onMounted(() => {
 onUnmounted(() => {
   directoryLoadGeneration += 1
   removeFriendPresenceListener?.()
+  removeFriendRequestCreatedListener?.()
   removeFriendRequestAcceptedListener?.()
   removeFriendRemovedListener?.()
   removeWorkspaceMessageListener?.()
@@ -397,13 +422,6 @@ onUnmounted(() => {
           <div>
             <div class="messenger-header__title-row">
               <strong>TaskFlow 메신저</strong>
-              <span
-                v-if="totalMessengerUnreadCount"
-                class="messenger-header__unread-badge"
-                :aria-label="`읽지 않은 메시지 및 활동 ${totalMessengerUnreadCount}개`"
-              >
-                {{ totalUnreadLabel }}
-              </span>
             </div>
             <span>{{ activeRoomTitle }}</span>
           </div>
@@ -451,9 +469,16 @@ onUnmounted(() => {
               @click="openFriendSettings"
             >
               <span aria-hidden="true">＋</span>
-              <span>
+              <span class="messenger-directory-action__content">
                 <strong>친구 관리</strong>
                 <small>요청 보내기·수락·삭제</small>
+              </span>
+              <span
+                v-if="friendRequestUnreadCount"
+                class="messenger-room-unread-badge"
+                :aria-label="`읽지 않은 친구 요청 ${friendRequestUnreadCount}개`"
+              >
+                {{ formatMessengerUnreadCount(friendRequestUnreadCount) }}
               </span>
             </button>
 
