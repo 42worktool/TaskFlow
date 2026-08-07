@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ChatAPI } from '../api/chat'
 import { ListAPI } from '../api/list'
 import { authState } from '../services/auth'
+import { openProfileModal } from '../services/profileModal'
 import {
   clearExternalCardDropHover,
   messengerState,
@@ -449,21 +450,37 @@ onUnmounted(() => {
             v-if="message.author.profile_image_url"
             :src="message.author.profile_image_url"
             alt=""
-            class="workspace-chat-avatar w-7 h-7 shrink-0 grow-0 basis-7 rounded-full object-cover"
+            class="workspace-chat-avatar h-7 w-7 shrink-0 grow-0 basis-7 cursor-pointer rounded-full object-cover outline-none transition hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-500"
             referrerpolicy="no-referrer"
+            role="button"
+            tabindex="0"
+            :aria-label="`${message.author.name} 프로필 보기`"
+            @click="openProfileModal(message.author.user_id)"
+            @keydown.enter.space.prevent="openProfileModal(message.author.user_id)"
           />
           <div
             v-else
-            class="workspace-chat-avatar w-7 h-7 shrink-0 grow-0 basis-7 rounded-full grid place-items-center bg-blue-600 text-white font-bold"
+            class="workspace-chat-avatar workspace-chat-avatar--fallback grid h-7 w-7 shrink-0 grow-0 basis-7 cursor-pointer place-items-center rounded-full bg-blue-600 font-bold text-white outline-none transition hover:ring-2 hover:ring-blue-300 focus:ring-2 focus:ring-blue-500"
+            role="button"
+            tabindex="0"
+            :aria-label="`${message.author.name} 프로필 보기`"
+            @click="openProfileModal(message.author.user_id)"
+            @keydown.enter.space.prevent="openProfileModal(message.author.user_id)"
           >
             {{ message.author.name.charAt(0).toUpperCase() }}
           </div>
           <div class="workspace-chat-message-body min-w-0">
             <div
-              class="workspace-chat-message-meta flex items-baseline gap-1.5 mb-0.75"
+              class="workspace-chat-message-meta mb-0.75 flex items-baseline gap-1.5"
               :class="{ 'justify-end': message.author.user_id === authState.user?.id }"
             >
-              <strong class="text-slate-600">{{ message.author.name }}</strong>
+              <button
+                type="button"
+                class="min-w-0 overflow-hidden border-0 bg-transparent p-0! font-bold text-ellipsis whitespace-nowrap text-slate-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500"
+                @click="openProfileModal(message.author.user_id)"
+              >
+                {{ message.author.name }}
+              </button>
               <time class="text-slate-400" :datetime="message.created_at">
                 {{ formatMessageTime(message.created_at) }}
               </time>

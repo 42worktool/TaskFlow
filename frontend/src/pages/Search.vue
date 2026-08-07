@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
+import ProfileLink from '../components/ProfileLink.vue'
 import { LabelAPI } from '../api/label'
 import { SearchAPI, type SearchResult } from '../api/search'
 import { WorkspaceAPI } from '../api/workspace'
@@ -610,13 +611,13 @@ onMounted(() => {
           <div v-if="searchError" class="section-empty" role="alert">{{ searchError }}</div>
           <div
             v-else
-            class="result-list result-list--people overflow-hidden gap-0 border border-gray-200 bg-white"
+            class="result-list result-list--people gap-0 overflow-hidden border border-gray-200 bg-white"
           >
-            <RouterLink
+            <ProfileLink
               v-for="user in userResults"
               :key="user.id"
-              :to="`/profiles/${user.id}`"
-              class="result-row result-person-row flex items-center gap-3 py-3.5 px-4 min-h-19.5 border-0 rounded-none text-inherit"
+              :user-id="user.id"
+              class="result-row result-person-row flex min-h-19.5 items-center gap-3 rounded-none border-0 px-4! py-3.5! text-inherit"
             >
               <img
                 v-if="user.profile_image_url"
@@ -657,7 +658,7 @@ onMounted(() => {
               >
                 프로필 보기
               </span>
-            </RouterLink>
+            </ProfileLink>
           </div>
         </section>
 

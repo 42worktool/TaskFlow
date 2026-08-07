@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue'
 import type { Workspace, WorkspaceMember } from '../types'
+import ProfileLink from './ProfileLink.vue'
 
 const props = defineProps<{
   members: Workspace['members']
@@ -207,12 +208,12 @@ onUnmounted(() => {
             </span>
           </span>
           <span class="workspace-member-copy min-w-0 flex flex-1 flex-col">
-            <RouterLink
-              :to="`/profiles/${member.user_id}`"
+            <ProfileLink
+              :user-id="member.user_id"
               class="workspace-member-name overflow-hidden font-semibold text-ellipsis whitespace-nowrap"
             >
               {{ member.user.name }}
-            </RouterLink>
+            </ProfileLink>
             <span class="workspace-member-role mt-0.25">{{ member.role }}</span>
           </span>
           <span

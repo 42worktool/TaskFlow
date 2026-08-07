@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { PublicProfile } from '../api/profile'
+import { openProfileModal } from '../services/profileModal'
 import { SearchAPI } from '../api/search'
 import {
   criteriaFromRouteQuery,
@@ -241,7 +242,7 @@ function selectCommand(index: number) {
 
 function selectPerson(user: PublicProfile) {
   focused.value = false
-  void router.push(`/profiles/${user.id}`)
+  openProfileModal(user.id)
 }
 
 function selectActiveSuggestion() {

@@ -8,7 +8,7 @@ import Board from '../pages/Board.vue'
 import Calendar from '../pages/Calendar.vue'
 import Dashboard from '../pages/Dashboard.vue'
 import Search from '../pages/Search.vue'
-import Account from '../pages/Account.vue'
+import AccountRoute from '../pages/AccountRoute.vue'
 import Profile from '../pages/Profile.vue'
 import PrivacyPolicy from '../pages/PrivacyPolicy.vue'
 import TermsOfService from '../pages/TermsOfService.vue'
@@ -23,7 +23,7 @@ const router = createRouter({
     { path: '/signup', component: SignUp },
     { path: '/privacy', component: PrivacyPolicy },
     { path: '/terms', component: TermsOfService },
-    { path: '/account', component: Account, meta: { requiresAuth: true } },
+    { path: '/account', component: AccountRoute, meta: { requiresAuth: true } },
     { path: '/profiles/:userId', component: Profile },
     {
       path: '/friends',
