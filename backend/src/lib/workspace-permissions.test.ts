@@ -8,6 +8,7 @@ import {
   requireMinimumWorkspaceRole,
   requireWorkspaceReadAccess,
   requireWorkspaceRole,
+  workspaceRoleOutranks,
   type WorkspacePermissionClient,
 } from './workspace-permissions'
 
@@ -36,6 +37,13 @@ test('workspace roles follow viewer, member, admin, owner order', () => {
   assert.equal(hasMinimumWorkspaceRole('VIEWER', 'MEMBER'), false)
   assert.equal(hasMinimumWorkspaceRole('MEMBER', 'ADMIN'), false)
   assert.equal(hasMinimumWorkspaceRole('ADMIN', 'OWNER'), false)
+})
+
+test('workspace management requires a strictly lower role', () => {
+  assert.equal(workspaceRoleOutranks('OWNER', 'ADMIN'), true)
+  assert.equal(workspaceRoleOutranks('ADMIN', 'MEMBER'), true)
+  assert.equal(workspaceRoleOutranks('ADMIN', 'ADMIN'), false)
+  assert.equal(workspaceRoleOutranks('MEMBER', 'ADMIN'), false)
 })
 
 test('minimum workspace role checks share the forbidden policy', () => {

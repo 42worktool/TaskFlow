@@ -29,6 +29,24 @@ describe('WorkspaceAPI', () => {
     })
   })
 
+  it('transfers ownership and leaves through dedicated endpoints', async () => {
+    vi.mocked(apiRequest)
+      .mockResolvedValueOnce({ id: 'workspace-1' })
+      .mockResolvedValueOnce(undefined)
+
+    await WorkspaceAPI.transferOwnership('workspace-1', 'member-1')
+    await WorkspaceAPI.leave('workspace-1')
+
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      1,
+      '/api/workspaces/workspace-1/ownership/member-1',
+      { method: 'PUT' },
+    )
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/workspaces/workspace-1/membership', {
+      method: 'DELETE',
+    })
+  })
+
   it('previews an invitation before explicitly accepting it', async () => {
     const preview = {
       workspace_name: 'Design',

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Workspace } from '../types'
 import {
+  canAssignWorkspaceRole,
   canChangeWorkspaceMemberRole,
   hasWorkspaceRole,
   partitionWorkspacesByOwnership,
@@ -65,7 +66,7 @@ describe('workspace permissions', () => {
   it.each([
     ['OWNER', 'ADMIN', true],
     ['OWNER', 'MEMBER', true],
-    ['ADMIN', 'ADMIN', true],
+    ['ADMIN', 'ADMIN', false],
     ['ADMIN', 'VIEWER', true],
     ['MEMBER', 'VIEWER', false],
     ['VIEWER', 'MEMBER', false],
@@ -74,6 +75,15 @@ describe('workspace permissions', () => {
     ['ADMIN', 'OWNER', false],
   ] as const)('allows %s to manage a %s role: %s', (callerRole, targetRole, expected) => {
     expect(canChangeWorkspaceMemberRole(callerRole, targetRole)).toBe(expected)
+  })
+
+  it.each([
+    ['OWNER', 'ADMIN', true],
+    ['ADMIN', 'MEMBER', true],
+    ['ADMIN', 'ADMIN', false],
+    ['MEMBER', 'VIEWER', false],
+  ] as const)('allows %s to assign %s: %s', (callerRole, role, expected) => {
+    expect(canAssignWorkspaceRole(callerRole, role)).toBe(expected)
   })
 
   it('separates owned projects from non-owner memberships', () => {

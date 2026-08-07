@@ -338,15 +338,7 @@ Update:
 
 The frontend should update local state after attach/remove and avoid requiring a full board reload for a card-detail-only change.
 
-## 8. OpenAPI and Tests
-
-Update the OpenAPI source under `backend/src/docs` for every new route, including:
-
-- Parameters and UUID formats.
-- Request bodies.
-- `200`, `201`, `204`, `400`, `401`, `403`, `404`, and `409` responses where applicable.
-- Label response schemas.
-- Cross-workspace and inbox-card error behavior.
+## 8. Tests
 
 Add backend tests covering:
 
@@ -394,4 +386,4 @@ Also verify manually or through integration tests:
 - Deleted labels disappear from card detail responses.
 - Removing a label preserves the label for later reuse.
 - Realtime events refresh the appropriate workspace/card state.
-- `docs/labels.dto.ts`, OpenAPI definitions, backend responses, and frontend types use the same field names.
+- Label DTOs, backend responses, and frontend types use the same field names.

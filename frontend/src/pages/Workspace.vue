@@ -85,11 +85,20 @@ function canEditWorkspace(ws: Workspace): boolean {
 }
 
 function canDeleteWorkspace(ws: Workspace): boolean {
-  return workspaceRoleFor(ws, authState.user?.id) === 'OWNER'
+  return workspaceRoleFor(ws, authState.user?.id) === 'OWNER' && ws.members.length === 1
+}
+
+function canLeaveWorkspace(ws: Workspace): boolean {
+  const role = workspaceRoleFor(ws, authState.user?.id)
+  return role !== null && (role !== 'OWNER' || ws.members.length > 1)
+}
+
+function leaveWorkspaceLabel(ws: Workspace): string {
+  return workspaceRoleFor(ws, authState.user?.id) === 'OWNER' ? '소유권 위임 후 나가기' : '나가기'
 }
 
 function hasWorkspaceMenu(ws: Workspace): boolean {
-  return canEditWorkspace(ws) || canDeleteWorkspace(ws)
+  return workspaceRoleFor(ws, authState.user?.id) !== null
 }
 
 function workspaceRoleLabel(ws: Workspace): string {
@@ -117,6 +126,30 @@ async function removeWorkspace(ws: Workspace) {
     memberWorkspaces.value = memberWorkspaces.value.filter((workspace) => workspace.id !== ws.id)
   } catch {
     alert('삭제에 실패했습니다.')
+  }
+}
+
+async function leaveWorkspace(ws: Workspace) {
+  const role = workspaceRoleFor(ws, authState.user?.id)
+  if (!role) return
+  menuOpen.value = null
+
+  if (role === 'OWNER' && ws.members.length > 1) {
+    alert('팀원 관리에서 다른 구성원에게 소유권을 위임한 뒤 나갈 수 있습니다.')
+    return
+  }
+
+  const prompt =
+    role === 'OWNER'
+      ? `"${ws.name}"에 혼자 남아 있습니다. 나가면 워크스페이스가 삭제됩니다. 계속하시겠습니까?`
+      : `"${ws.name}" 프로젝트에서 나가시겠습니까?`
+  if (!confirm(prompt)) return
+
+  try {
+    await WorkspaceAPI.leave(ws.id)
+    memberWorkspaces.value = memberWorkspaces.value.filter((workspace) => workspace.id !== ws.id)
+  } catch (caught) {
+    alert(caught instanceof Error ? caught.message : '프로젝트에서 나가지 못했습니다.')
   }
 }
 
@@ -209,6 +242,14 @@ onMounted(refreshList)
                     @click="removeWorkspace(ws)"
                   >
                     삭제
+                  </button>
+                  <button
+                    v-if="canLeaveWorkspace(ws)"
+                    class="card-menu-item card-menu-item--danger"
+                    type="button"
+                    @click="leaveWorkspace(ws)"
+                  >
+                    {{ leaveWorkspaceLabel(ws) }}
                   </button>
                 </div>
               </div>

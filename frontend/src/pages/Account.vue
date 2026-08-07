@@ -203,7 +203,10 @@ async function removeAccount() {
 
       <section class="danger-zone">
         <h2>계정 삭제</h2>
-        <p>계정과 로그인 정보가 영구적으로 삭제됩니다.</p>
+        <p>
+          계정과 로그인 정보가 영구적으로 삭제됩니다. 소유한 프로젝트가 있다면 먼저 소유권을
+          위임하거나 프로젝트를 삭제해야 합니다.
+        </p>
         <button type="button" class="danger-button" @click="removeAccount">계정 삭제</button>
       </section>
     </main>
