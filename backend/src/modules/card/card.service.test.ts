@@ -837,6 +837,77 @@ test('updateCardDates validates against dates read under the card lock', async (
   assert.equal(publishCalls, 0)
 })
 
+test('updateComment rejects its author after workspace membership is removed', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { updateComment }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.comment, 'findFirst', async () => comment())
+  stubMethod(t, prisma.card, 'findFirst', async () => card())
+  stubMethod(t, prisma.list, 'findFirst', async () => list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => null)
+  stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
+  let updateCount = 0
+  stubMethod(t, prisma.comment, 'updateMany', async () => {
+    updateCount += 1
+    return { count: 1 }
+  })
+  stubMethod(t, prisma.comment, 'findFirstOrThrow', async () => ({
+    ...comment({ comment_str: 'Updated' }),
+    user: {
+      id: USER_ID,
+      name: 'Author',
+      profile_image_url: null,
+    },
+  }))
+  let publishCount = 0
+  stubMethod(t, realtime, 'publish', () => {
+    publishCount += 1
+  })
+
+  await assert.rejects(
+    () =>
+      updateComment({
+        userId: USER_ID,
+        commentId: COMMENT_ID,
+        comment: 'Updated',
+      }),
+    /Forbidden/,
+  )
+  assert.equal(updateCount, 0)
+  assert.equal(publishCount, 0)
+})
+
+test('deleteComment rejects its author after workspace membership is removed', async (t) => {
+  setRequiredEnvironment()
+  const [{ prisma }, { realtime }, { deleteComment }] = await Promise.all([
+    import('../../db'),
+    import('../../realtime'),
+    import('./card.service'),
+  ])
+
+  stubMethod(t, prisma.comment, 'findFirst', async () => comment())
+  stubMethod(t, prisma.card, 'findFirst', async () => card())
+  stubMethod(t, prisma.list, 'findFirst', async () => list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => null)
+  let deleteCount = 0
+  stubMethod(t, prisma.comment, 'updateMany', async () => {
+    deleteCount += 1
+    return { count: 1 }
+  })
+  let publishCount = 0
+  stubMethod(t, realtime, 'publish', () => {
+    publishCount += 1
+  })
+
+  await assert.rejects(() => deleteComment({ userId: USER_ID, commentId: COMMENT_ID }), /Forbidden/)
+  assert.equal(deleteCount, 0)
+  assert.equal(publishCount, 0)
+})
+
 test('updateComment conditionally updates only an active comment', async (t) => {
   setRequiredEnvironment()
   const [{ prisma }, { realtime }, { updateComment }] = await Promise.all([
@@ -848,6 +919,7 @@ test('updateComment conditionally updates only an active comment', async (t) => 
   stubMethod(t, prisma.comment, 'findFirst', async () => comment())
   stubMethod(t, prisma.card, 'findFirst', async () => card())
   stubMethod(t, prisma.list, 'findFirst', async () => list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
   stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
   let updateWhere: unknown
   stubMethod(t, prisma.comment, 'updateMany', async (args) => {
@@ -893,6 +965,7 @@ test('updateComment rejects a delete race without publishing', async (t) => {
   stubMethod(t, prisma.comment, 'findFirst', async () => comment())
   stubMethod(t, prisma.card, 'findFirst', async () => card())
   stubMethod(t, prisma.list, 'findFirst', async () => list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
   stubMethod(t, prisma, '$transaction', async (operation) => operation(prisma))
   stubMethod(t, prisma.comment, 'updateMany', async () => ({ count: 0 }))
   let publishCount = 0
@@ -924,6 +997,7 @@ test('deleteComment conditionally deletes only an active comment', async (t) => 
   stubMethod(t, prisma.comment, 'findFirst', async () => comment())
   stubMethod(t, prisma.card, 'findFirst', async () => card())
   stubMethod(t, prisma.list, 'findFirst', async () => list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
   let deleteWhere: unknown
   let deleteData: Record<string, unknown> = {}
   stubMethod(t, prisma.comment, 'updateMany', async (args) => {
@@ -955,6 +1029,7 @@ test('deleteComment rejects a concurrent delete without publishing', async (t) =
   stubMethod(t, prisma.comment, 'findFirst', async () => comment())
   stubMethod(t, prisma.card, 'findFirst', async () => card())
   stubMethod(t, prisma.list, 'findFirst', async () => list(SOURCE_LIST_ID, SOURCE_WORKSPACE_ID))
+  stubMethod(t, prisma.workspaceMember, 'findFirst', async () => ({ role: 'MEMBER' }))
   stubMethod(t, prisma.comment, 'updateMany', async () => ({ count: 0 }))
   let publishCount = 0
   stubMethod(t, realtime, 'publish', () => {
