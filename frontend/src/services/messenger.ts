@@ -3,6 +3,7 @@ import type { Friend, List } from '../types'
 import {
   clearMessengerUnread,
   markDirectConversationRead,
+  markFriendRequestsRead,
   markWorkspaceConversationRead,
 } from './messengerUnread'
 
@@ -119,6 +120,7 @@ export function openMessenger(pane: MessengerPane = messengerState.pane): void {
   if (pane === 'dm' && messengerState.activeRoom?.kind === 'dm') {
     markDirectConversationRead(messengerState.activeRoom.friend.id)
   }
+  if (pane === 'friends') markFriendRequestsRead()
 }
 
 export function toggleMessenger(pane: MessengerPane = messengerState.pane): void {
@@ -145,6 +147,7 @@ export function showMessengerDirectory(): void {
 export function showFriendManagement(): void {
   messengerState.pane = 'friends'
   messengerState.open = true
+  markFriendRequestsRead()
 }
 
 export function openWorkspaceConversation(workspace: MessengerWorkspace): void {

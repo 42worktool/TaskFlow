@@ -24,10 +24,12 @@ import {
   directMessageUnreadCount,
   formatMessengerUnreadCount,
   markDirectConversationRead,
+  markFriendRequestsRead,
   markWorkspaceConversationRead,
   parseNotificationEvent,
   pruneMessengerUnreadRooms,
   receiveDirectMessageUnread,
+  receiveFriendRequestUnread,
   receiveWorkspaceActivityUnread,
   receiveWorkspaceMessageUnread,
   totalMessengerUnreadCount,
@@ -39,6 +41,7 @@ import {
   parseDirectMessage,
   parseFriend,
   parseFriendPresenceEvent,
+  parseFriendRequest,
   parseFriendUserIdEvent,
   parseWorkspaceMessage,
 } from '../services/realtime/protocol'
@@ -217,13 +220,29 @@ function visibleMessengerRoom(): VisibleMessengerRoom | null {
   return null
 }
 
+function friendManagementVisible(): boolean {
+  return (
+    messengerState.open &&
+    messengerState.pane === 'friends' &&
+    document.visibilityState === 'visible'
+  )
+}
+
 function markVisibleConversationRead(): void {
   const room = visibleMessengerRoom()
   if (room?.kind === 'workspace') {
     markWorkspaceConversationRead(room.id)
   } else if (room?.kind === 'dm') {
     markDirectConversationRead(room.id)
+  } else if (friendManagementVisible()) {
+    markFriendRequestsRead()
   }
+}
+
+function receiveFriendRequestCreated(value: unknown): void {
+  const request = parseFriendRequest(value)
+  if (!request) return
+  receiveFriendRequestUnread(request, authState.user?.id ?? null, friendManagementVisible())
 }
 
 function receiveWorkspaceMessage(value: unknown): void {
@@ -276,6 +295,7 @@ function returnToDirectory(): void {
 }
 
 let removeFriendPresenceListener: (() => void) | null = null
+let removeFriendRequestCreatedListener: (() => void) | null = null
 let removeFriendRequestAcceptedListener: (() => void) | null = null
 let removeFriendRemovedListener: (() => void) | null = null
 let removeWorkspaceMessageListener: (() => void) | null = null
@@ -335,6 +355,10 @@ watch(
 onMounted(() => {
   compactViewport.value = window.matchMedia('(max-width: 760px)').matches
   removeFriendPresenceListener = realtime.on('friend.presence_changed', receiveFriendPresence)
+  removeFriendRequestCreatedListener = realtime.on(
+    'friend.request_created',
+    receiveFriendRequestCreated,
+  )
   removeFriendRequestAcceptedListener = realtime.on(
     'friend.request_accepted',
     receiveFriendRequestAccepted,
@@ -351,6 +375,7 @@ onMounted(() => {
 onUnmounted(() => {
   directoryLoadGeneration += 1
   removeFriendPresenceListener?.()
+  removeFriendRequestCreatedListener?.()
   removeFriendRequestAcceptedListener?.()
   removeFriendRemovedListener?.()
   removeWorkspaceMessageListener?.()
