@@ -13,9 +13,8 @@ export async function enqueue(options: MailOptions): Promise<void> {
 }
 
 async function processJob(): Promise<void> {
-  // BRPOP blocks the connection it runs on for up to the timeout, so it
-  // needs its own dedicated connection — sharing the app's main client
-  // would queue every other Redis command behind each blocking poll.
+  // BRPOP은 지정 시간 동안 연결을 점유한다. 일반 Redis 연결을 공유하면 다른 명령도
+  // 매 폴링 뒤에 대기하므로, 메일 워커 전용 연결을 복제해 사용한다.
   const redis = await getRedisClient()
   workerClient = redis.duplicate()
   await workerClient.connect()
@@ -45,6 +44,8 @@ export function startMailWorker(): void {
 }
 
 export function stopMailWorker(): Promise<void> {
+  // 최초 stop은 최대 1초의 BRPOP 또는 진행 중 sendMail이 끝나 루프가 종료될 때 resolve한다.
+  // BRPOP으로 꺼낸 뒤 전송에 실패한 메일을 재큐잉하지 않으므로 전달·재시도를 보장하지는 않는다.
   return new Promise((resolve) => {
     if (!running) return resolve()
     running = false

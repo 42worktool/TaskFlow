@@ -27,6 +27,8 @@ import {
 import type { Card, Workspace, WorkspaceSubscriptionResult } from '../types'
 import { hasWorkspaceRole, workspaceRoleFor } from '../utils/workspacePermissions'
 
+// 워크스페이스 하위 화면이 공통으로 쓰는 권한, 멤버 현황, 인박스와 실시간 구독을 한곳에서 조율한다.
+// 페이지마다 같은 구독을 중복하지 않고 RouterView에는 화면에 필요한 상태만 내려주기 위한 레이아웃 경계다.
 const route = useRoute()
 const router = useRouter()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
@@ -51,6 +53,7 @@ const inboxAcceptingBoardCard = computed(
   () => inboxOpen.value && canEditBoard.value && messengerState.cardDrag?.source === 'board',
 )
 
+// 카드 드래그 중 브라우저의 텍스트 선택을 막고, dragend가 유실돼도 전역 드래그 상태가 남지 않게 정리한다.
 function setCardDragPageState(active: boolean): void {
   document.documentElement.classList.toggle(CARD_DRAG_PAGE_CLASS, active)
   document.body.classList.toggle(CARD_DRAG_PAGE_CLASS, active)
@@ -126,6 +129,7 @@ let messengerContextWorkspaceId: string | null = null
 let removeSubscriptionRecovery: (() => void) | null = null
 const livePresence = new Map<string, { online: boolean; sequence: number }>()
 
+// 라우트가 빠르게 바뀔 때 늦게 끝난 요청이 새 워크스페이스를 덮지 않도록 세대 번호로 응답을 폐기한다.
 async function loadWorkspace(id: string, reset: boolean): Promise<void> {
   const generation = ++workspaceLoadGeneration
   const attempts = reset ? 1 : 3
@@ -167,6 +171,7 @@ async function loadWorkspace(id: string, reset: boolean): Promise<void> {
 }
 
 function applyPresenceSnapshot(onlineIds: readonly string[], sequenceAtStart: number): void {
+  // 구독 응답을 기다리는 동안 도착한 presence 이벤트를 스냅샷 위에 다시 적용해 최신 상태를 보존한다.
   const next = new Set(onlineIds)
   for (const [userId, presence] of livePresence) {
     if (presence.sequence <= sequenceAtStart) continue
@@ -197,6 +202,7 @@ async function subscribeWorkspace(id: string): Promise<void> {
         activeSubscriptionWorkspaceId === id &&
         workspaceId.value === id
       ) {
+        // 구독 권한이 사라졌다면 HTTP의 최신 멤버십을 기준으로 화면을 복구하거나 목록으로 돌려보낸다.
         try {
           const loaded = await WorkspaceAPI.get(id)
           if (activeSubscriptionWorkspaceId === id && workspaceId.value === id) {
@@ -285,6 +291,7 @@ const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) =
   }
   if (event.entity !== 'workspace' && event.entity !== 'member') return
 
+  // 실시간 이벤트는 변경 사실만 전달하므로, 권한과 멤버 목록은 API에서 다시 읽어 정합성을 맞춘다.
   const id = event.workspace_id
   void (async () => {
     await loadWorkspace(id, false)
@@ -333,6 +340,7 @@ watch([workspaceId, currentRole], ([id, role]) => {
   else stopWorkspaceSubscription()
 })
 
+// 전역 메신저가 현재 워크스페이스 대화방과 카드 드롭 대상을 알 수 있도록 레이아웃 상태를 연결한다.
 watch(
   [workspace, currentRole, workspaceSyncVersion],
   ([loadedWorkspace, role, syncVersion]) => {
@@ -354,6 +362,7 @@ watch(
   { immediate: true },
 )
 
+// 드래그 상태는 DOM 선택 방지와 종료 fallback에 함께 쓰이므로 동기적으로 페이지 클래스에 반영한다.
 watch(
   () => messengerState.cardDrag !== null,
   (active) => {

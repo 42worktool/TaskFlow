@@ -5,6 +5,8 @@ import TaskCard from './TaskCard.vue'
 import { isExternalCardDropClaimed } from '../services/messenger'
 import type { Card, DraggableChange, ListWithCards } from '../types'
 
+// 하나의 보드 리스트에서 카드 정렬과 편집 이벤트를 상위 보드로 전달하고 키보드 이동 수단도 제공한다.
+// 서버 저장과 워크스페이스 간 조율은 Board가 맡고 이 컴포넌트는 Sortable의 화면 상태에만 집중한다.
 const props = withDefaults(
   defineProps<{
     list: ListWithCards
@@ -107,6 +109,7 @@ function removeOriginPlaceholder(): void {
 }
 
 function createOriginPlaceholder(item: HTMLElement): void {
+  // fallback 드래그가 원본 노드를 즉시 옮겨도 출발 자리에 반투명 복제본을 남겨 위치 맥락을 보존한다.
   removeOriginPlaceholder()
   const bounds = item.getBoundingClientRect()
   const placeholder = item.cloneNode(true) as HTMLElement
@@ -146,6 +149,7 @@ function finishCardDrag(): void {
 }
 
 function canMoveCard(event: { draggedContext?: { element?: Card } }): boolean {
+  // 인박스나 채팅이 이미 외부 드롭을 소유한 카드는 리스트 변경으로 중복 저장하지 않는다.
   const cardId = event.draggedContext?.element?.id
   return !cardId || !isExternalCardDropClaimed(cardId)
 }
@@ -162,6 +166,7 @@ function closeMoveMenu(restoreFocus = false): void {
 }
 
 function positionMoveMenu(): void {
+  // Teleport된 키보드 이동 메뉴를 앵커 옆에 두되 화면 경계를 넘으면 반대편과 안쪽으로 보정한다.
   const target = moveMenu.value
   const menu = moveMenuElement.value
   if (!target || !menu) return
@@ -225,6 +230,7 @@ function handleMoveMenuFocusOut(): void {
 }
 
 function handleMoveMenuKeydown(event: KeyboardEvent): void {
+  // 메뉴 항목을 순환 탐색하게 해 드래그를 쓰지 않는 사용자도 같은 이동 기능에 접근하게 한다.
   if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
   const buttons = [
     ...(moveMenuElement.value?.querySelectorAll<HTMLButtonElement>('button') ?? []),
@@ -264,6 +270,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 복제 DOM과 전역 리스너는 리스트가 삭제되거나 화면이 바뀔 때 반드시 함께 제거한다.
   removeOriginPlaceholder()
   window.removeEventListener('pointerdown', handleOutsidePointerDown, true)
   window.removeEventListener('resize', handleViewportChange)

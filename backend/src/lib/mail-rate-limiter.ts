@@ -5,7 +5,7 @@ const RATE_LIMIT = 20
 const WINDOW_SECONDS = 3600
 
 function recipientKey(email: string): string {
-  // Keep the existing key format so deployed recipient counters remain valid.
+  // 배포 중인 수신자 카운터가 초기화되지 않도록 기존 Redis 키 형식을 유지한다.
   return `mail:ratelimit:${email}`
 }
 
@@ -37,6 +37,7 @@ type MailRateLimitInput = {
 
 export function createMailRateLimitChecker(redis: MailRateLimitClient) {
   return async (input: MailRateLimitInput): Promise<void> => {
+    // 발신자와 수신자 양쪽을 제한해 한 사용자의 대량 발송과 한 주소에 대한 집중 공격을 함께 막는다.
     const [senderCount, recipientCount] = await Promise.all([
       increment(redis, senderKey(input.senderUserId)),
       increment(redis, recipientKey(input.recipientEmail)),

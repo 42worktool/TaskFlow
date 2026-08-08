@@ -1,9 +1,8 @@
 // ============================================================
-// workspace.service.ts — Workspace CRUD business logic
+// workspace.service.ts — 워크스페이스 CRUD와 멤버십 정책
 //
-// All functions operate on the Prisma client singleton (../db.ts).
-// Authorization checks are done here; the controller only handles
-// HTTP concerns (parsing, validation, status codes).
+// 모든 함수는 공용 Prisma 클라이언트를 사용한다. 권한과 역할 계층은 서비스에서
+// 검사하고 컨트롤러는 입력 파싱과 상태 코드 같은 HTTP 책임만 맡는다.
 // ============================================================
 import { prisma } from '../../db'
 import { config } from '../../config'
@@ -74,6 +73,8 @@ async function requireManagedWorkspace(
   callerId: string,
   minRole: Role,
 ) {
+  // 워크스페이스와 활성 멤버를 한 결과로 받아 호출자 역할과 대상을 일관된 객체에서 판단한다.
+  // 이 조회가 동시 수정을 직렬화하지는 않으므로 변경 작업의 순서는 바깥 lock이 담당한다.
   const workspace = await tx.workspace.findFirst({
     where: { id: wsId, deleted_at: null },
     include: { members: { where: { deleted_at: null } } },
@@ -90,6 +91,7 @@ function requireRoleChangeAllowed(
   targetMembership: WorkspaceMember,
   newRole: Role,
 ): void {
+  // 관리자는 자기보다 낮은 현재 역할만 다룰 수 있고, 새로 부여할 역할도 자기보다 낮아야 한다.
   if (
     !workspaceRoleOutranks(callerRole, targetMembership.role) ||
     !workspaceRoleOutranks(callerRole, newRole)
@@ -99,6 +101,7 @@ function requireRoleChangeAllowed(
 }
 
 function finalizeWorkspaceDeletion(workspaceId: string, actorUserId: string): void {
+  // DB 커밋 뒤 구독 권한을 무효화하고 삭제 이벤트를 보낸 후 채널을 비운다.
   revokeWorkspaceAccess(workspaceId)
   publishWorkspaceChange({
     workspace_id: workspaceId,
@@ -116,6 +119,7 @@ function finalizeMemberRemoval(
   targetUserId: string,
   actorUserId: string,
 ): void {
+  // 제거된 사용자의 모든 탭을 채널에서 내보내 더 이상 워크스페이스 이벤트를 받지 못하게 한다.
   revokeWorkspaceMemberAccess(workspaceId, targetUserId)
   publishWorkspaceChange({
     workspace_id: workspaceId,
@@ -129,14 +133,12 @@ function finalizeMemberRemoval(
 }
 
 // ============================================================
-// Public API
+// 외부 공개 API
 // ============================================================
 
 /**
- * List workspaces the user can see.
- * Returns two groups:
- *   my    — workspaces where the user is a member (private + public)
- *   public — public workspaces the user has NOT joined
+ * 사용자가 볼 수 있는 워크스페이스를 두 그룹으로 조회한다.
+ * my는 가입한 비공개/공개 공간, public은 아직 가입하지 않은 공개 공간이다.
  */
 export async function listWorkspaces(input: { userId: string }) {
   const [my, public_] = await Promise.all([
@@ -168,16 +170,13 @@ export async function listWorkspaces(input: { userId: string }) {
 type WorkspaceWithMembers = Prisma.WorkspaceGetPayload<{ include: typeof workspaceInclude }>
 
 /**
- * Runs `operation` inside a transaction holding a Postgres advisory lock
- * scoped to the (workspace_id, user_id) pair, serializing every concurrent
- * membership-transition attempt for that pair — whether they're racing to
- * create, restore, or (for the public-join path) re-check the workspace's
- * live state — before any of them reads or writes anything.
+ * (workspace_id, user_id) 쌍의 PostgreSQL advisory lock을 잡은 트랜잭션에서
+ * operation을 실행한다. 같은 멤버십을 생성/복구하거나 공개 공간 가입 상태를
+ * 재검사하는 동시 요청을 읽기 전부터 직렬화한다.
  *
- * A row lock (`SELECT ... FOR UPDATE`) can't do this on its own: there's no
- * row to lock until one side commits a brand-new membership, so two
- * concurrent callers could both see no row and both attempt `create`,
- * failing the second on the unique (workspace_id, user_id) constraint.
+ * 신규 멤버십은 아직 잠글 행이 없어 FOR UPDATE만으로 보호할 수 없다. 두 요청이
+ * 모두 행이 없다고 판단해 동시에 create한 뒤 unique 제약에서 충돌하는 것을 막기 위해
+ * 행의 존재 여부와 무관한 advisory lock을 사용한다.
  */
 async function lockMembershipPair<T>(
   workspaceId: string,
@@ -185,24 +184,20 @@ async function lockMembershipPair<T>(
   operation: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   return prisma.$transaction(async (tx) => {
-    // pg_advisory_xact_lock returns PostgreSQL `void`, which Prisma cannot
-    // deserialize through $queryRaw (P2010). This is an effect-only statement,
-    // so execute it without asking Prisma to decode a result row.
+    // pg_advisory_xact_lock은 Prisma가 $queryRaw로 역직렬화할 수 없는 void를 반환한다.
+    // 결과가 필요 없는 잠금 문장이므로 $executeRaw로 실행한다.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${workspaceId}), hashtext(${userId}))`
     return operation(tx)
   })
 }
 
 /**
- * Restore a soft-deleted membership or create a fresh one. WorkspaceMember's
- * PK is (workspace_id, user_id), so a prior removal must be restored rather
- * than re-created. Assumes the caller already holds the pair's advisory
- * lock (see lockMembershipPair) — this only does the read-then-write, not
- * the locking.
+ * soft delete된 멤버십은 복구하고 없으면 새로 만든다. WorkspaceMember의 PK가
+ * (workspace_id, user_id)이므로 과거에 제거된 관계는 재생성할 수 없다.
+ * 호출자가 이미 쌍의 advisory lock을 잡았다고 가정하고 읽기/쓰기만 수행한다.
  *
- * Returns whether the membership actually transitioned from inactive
- * (absent or soft-deleted) to active, so callers emit a join notification
- * exactly once instead of once per racing request.
+ * 비활성 상태에서 실제로 활성화됐는지를 반환해 경쟁 요청이 있어도 참여 알림을
+ * 정확히 한 번만 발행할 수 있게 한다.
  */
 async function writeActiveMembership(
   tx: Prisma.TransactionClient,
@@ -229,7 +224,7 @@ async function writeActiveMembership(
   return wasInactive
 }
 
-/** Notification + realtime fan-out after a membership is created/restored. */
+/** 멤버십 생성/복구가 커밋된 뒤 알림과 실시간 이벤트를 함께 전파한다. */
 function announceMemberJoined(
   workspace: { id: string; name: string; members: { user_id: string }[] },
   actor: { userId: string; name: string; profileImageUrl: string | null },
@@ -259,17 +254,12 @@ function announceMemberJoined(
 }
 
 /**
- * Row-locks the workspace so a concurrent `updateWorkspace` (is_public
- * toggle) or `deleteWorkspace` can't land between this check and the
- * membership write below. Both of those do a plain `tx.workspace.update`,
- * which Postgres already gives an exclusive row lock for the duration of
- * their transaction — `FOR UPDATE` here requests that same lock, so
- * whichever transaction gets there first makes the other wait, instead of
- * both reading a snapshot that's stale by the time either one writes.
+ * 워크스페이스 행을 잠가 공개 여부 변경이나 삭제가 상태 검사와 멤버십 쓰기 사이에
+ * 끼어들지 못하게 한다. update가 잡는 배타 잠금과 같은 행 잠금을 요청하므로 먼저
+ * 도착한 트랜잭션이 끝날 때까지 다른 쪽이 기다리고, 오래된 스냅샷으로 쓰지 않는다.
  *
- * Unlike the (workspace_id, user_id) membership pair (see
- * lockMembershipPair), the workspace row is known to already exist by the
- * time this runs, so a plain row lock — not an advisory one — is enough.
+ * 멤버십 쌍과 달리 워크스페이스 행은 이미 존재하므로 advisory lock이 아닌
+ * 일반 FOR UPDATE만으로 충분하다.
  */
 async function lockWorkspaceRow(
   tx: Prisma.TransactionClient,
@@ -284,14 +274,10 @@ async function lockWorkspaceRow(
 }
 
 /**
- * First visit to a public workspace by a non-member auto-provisions a VIEWER
- * membership. The initial `is_public`/membership check the caller made to
- * decide whether to call this is a separate read from the write below, so
- * by the time the lock is held, the workspace may have been made private or
- * deleted out from under it — re-checks its live state inside the same
- * locked transaction as the write, instead of trusting that stale snapshot,
- * and returns the current row (or null, if it's gone) so the caller never
- * has to re-fetch-and-assume-non-null afterward.
+ * 비회원이 공개 워크스페이스를 처음 열면 VIEWER 멤버십을 자동 생성한다.
+ * 최초 공개 여부 확인과 실제 쓰기는 별도 시점이므로, 잠금을 얻는 동안 비공개 전환이나
+ * 삭제가 일어날 수 있다. 따라서 잠긴 트랜잭션 안에서 최신 상태를 다시 확인하고
+ * 현재 행 자체를 반환해 호출자가 존재한다고 가정한 재조회에 의존하지 않게 한다.
  */
 async function joinPublicWorkspaceAsViewer(
   workspaceId: string,
@@ -308,8 +294,8 @@ async function joinPublicWorkspaceAsViewer(
 
     const isMember = workspace.members.some((member) => member.user_id === userId)
     if (!workspace.is_public || isMember) {
-      // Went private, or was joined some other way, while we waited for the
-      // lock — nothing to do; let the caller re-evaluate access itself.
+      // 잠금을 기다리는 동안 비공개가 됐거나 다른 경로로 가입됐다.
+      // 여기서는 쓰지 않고 호출자가 최신 상태로 접근 가능 여부를 다시 판단한다.
       return { workspace, joined: false }
     }
 
@@ -325,8 +311,7 @@ async function joinPublicWorkspaceAsViewer(
 }
 
 /**
- * Get a single workspace by ID.
- * Accessible if the user is a member OR the workspace is public.
+ * ID로 워크스페이스를 조회한다. 활성 멤버이거나 공개 공간일 때만 접근할 수 있다.
  */
 export async function getWorkspace(input: { userId: string; workspaceId: string }) {
   const ws = await prisma.workspace.findFirst({
@@ -341,10 +326,8 @@ export async function getWorkspace(input: { userId: string; workspaceId: string 
   }
 
   const result = await joinPublicWorkspaceAsViewer(workspace.id, input.userId)
-  // Re-validate against the fresh, lock-consistent state rather than the
-  // snapshot above: requireWorkspaceReadAccess throws NotFoundError if the
-  // workspace was deleted, or ForbiddenError if it turned private and this
-  // user still isn't a member.
+  // 위의 오래된 조회 결과가 아닌 잠금 이후 최신 상태로 다시 검증한다.
+  // 그 사이 삭제되면 NotFound, 비공개로 바뀐 비회원이면 Forbidden이 된다.
   const fresh = requireWorkspaceReadAccess(result.workspace, input.userId)
 
   if (result.joined) {
@@ -365,7 +348,7 @@ export async function getWorkspace(input: { userId: string; workspaceId: string 
 }
 
 /**
- * Create a workspace and register the creator as OWNER in a single transaction.
+ * 워크스페이스와 생성자의 OWNER 멤버십을 하나의 중첩 쓰기로 함께 생성한다.
  */
 export async function createWorkspace(input: { userId: string; name: string; isPublic: boolean }) {
   const workspace = await prisma.workspace.create({
@@ -388,7 +371,7 @@ export async function createWorkspace(input: { userId: string; name: string; isP
 }
 
 /**
- * Partial update (name / is_public). Requires ADMIN or above.
+ * 이름/공개 여부를 부분 수정한다. ADMIN 이상만 가능하다.
  */
 export async function updateWorkspace(input: {
   userId: string
@@ -424,8 +407,8 @@ export async function updateWorkspace(input: {
 }
 
 /**
- * Soft-delete a workspace. Child rows stay intact for auditability and are
- * hidden by active-workspace filters. Requires OWNER.
+ * 워크스페이스를 soft delete한다. 하위 데이터는 감사와 복구를 위해 보존하고
+ * 활성 워크스페이스 필터로 숨긴다. 다른 멤버가 없는 OWNER만 실행할 수 있다.
  */
 export async function deleteWorkspace(input: { userId: string; workspaceId: string }) {
   await workspaceMutationLock.run(input.workspaceId, async () => {
@@ -448,8 +431,8 @@ export async function deleteWorkspace(input: { userId: string; workspaceId: stri
 }
 
 /**
- * Transfer the single OWNER position to an active member. The previous owner
- * stays in the workspace as ADMIN and may leave through the normal flow.
+ * 하나뿐인 OWNER 역할을 활성 멤버에게 위임한다. 이전 소유자는 ADMIN으로 남아
+ * 일반 나가기 흐름을 사용할 수 있다. 두 역할 변경은 한 트랜잭션으로 처리한다.
  */
 export async function transferWorkspaceOwnership(input: {
   userId: string
@@ -504,8 +487,8 @@ export async function transferWorkspaceOwnership(input: {
 }
 
 /**
- * Leave a workspace. A sole OWNER leaves by deleting the now-empty workspace;
- * an OWNER with other active members must transfer ownership first.
+ * 워크스페이스에서 나간다. 유일한 멤버인 OWNER는 빈 공간을 함께 삭제하고,
+ * 다른 활성 멤버가 있으면 먼저 소유권을 위임해야 한다.
  */
 export async function leaveWorkspace(input: {
   userId: string
@@ -551,9 +534,8 @@ export async function leaveWorkspace(input: {
 }
 
 /**
- * Change a member's role. Caller must be ADMIN+.
- * OWNER membership is intentionally immutable here: ownership transfer is a
- * separate workflow, not an ordinary member-role update.
+ * 멤버 역할을 변경한다. 호출자는 ADMIN 이상이어야 하며 자기보다 낮은 역할만 다룬다.
+ * OWNER 변경은 일반 역할 수정이 아니라 별도의 소유권 위임 흐름으로만 허용한다.
  */
 export async function changeMemberRole(input: {
   userId: string
@@ -605,8 +587,8 @@ export async function changeMemberRole(input: {
 }
 
 /**
- * Remove a member from the workspace. Caller must be ADMIN+.
- * A caller can remove only members whose role is strictly lower than theirs.
+ * 멤버를 워크스페이스에서 soft delete한다. ADMIN 이상이면서 자신보다 낮은 역할만
+ * 제거할 수 있어 ADMIN끼리 또는 OWNER를 임의로 추방하지 못한다.
  */
 export async function removeMember(input: {
   userId: string
@@ -662,6 +644,8 @@ export async function inviteWorkspaceMember(input: {
       recipientEmail: email,
     })
 
+    // 초대 토큰을 먼저 만들고 큐 등록 자체가 실패하면 즉시 폐기해, 큐에도 없는
+    // 유효 초대가 Redis에 남지 않게 한다. 큐 등록 이후의 실제 메일 전달은 별도 단계다.
     const token = await workspaceInvitationStore.create({
       workspaceId: input.workspaceId,
       role: input.role,
@@ -681,7 +665,7 @@ export async function inviteWorkspaceMember(input: {
 }
 
 /**
- * Preview an invite without consuming it.
+ * 초대 페이지 표시에 필요한 정보를 토큰을 소비하지 않고 확인한다.
  */
 export async function previewInvite(input: { userId: string; token: string }) {
   const invitation = await workspaceInvitationStore.preview(input.token)
@@ -712,8 +696,8 @@ export async function previewInvite(input: { userId: string; token: string }) {
 }
 
 /**
- * Consume an invite and add the signed-in user as a member.
- * Returns the workspace DTO on success.
+ * 초대 토큰을 한 번만 소비하고 로그인 사용자를 멤버로 추가한다.
+ * 이미 활성 멤버면 토큰을 소비하지 않고 현재 워크스페이스를 반환한다.
  */
 export async function acceptInvite(input: { userId: string; token: string }) {
   const pendingInvitation = await workspaceInvitationStore.preview(input.token)

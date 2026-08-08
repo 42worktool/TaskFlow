@@ -2,6 +2,8 @@
 import ProfileMenu from './ProfileMenu.vue'
 import SearchInput from './SearchInput.vue'
 
+// 전역 검색과 계정 메뉴를 공통으로 유지하면서, 워크스페이스 화면은 이름과
+// 전용 action slot만 주입해 같은 상단바를 재사용한다.
 withDefaults(
   defineProps<{
     workspaceName?: string

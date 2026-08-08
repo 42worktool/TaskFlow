@@ -1,3 +1,4 @@
+// DB 채팅 행과 작성자 정보를 실시간 전송에도 재사용할 메시지 DTO로 변환·검증한다.
 import type { WorkspaceMessage } from '@prisma/client'
 import { z } from 'zod'
 import { messageBaseDtoSchema } from '../../lib/messaging'

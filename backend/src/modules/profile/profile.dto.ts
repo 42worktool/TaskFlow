@@ -1,3 +1,4 @@
+// 사용자 모델 중 공개 프로필에 허용된 필드만 응답 형태로 고정한다.
 export interface PublicProfileRecord {
   id: string
   name: string

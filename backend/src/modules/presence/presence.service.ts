@@ -29,6 +29,10 @@ let stopped = false
 let currentStop: (() => Promise<void>) | null = null
 const pendingNotifications = new Set<Promise<void>>()
 
+// 접속 상태는 메모리에서 즉시 바꾸고, 관계 조회와 fan-out은 비동기로 수행한다.
+// 진행 중인 조회·알림 작업이 DB 종료와 겹치지 않도록 settle까지 추적하되,
+// stop 이후에는 전송을 중단하므로 종료 중 알림 전달 자체를 보장하지는 않는다.
+
 async function drainPendingNotifications(timeoutMs: number): Promise<void> {
   const tasks = [...pendingNotifications]
   if (tasks.length === 0) return
@@ -67,6 +71,7 @@ async function notifyPresence(userId: string, online: boolean): Promise<void> {
     }),
   ])
 
+  // DB를 조회하는 동안 다시 접속/해제됐을 수 있으므로 최신 상태와 일치할 때만 전송한다.
   if (!running || isUserOnline(userId) !== online) return
 
   const event = friendPresenceEventSchema.parse({
@@ -99,6 +104,7 @@ function schedulePresenceNotification(userId: string, online: boolean): void {
 
 function connectionAuthenticated(connection: Readonly<RealtimeConnectionInfo>): void {
   if (!running) return
+  // 첫 연결과 마지막 연결에서만 알림을 보내 탭 수만큼 상태 이벤트가 중복되지 않게 한다.
   if (addPresenceConnection(connection.userId, connection.connectionId)) {
     schedulePresenceNotification(connection.userId, true)
   }
@@ -123,6 +129,7 @@ export function startPresence(options: { drainTimeoutMs?: number } = {}): () => 
 
   let stopPromise: Promise<void> | null = null
   const stop = (): Promise<void> => {
+    // 리스너와 상태를 먼저 정리한 뒤 이미 예약된 작업이 settle될 때까지만 제한 시간 동안 기다린다.
     if (stopPromise) return stopPromise
     running = false
     stopped = true

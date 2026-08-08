@@ -1,3 +1,5 @@
+// 인증 여부와 무관하게 열 수 있는 공개 프로필 API다.
+// 일반 인증 API와 달리 공개 경로를 직접 호출하되 오류 문구 변환 규칙은 공유한다.
 import { authRequestError } from '../services/auth'
 
 export interface PublicProfile {

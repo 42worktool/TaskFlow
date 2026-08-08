@@ -3,7 +3,7 @@ networks:
     driver: bridge
 
 services:
-  # 1. Reverse Proxy (Nginx)
+  # 1. 외부 HTTPS 진입점과 프론트·백엔드 라우팅을 담당한다.
   nginx:
     build:
       context: ./nginx
@@ -18,7 +18,7 @@ services:
     networks:
       - app-network
 
-  # 2. Frontend (Vue.js)
+  # 2. Vue 개발/정적 프론트엔드를 내부 5173 포트로 노출한다.
   frontend:
     build:
       context: ./frontend
@@ -28,7 +28,7 @@ services:
     networks:
       - app-network
 
-  # 3. Backend (Node.js + TypeScript)
+  # 3. API와 WebSocket을 제공하며 DB·Redis가 준비된 뒤 시작한다.
   backend:
     build:
       context: ./backend
@@ -63,7 +63,7 @@ services:
     networks:
       - app-network
 
-  # 4. Main Database (PostgreSQL)
+  # 4. 영속 업무 데이터를 이름 있는 볼륨에 저장한다.
   postgres:
     image: postgres:15-alpine
     environment:
@@ -80,7 +80,7 @@ services:
     networks:
       - app-network
 
-  # 5. In-Memory Database (Redis)
+  # 5. refresh session·초대·메일 큐·rate limit 같은 일시 상태를 환경과 무관하게 보존한다.
   redis:
     image: redis:7-alpine
     volumes:

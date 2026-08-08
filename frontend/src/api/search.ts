@@ -1,3 +1,4 @@
+// 통합 검색 조건을 백엔드 쿼리 문자열로 변환하고 결과 종류를 판별하는 API 경계다.
 import { apiRequest } from '../services/auth'
 import type { PublicProfile } from './profile'
 
@@ -51,6 +52,7 @@ interface SearchRequest {
 }
 
 function searchPath(input: SearchRequest): string {
+  // 기본값은 URL에서 생략해 주소를 짧게 유지하고 서버의 기본 정책과 중복하지 않는다.
   const params = new URLSearchParams()
   if (input.query) params.set('q', input.query)
   if (input.type && input.type !== 'all') params.set('type', input.type)
@@ -70,6 +72,7 @@ export const SearchAPI = {
     const response = await apiRequest<SearchResponse>(
       searchPath({ query, type: 'user', workspaceId, limit }),
     )
+    // 공용 검색 응답은 합집합 타입이므로 친구 검색 소비자에는 사용자 결과만 넘긴다.
     return response.items.flatMap((item) => (item.kind === 'user' ? [item] : []))
   },
 }

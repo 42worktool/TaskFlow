@@ -6,6 +6,8 @@ const DEFAULT_WS_HEARTBEAT_INTERVAL_MS = 30_000
 const DEFAULT_WS_MAX_PAYLOAD_BYTES = 64 * 1024
 const DEFAULT_WS_MAX_MESSAGES_PER_MINUTE = 120
 
+// 필수 환경 변수와 숫자/불리언 값을 시작 시점에 검증해 잘못된 설정으로
+// 서버가 일부만 기동된 뒤 런타임 오류를 내는 상황을 막는다.
 function required(name: string): string {
   const value = process.env[name]?.trim()
   if (!value) {
@@ -34,6 +36,7 @@ function booleanValue(name: string, fallback: boolean): boolean {
 }
 
 function normalizedOrigin(value: string): string {
+  // Origin 비교에 경로나 쿼리가 섞이지 않도록 scheme/host/port만 허용한다.
   const url = new URL(value)
   if (url.pathname !== '/' || url.search || url.hash) {
     throw new Error('APP_ORIGIN must contain only scheme, host, and optional port')
@@ -42,6 +45,8 @@ function normalizedOrigin(value: string): string {
 }
 
 function validateRedirectUri(value: string, nodeEnv: string): string {
+  // OAuth 코드는 민감 정보이므로 운영에서는 HTTPS 콜백만 허용한다.
+  // 개발 편의를 위해 localhost에서만 HTTP 예외를 둔다.
   const url = new URL(value)
   const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
   if (url.protocol !== 'https:' && !(nodeEnv !== 'production' && isLocalhost)) {

@@ -1,11 +1,9 @@
 // ============================================================
-// signup-rate-limiter.ts — IP-scoped attempt limiter for signup
+// signup-rate-limiter.ts — IP 단위 회원가입 시도 제한
 //
-// Mirrors the login attempt limiter in modules/auth/auth.service.ts
-// but scopes the counter to the client IP only. The counter is not
-// cleared on success: a successful registration is itself the
-// protected resource, so clearing would let scripted mass account
-// creation slip through.
+// 로그인 제한과 달리 클라이언트 IP만 키로 사용한다. 회원가입 자체가 보호 대상이므로
+// 성공해도 카운터를 지우지 않는다. 성공할 때 초기화하면 자동화된 대량 계정 생성이
+// 제한을 우회할 수 있기 때문이다.
 // ============================================================
 import { createHash } from 'crypto'
 import { getRedisClient } from './redis'

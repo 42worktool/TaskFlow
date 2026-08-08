@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import LegalDocumentLayout from '../layouts/LegalDocumentLayout.vue'
+
+// 인증 없이 접근 가능한 고정 개인정보처리방침을 공통 법적 문서 레이아웃에 표시한다.
 </script>
 
 <template>

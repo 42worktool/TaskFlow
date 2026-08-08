@@ -6,6 +6,7 @@ import AppLogo from '../components/AppLogo.vue'
 import AuthInput from '../components/AuthInput.vue'
 import { loginWithPassword, startGoogleLogin } from '../services/auth'
 
+// 이메일 로그인과 Google OAuth를 같은 안전한 내부 redirect 규칙으로 연결한다.
 const route = useRoute()
 const router = useRouter()
 const email = ref('')
@@ -13,6 +14,8 @@ const password = ref('')
 const formError = ref('')
 const submitting = ref(false)
 const redirectTarget = computed(() =>
+  // 슬래시로 시작하지 않는 명백한 외부 값은 UI에서 먼저 제외한다. OAuth 경로는
+  // 서버의 safeReturnTo가 다시 검증하므로 이 조건 하나를 보안 경계로 사용하지 않는다.
   typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
     ? route.query.redirect
     : '/workspaces',

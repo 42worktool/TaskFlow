@@ -19,6 +19,8 @@ import {
 
 const PAGE_SIZE = 10
 
+// 검색 조건을 URL의 단일 상태로 사용해 필터, 정렬, 페이지를 새로고침과 공유 링크에서도 그대로 복원한다.
+// 레이블은 워크스페이스에 종속되므로 워크스페이스를 먼저 확정한 뒤에만 검색 요청에 포함한다.
 const route = useRoute()
 const router = useRouter()
 const allWorkspaces = ref<Workspace[]>([])
@@ -60,6 +62,7 @@ function resolveWorkspace(scope: string | null): Workspace | null {
   )
   if (exact) return exact
 
+  // 이름 일부가 정확히 한 곳만 가리킬 때만 해석해 동명이거나 모호한 범위로 검색하지 않는다.
   const partialMatches = allWorkspaces.value.filter((workspace) =>
     workspace.name.toLocaleLowerCase().includes(normalized),
   )
@@ -136,6 +139,7 @@ function userWorkspaceSummary(userId: string): string {
 }
 
 function updateCriteria(patch: Partial<AdvancedSearchCriteria>) {
+  // 필터가 바뀌면 이전 페이지는 유효하지 않을 수 있으므로 명시한 경우 외에는 1페이지로 돌아간다.
   const next = {
     ...criteria.value,
     ...patch,
@@ -198,6 +202,7 @@ async function loadSearchData() {
 watch(
   () => selectedWorkspace.value?.id ?? null,
   async (workspaceId) => {
+    // 워크스페이스 전환 중 이전 레이블 응답이 도착해도 새 선택지에 섞이지 않도록 버전으로 폐기한다.
     const requestVersion = ++labelRequestVersion
     workspaceLabels.value = []
     labelLoadError.value = ''
@@ -255,6 +260,7 @@ watch(
     workspaceScope,
     labelScope,
   ]) => {
+    // 조건 변경이 잦은 검색은 마지막 요청만 화면에 반영해 결과와 URL이 어긋나지 않게 한다.
     const requestVersion = ++searchRequestVersion
     searchResults.value = []
     totalResults.value = 0
@@ -298,6 +304,7 @@ watch(
 watch(
   [loading, searchLoading, pageCount, () => criteria.value.page],
   ([metadataLoading, resultsLoading, availablePages, requestedPage]) => {
+    // 삭제 등으로 마지막 페이지가 사라지면 서버가 알려준 범위 안의 마지막 페이지로 URL을 보정한다.
     if (!metadataLoading && !resultsLoading && requestedPage > availablePages) {
       updateCriteria({ page: availablePages })
     }

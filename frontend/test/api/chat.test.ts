@@ -1,0 +1,69 @@
+// 워크스페이스 채팅 기록과 메시지 생성 요청 규약을 검증한다.
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('../../src/services/auth', () => ({
+  apiRequest: vi.fn(),
+}))
+
+import { ChatAPI } from '../../src/api/chat'
+import { apiRequest } from '../../src/services/auth'
+
+describe('ChatAPI', () => {
+  beforeEach(() => {
+    vi.mocked(apiRequest).mockReset()
+  })
+
+  it('loads workspace messages', async () => {
+    vi.mocked(apiRequest).mockResolvedValueOnce([])
+
+    await expect(ChatAPI.list('workspace-1')).resolves.toEqual([])
+    expect(apiRequest).toHaveBeenCalledWith('/api/workspaces/workspace-1/messages')
+  })
+
+  it('sends a workspace message', async () => {
+    const message = {
+      id: 'message-1',
+      workspace_id: 'workspace-1',
+      card_id: null,
+      content: '안녕하세요',
+      created_at: '2026-07-29T00:00:00.000Z',
+      author: {
+        user_id: 'user-1',
+        name: 'Sean',
+        profile_image_url: null,
+      },
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(message)
+
+    await expect(ChatAPI.send('workspace-1', '안녕하세요')).resolves.toEqual(message)
+    expect(apiRequest).toHaveBeenCalledWith('/api/workspaces/workspace-1/messages', {
+      method: 'POST',
+      json: { content: '안녕하세요' },
+    })
+  })
+
+  it('sends an optional card reference with a workspace message', async () => {
+    const message = {
+      id: 'message-1',
+      workspace_id: 'workspace-1',
+      card_id: 'card-1',
+      content: '카드 코멘트',
+      created_at: '2026-07-29T00:00:00.000Z',
+      author: {
+        user_id: 'user-1',
+        name: 'Sean',
+        profile_image_url: null,
+      },
+    }
+    vi.mocked(apiRequest).mockResolvedValueOnce(message)
+
+    await expect(ChatAPI.send('workspace-1', '카드 코멘트', 'card-1')).resolves.toEqual(message)
+    expect(apiRequest).toHaveBeenCalledWith('/api/workspaces/workspace-1/messages', {
+      method: 'POST',
+      json: {
+        content: '카드 코멘트',
+        card_id: 'card-1',
+      },
+    })
+  })
+})

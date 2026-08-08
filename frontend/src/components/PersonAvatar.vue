@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 프로필 이미지 유무와 관계없이 목록이 같은 크기의 사람 식별자를 표시하도록 한다.
 defineProps<{
   name: string
   imageUrl: string | null

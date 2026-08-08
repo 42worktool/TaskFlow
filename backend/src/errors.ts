@@ -1,10 +1,9 @@
 // ============================================================
-// errors.ts — shared application error type + HTTP response mapping
+// errors.ts — 애플리케이션 오류와 HTTP 응답 형식의 공통 매핑
 //
-// Every module throws AppError (or one of the generic subclasses below)
-// for expected failure cases; sendError() maps it to the documented
-// { status_code, error, message } response shape in one place instead of
-// each controller re-implementing its own instanceof chain.
+// 예상 가능한 실패는 각 서비스가 AppError 계열로 표현하고, 이 모듈이
+// { status_code, error, message } 응답으로 일괄 변환한다. 컨트롤러마다
+// 오류 타입 분기를 반복하지 않고 모든 API의 오류 정책을 동일하게 유지하기 위함이다.
 // ============================================================
 import type { ErrorRequestHandler, Response } from 'express'
 import { ZodError } from 'zod'
@@ -46,6 +45,7 @@ export class ConflictError extends AppError {
 }
 
 function sendError(res: Response, error: unknown): void {
+  // 도메인 오류, 업로드 오류, 입력 검증 오류 순으로 알려진 실패를 안전하게 노출한다.
   if (error instanceof AppError) {
     res.status(error.statusCode).json({
       status_code: error.statusCode,
@@ -84,6 +84,7 @@ function sendError(res: Response, error: unknown): void {
     return
   }
 
+  // 분류되지 않은 내부 오류의 상세는 로그에만 남기고 클라이언트에는 숨긴다.
   console.error(error)
   res.status(500).json({
     status_code: 500,

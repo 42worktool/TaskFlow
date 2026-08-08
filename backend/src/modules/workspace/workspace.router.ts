@@ -1,5 +1,5 @@
 // ============================================================
-// workspace.router.ts — mount workspace CRUD routes
+// workspace.router.ts — 워크스페이스와 하위 자원 라우트 연결
 // ============================================================
 import { Router } from 'express'
 import * as ctrl from './workspace.controller'

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Card } from '../types'
 
+// 보드와 인박스가 공통으로 쓰는 카드 표현이며, 열기·삭제·완료 행동은 부모가 실제 저장을 담당한다.
 const props = withDefaults(
   defineProps<{
     card: Card
@@ -36,6 +37,7 @@ function openCard() {
 }
 
 function getLabelTextColor(hex: string): string {
+  // 배경색의 상대 휘도로 라벨 글자색을 정해 사용자 지정 색에서도 대비를 유지한다.
   const normalized = hex.replace('#', '')
   if (!/^[\da-f]{6}$/i.test(normalized)) return '#111827'
 

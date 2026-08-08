@@ -7,6 +7,9 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 const TARGET_TYPES: ActivityTargetType[] = ['WORKSPACE', 'MEMBER', 'LIST', 'CARD', 'COMMENT']
 
+// 대시보드는 원본 활동 로그와 현재 카드 상태를 응답 시점에 집계한다.
+// 별도 통계 테이블을 두지 않아 프로토타입의 쓰기 경로를 단순하게 유지한다.
+
 function startOfUtcDay(value: Date): Date {
   return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()))
 }
@@ -47,6 +50,7 @@ export async function getWorkspaceDashboard(input: {
   const periodStart = addUtcDays(today, -(input.periodDays - 1))
   const tomorrow = addUtcDays(today, 1)
 
+  // 기간 활동과 현재 보드 상태는 독립적이므로 병렬로 조회한다.
   const [logs, lists] = await Promise.all([
     prisma.activityLog.findMany({
       where: {
@@ -98,6 +102,8 @@ export async function getWorkspaceDashboard(input: {
   let completedInPeriod = 0
   let reopenedInPeriod = 0
 
+  // 한 비즈니스 동작이 여러 DB trigger 로그를 만들 수 있어 transaction_id 기준의
+  // 활동 수와 실제 로그 수를 따로 계산한다.
   for (const log of logs) {
     const date = utcDateKey(log.created_at)
     const activity = activityByDate.get(date) ?? {
@@ -128,6 +134,7 @@ export async function getWorkspaceDashboard(input: {
     flowByDate.set(date, flow)
   }
 
+  // 최근 활동에 표시할 사용자만 추가 조회해 전체 기간의 actor를 불필요하게 불러오지 않는다.
   const recentLogs = logs.slice(0, 50)
   const actorIds = Array.from(
     new Set(

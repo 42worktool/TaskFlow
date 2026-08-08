@@ -17,6 +17,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
   }
 
   try {
+    // 검증된 최소 식별자만 Request에 남겨 이후 서비스가 토큰 원문에 의존하지 않게 한다.
     const principal = verifyAccessToken(authorization.slice('Bearer '.length))
     req.user = { id: principal.userId }
     next()

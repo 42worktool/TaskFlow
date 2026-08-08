@@ -1,3 +1,4 @@
+// DB의 DM과 양쪽 사용자 정보를 클라이언트용 대화 메시지 형태로 변환·검증한다.
 import type { DirectMessage } from '@prisma/client'
 import { z } from 'zod'
 import { messageBaseDtoSchema } from '../../lib/messaging'

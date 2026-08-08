@@ -1,3 +1,0 @@
-ALTER TABLE "Users"
-ADD COLUMN "headline" VARCHAR(160) NOT NULL DEFAULT '안녕하세요',
-ADD COLUMN "linkedin_url" VARCHAR(2048);

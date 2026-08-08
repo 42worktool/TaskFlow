@@ -10,8 +10,9 @@ import { isDateRangeValid, toDateInput, toIsoDate } from '../utils/cardDates'
 import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
 import { ATTACHMENT_MAX_BYTES, ATTACHMENT_MIME_ALLOWLIST } from '../utils/uploadLimits'
 
-// Derived once from the shared allowlist so the file picker's filter can't
-// drift out of sync with the ATTACHMENT_MIME_ALLOWLIST.has(file.type) check below.
+// 카드 편집, 댓글, 라벨, 첨부파일을 한 상세 화면에서 다룬다. 카드 본문·댓글·첨부 조회는
+// 각 세대 번호로 보호해 모달이 닫히거나 카드가 바뀐 뒤의 응답이 주요 상태를 덮지 않게 한다.
+// 파일 선택기의 accept와 실제 검증이 달라지지 않도록 공용 허용 목록에서 한 번만 파생한다.
 const attachmentAccept = [...ATTACHMENT_MIME_ALLOWLIST].join(',')
 
 const route = useRoute()
@@ -77,6 +78,7 @@ let initialStartDate = ''
 let initialDeadline = ''
 let returnFocus: HTMLElement | null = null
 
+// 모달 밖으로 키보드 초점이 빠지지 않게 순환시키고 닫힐 때는 열기 전 요소로 되돌린다.
 function focusableElements(): HTMLElement[] {
   return [
     ...(modal.value?.querySelectorAll<HTMLElement>(
@@ -178,6 +180,7 @@ async function onAttachmentSelected(event: Event): Promise<void> {
     return
   }
 
+  // 업로드 중 카드가 바뀌거나 모달이 닫히면 이전 진행률과 결과를 현재 상세에 반영하지 않는다.
   const generation = ++attachmentGeneration
   attachmentUploading.value = true
   attachmentProgress.value = 0
@@ -212,6 +215,7 @@ async function onAttachmentSelected(event: Event): Promise<void> {
 async function removeAttachmentItem(attachment: CardAttachment): Promise<void> {
   if (!detail.value || attachmentUploading.value || !props.editable) return
   const cardId = props.cardId
+  // 삭제 반응은 즉시 보여주되 API가 실패하면 보관한 목록으로 되돌리는 낙관적 갱신이다.
   const previousAttachments = detail.value.attachments
   detail.value = {
     ...detail.value,
@@ -348,6 +352,7 @@ async function loadCard(options: { background?: boolean } = {}): Promise<void> {
     const card = await CardAPI.get(props.cardId)
     void loadLabels()
     if (generation === loadGeneration) {
+      // 팀원의 변경을 자동 반영하되 작성 중인 로컬 입력은 덮지 않고 충돌 안내로 전환한다.
       if (background && (saving.value || (props.editable && hasUnsavedChanges()))) {
         remoteUpdatePending.value = true
         return
@@ -379,7 +384,7 @@ async function reloadAfterFailedSave(cardId: string, message: string): Promise<v
       emit('saved', card)
     }
   } catch {
-    // Keep the original save error; a later reopen will retry the detail request.
+    // 재조회까지 실패해도 사용자가 원인을 알 수 있도록 최초 저장 오류를 유지하고 다음 열기에서 재시도한다.
   }
   if (generation === loadGeneration) error.value = message
 }
@@ -528,6 +533,7 @@ async function removeComment(comment: CardComment): Promise<void> {
   }
 }
 
+// 한글 조합 종료 직후 Enter가 마지막 글자를 누락하지 않도록 다음 렌더 틱에 댓글 제출을 확정한다.
 const deferComposerSubmit = (callback: () => void): void => void nextTick(callback)
 
 const commentSubmitter = createComposerEnterSubmitter(() => {
@@ -580,8 +586,7 @@ async function submit(): Promise<void> {
     }
     if (startDateChanged || deadlineChanged) {
       await CardAPI.updateDates(cardId, {
-        // The modal deliberately uses date-only inputs. Persist the complete
-        // displayed range so server validation sees the same values.
+        // 날짜 전용 입력이므로 화면에 보인 시작일과 마감일을 함께 보내 서버도 같은 범위로 검증하게 한다.
         start_at: toIsoDate(nextStartDate),
         deadline: toIsoDate(nextDeadline),
       })
@@ -636,6 +641,8 @@ watch(
   },
 )
 
+// 모달 접근성을 위해 최초 초점을 닫기 버튼에 두고, 해제 시 Object URL과
+// 세대 번호로 관리하는 카드·댓글·첨부 요청을 무효화한다.
 onMounted(() => {
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
   void nextTick(() => closeButton.value?.focus())

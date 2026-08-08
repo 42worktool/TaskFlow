@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import LegalFooter from '../components/LegalFooter.vue'
+
+// 로그인·회원가입 폼 내용만 slot으로 받고 배경, 카드 폭, 법적 링크 배치를 공통화한다.
 </script>
 
 <template>

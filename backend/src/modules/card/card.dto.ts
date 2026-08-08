@@ -32,11 +32,9 @@ export function toAttachmentDto(attachment: Attachment) {
   return {
     id: attachment.id,
     card_id: attachment.card_id,
-    // Attachments uploaded through the file-storage flow have a storage_key
-    // and are served through the authenticated download route below. Rows
-    // created under the old {file_url, file_name} JSON-body flow (before file
-    // uploads were stored on disk) have no storage_key; their original
-    // external file_url is preserved as-is so those links keep working.
+    // 현재 파일 저장 흐름의 첨부는 storage_key가 있어 인증 다운로드 경로를 사용한다.
+    // 과거 JSON {file_url, file_name} 방식으로 만든 행은 storage_key가 없으므로
+    // 기존 외부 file_url을 유지해 이전 링크가 깨지지 않게 한다.
     file_url: attachment.storage_key
       ? `/api/cards/attachments/${attachment.id}/download`
       : attachment.file_url,

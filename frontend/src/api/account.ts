@@ -1,3 +1,5 @@
+// 계정 정보와 아바타 변경을 인증 상태에 즉시 반영하는 API 경계다.
+// 서버 응답을 authState에 다시 넣어 새로고침 없이 전역 사용자 UI가 같은 값을 보게 한다.
 import {
   apiRequest,
   authState,

@@ -1,3 +1,4 @@
+// 리스트 CRUD·순서 변경 요청을 파싱해 권한을 처리하는 서비스로 전달한다.
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
 import * as svc from './list.service'

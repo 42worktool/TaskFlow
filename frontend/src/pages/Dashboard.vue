@@ -14,6 +14,8 @@ import type {
 } from '../types'
 import { buildContributionCells, contributionLevel, formatDashboardDate } from '../utils/dashboard'
 
+// 활동 로그를 선택 기간의 잔디, 카드 흐름, 이벤트 분포와 최근 내역으로 해석해 보여준다.
+// WebSocket은 갱신 신호로만 사용하고 집계 수치는 API에서 다시 받아 서로 다른 브라우저의 결과를 맞춘다.
 const props = withDefaults(
   defineProps<{
     workspaceSyncVersion?: number
@@ -148,6 +150,7 @@ function formatGeneratedAt(value: string): string {
 }
 
 function flowPoints(key: 'created' | 'completed' | 'reopened'): string {
+  // 선택 기간의 값을 고정 SVG 좌표로 정규화해 세 흐름을 동일한 축에서 비교한다.
   const days = dashboard.value?.daily_flow ?? []
   if (days.length === 0) return ''
 
@@ -180,6 +183,7 @@ async function loadDashboard(background = false): Promise<void> {
   const id = workspaceId.value
   if (!id) return
   const requestedPeriod = periodDays.value
+  // 워크스페이스나 기간이 바뀐 뒤 도착한 이전 집계는 세대 번호와 요청 조건으로 폐기한다.
   const generation = ++loadGeneration
   if (background && dashboard.value) refreshing.value = true
   else {
@@ -220,6 +224,7 @@ async function loadDashboard(background = false): Promise<void> {
 }
 
 function scheduleRefresh(): void {
+  // 한 작업이 여러 활동 이벤트를 만들 수 있어 짧게 모은 뒤 한 번만 배경 갱신한다.
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
     refreshTimer = null
@@ -252,6 +257,7 @@ watch(
 )
 
 onUnmounted(() => {
+  // 화면 해제 뒤 예약 요청과 실시간 이벤트가 이전 대시보드 상태를 바꾸지 못하게 종료한다.
   loadGeneration += 1
   if (refreshTimer) clearTimeout(refreshTimer)
   removeWorkspaceChangeListener()

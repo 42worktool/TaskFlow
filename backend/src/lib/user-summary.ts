@@ -1,3 +1,4 @@
+// 여러 도메인 응답에 노출할 최소 사용자 필드와 변환 규칙을 한곳에서 정의한다.
 import type { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { uuidSchema } from './validation'

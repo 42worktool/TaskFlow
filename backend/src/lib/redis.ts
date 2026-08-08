@@ -10,6 +10,7 @@ redis.on('error', (error) => {
 
 export async function getRedisClient(): Promise<typeof redis> {
   if (redis.isReady) return redis
+  // 동시에 들어온 최초 요청들이 각각 connect()를 호출하지 않도록 연결 Promise를 공유한다.
   if (!connectPromise) {
     connectPromise = redis
       .connect()

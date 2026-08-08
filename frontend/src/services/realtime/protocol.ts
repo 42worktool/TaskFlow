@@ -1,3 +1,5 @@
+// WebSocket 양방향 메시지 계약과 런타임 파서를 정의한다.
+// JSON과 소켓 이벤트는 타입스크립트 타입을 보장하지 않으므로 UI에 전달하기 전 여기서 검증한다.
 import type {
   DirectMessage,
   Friend,
@@ -29,6 +31,7 @@ const realtimeControlEvents = new Set<string>([
 ])
 
 export function isRealtimeControlEvent(event: string): boolean {
+  // 인증·ACK 같은 제어 이벤트는 애플리케이션 send API가 임의로 발행하지 못하게 구분한다.
   return realtimeControlEvents.has(event)
 }
 
@@ -99,6 +102,7 @@ export interface RealtimeClientRequestResults {
 }
 
 export function parseRealtimeMessage(raw: string): RealtimeMessage | null {
+  // 최상위 envelope만 먼저 검사하고, data는 이벤트별 전용 파서가 이어서 검증한다.
   let value: unknown
   try {
     value = JSON.parse(raw)
@@ -122,6 +126,7 @@ export function parseRealtimeMessage(raw: string): RealtimeMessage | null {
 }
 
 export function isRealtimeEventName(value: unknown): value is string {
+  // domain.action 형식을 강제해 서버 라우팅 키와 사용자 정의 이벤트 이름이 모호해지지 않게 한다.
   return (
     typeof value === 'string' &&
     value.length >= 3 &&
@@ -208,6 +213,7 @@ export function parseFriendUserIdEvent(value: unknown): FriendUserIdEvent | null
 }
 
 export function parseDirectMessage(value: unknown): DirectMessage | null {
+  // 알림 배지 계산에 쓰이는 송·수신자 관계까지 확인해 잘못된 이벤트의 전파를 차단한다.
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<DirectMessage>
   const author = candidate.author
@@ -238,6 +244,7 @@ export function parseDirectMessage(value: unknown): DirectMessage | null {
 }
 
 export function parseWorkspaceChangedEvent(value: unknown): WorkspaceChangedEvent | null {
+  // 전체 보드를 밀어 보내지 않고 변경 종류와 관련 리스트 ID만 받아 부분 재조회할 수 있게 한다.
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<WorkspaceChangedEvent>
   if (
@@ -278,6 +285,7 @@ export function parseWorkspaceMemberPresenceEvent(
 }
 
 export function parseWorkspaceMessage(value: unknown): WorkspaceMessage | null {
+  // card_id가 있으면 채팅 메시지이면서 카드 댓글로 연결되는 메시지 계약을 허용한다.
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<WorkspaceMessage>
   const author = candidate.author

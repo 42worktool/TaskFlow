@@ -16,6 +16,8 @@ import {
 import type { Friend, FriendRequest } from '../types'
 import { resolveFriendRelationship } from '../utils/friendRelationship'
 
+// 친구 목록과 양방향 요청을 관리하며, 검색 결과에도 현재 관계에 맞는 행동을 즉시 제공한다.
+// API 스냅샷과 presence 이벤트의 도착 순서가 뒤집혀도 더 최신 온라인 상태를 유지한다.
 const emit = defineEmits<{
   changed: []
   'open-dm': [friend: Friend]
@@ -53,6 +55,7 @@ const visibleFriendSearchResults = computed(() =>
 )
 
 watch([friendSearchQuery, loading], ([value, isLoading]) => {
+  // 입력마다 요청하지 않고 짧게 지연하며, 버전이 지난 검색 응답은 새 검색 결과를 덮지 못하게 한다.
   const version = ++friendSearchVersion
   if (friendSearchTimer) clearTimeout(friendSearchTimer)
   friendSearchResults.value = []
@@ -100,6 +103,7 @@ function friendFor(userId: string) {
 }
 
 function applyNewerPresence(friend: Friend, presenceAtStart: number): void {
+  // 목록 조회 시작 뒤 도착한 실시간 상태는 조회 응답보다 최신이므로 응답 위에 다시 적용한다.
   const live = livePresence.get(friend.id)
   if (live && live.sequence > presenceAtStart) {
     friend.online = live.online
@@ -176,6 +180,7 @@ function receiveFriendRemoved(value: unknown): void {
 }
 
 function refreshAfterReconnect(): void {
+  // 친구 변경 API와 재연결 조회가 경쟁하면 변경이 끝난 직후 한 번만 다시 읽어 정합성을 맞춘다.
   if (busyAction.value) {
     reloadAfterMutation = true
     return
@@ -296,6 +301,7 @@ function formatDate(value: string): string {
 }
 
 onMounted(() => {
+  // 친구 관련 이벤트는 목록을 부분 갱신하고, 연결 복구 시 놓친 구간만 전체 조회로 보완한다.
   removePresenceListener = realtime.on('friend.presence_changed', receiveFriendPresence)
   removeRequestCreatedListener = realtime.on('friend.request_created', receiveFriendRequestCreated)
   removeRequestAcceptedListener = realtime.on(

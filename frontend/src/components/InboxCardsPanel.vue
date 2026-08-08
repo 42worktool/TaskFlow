@@ -8,6 +8,8 @@ import { InboxAPI } from '../api/inbox'
 import { isExternalCardDropClaimed } from '../services/messenger'
 import type { Card, DraggableChange, List } from '../types'
 
+// 아직 리스트에 배치하지 않은 카드를 보관하고, 보드와의 양방향 드래그 및 카드 상세 편집을 제공한다.
+// 실제 외부 드롭 소유권은 전역 메신저 상태와 맞춰 중복 이동 요청을 방지한다.
 const props = withDefaults(
   defineProps<{
     allowDrag?: boolean
@@ -99,6 +101,7 @@ async function toggleCardCompletion(card: Card) {
 async function handleCardChange(event: DraggableChange<Card>) {
   if (!event.added || busyCardId.value) return
   const card = event.added.element
+  // 툴박스가 이미 드롭을 처리했다면 Sortable이 추가한 화면 항목만 정리하고 API를 다시 부르지 않는다.
   if (isExternalCardDropClaimed(card.id)) {
     cards.value = cards.value.filter((item) => item.id !== card.id)
     emit('drop-settled')
@@ -128,6 +131,7 @@ function startInboxDrag(event: { oldIndex?: number | null }) {
 }
 
 function finishInboxDrag(event: { from?: Element; to?: Element }) {
+  // 출발지와 도착지가 다를 때만 보드 이동으로 보고 상위에서 양쪽 목록을 재동기화한다.
   emit('drag-end', Boolean(event.from && event.to && event.from !== event.to))
 }
 

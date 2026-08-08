@@ -11,6 +11,8 @@ const ROLE_RANK: Readonly<Record<Role, number>> = {
   OWNER: 4,
 }
 
+// 역할 순위를 한 곳에서 정의해 각 도메인이 서로 다른 권한 계층을 구현하지 않게 한다.
+
 type ReadableWorkspace = {
   is_public: boolean
   members: readonly { user_id: string }[]
@@ -35,6 +37,7 @@ export function requireWorkspaceReadAccess<T extends ReadableWorkspace>(
   workspace: T | null,
   userId: string,
 ): { workspace: T; isMember: boolean } {
+  // 공개 워크스페이스는 비회원에게 읽기만 허용하고, 비공개 공간은 활성 멤버만 통과시킨다.
   if (!workspace) throw new NotFoundError()
 
   const isMember = workspace.members.some((member) => member.user_id === userId)
@@ -48,6 +51,7 @@ export async function getWorkspaceRole(
   userId: string,
   client: WorkspacePermissionClient = prisma,
 ): Promise<Role | null> {
+  // soft delete된 멤버십이나 워크스페이스는 권한으로 인정하지 않는다.
   const membership = await client.workspaceMember.findFirst({
     where: {
       workspace_id: workspaceId,

@@ -1,3 +1,4 @@
+// 리스트와 하위 카드·레이블 조회 결과를 보드 초기 렌더링용 응답으로 조립한다.
 import type { Card, CardLabel, Label, List } from '@prisma/client'
 import { toCardDto } from '../card/card.dto'
 

@@ -1,3 +1,4 @@
+// 워크스페이스·멤버십 HTTP 요청을 파싱해 정책을 담당하는 서비스로 전달한다.
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
 import * as svc from './workspace.service'

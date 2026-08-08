@@ -1,3 +1,6 @@
+// 백엔드 API와 WebSocket이 공유하는 프론트 도메인 계약을 한곳에 둔다.
+// WebSocket payload는 protocol 계층에서 런타임 검증하고 HTTP 응답은 현재 타입 단언을
+// 사용하므로, 이 파일은 두 전송 방식과 화면 사이에서 공유하는 정적 타입 기준이다.
 type UUID = string
 type ISODateString = string
 export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER'
@@ -73,7 +76,7 @@ export interface WorkspaceSubscriptionResult {
   online_user_ids: UUID[]
 }
 
-/** Derive a stable color from a workspace id for the card color bar. */
+/** 워크스페이스 ID에서 항상 같은 카드 색상 막대를 선택한다. */
 export function workspaceColor(_wsId: UUID): string {
   const COLORS = ['#2563EB', '#EF4444', '#F59E0B', '#10B981', '#7C3AED', '#0EA5E9']
   let hash = 0
@@ -150,7 +153,7 @@ export interface ListWithCards extends List {
   cards: Card[]
 }
 
-/** Payload shape emitted by vuedraggable's `change` event. */
+/** vuedraggable의 change 이벤트가 전달하는 추가·이동·제거 형태다. */
 export interface DraggableChange<T extends { id: string } = { id: string }> {
   added?: { element: T; newIndex: number }
   moved?: { element: T; oldIndex: number; newIndex: number }
@@ -278,6 +281,7 @@ export interface DashboardRecentActivity {
 }
 
 export interface WorkspaceDashboard {
+  // 한 응답에 동일 기간의 요약·차트·최근 로그를 묶어 위젯 간 기준 시점을 통일한다.
   generated_at: ISODateString
   period_days: DashboardPeriod
   summary: DashboardSummary

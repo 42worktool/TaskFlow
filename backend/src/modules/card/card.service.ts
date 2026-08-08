@@ -1,10 +1,9 @@
 // ============================================================
-// card.service.ts — Card (+ attachments, comments) business logic
+// card.service.ts — 카드, 첨부 파일, 댓글 비즈니스 로직
 //
-// Mirrors workspace.service.ts conventions: Prisma singleton, soft delete
-// via deleted_at, role checks via the shared workspace helper. Cards with
-// list_id === null are personal inbox cards; access to those is by
-// ownership (user_id), not workspace role.
+// 워크스페이스 서비스와 같은 공용 Prisma, soft delete, 역할 검사를 사용한다.
+// list_id가 null인 카드는 개인 인박스 카드이므로 워크스페이스 역할이 아니라
+// user_id 소유권으로 접근을 판단한다. 이 두 상태의 전환이 카드 이동의 핵심이다.
 // ============================================================
 import path from 'node:path'
 import { prisma } from '../../db'
@@ -18,9 +17,10 @@ import { getWorkspaceRole, requireWorkspaceRole } from '../../lib/workspace-perm
 import { toAttachmentDto, toCardDetailDto, toCardDto, toCommentDto } from './card.dto'
 import { publishWorkspaceChange } from '../workspace/workspace.realtime'
 
-// ─── DTOs ─────────────────────────────────────────────────────
+// ─── 상세 응답 조립
 
 async function buildCardDetail(card: Card) {
+  // 독립적인 레이블, 첨부 파일, 댓글은 병렬 조회해 상세 응답의 대기 시간을 줄인다.
   const [labels, attachments, comments] = await Promise.all([
     prisma.cardLabel.findMany({
       where: {
@@ -51,7 +51,7 @@ async function buildCardDetail(card: Card) {
   return toCardDetailDto(card, labels, attachments, comments)
 }
 
-// ─── Access helpers ───────────────────────────────────────────
+// ─── 접근 권한 도우미
 
 async function getCardOrThrow(cardId: string): Promise<Card> {
   const card = await prisma.card.findFirst({ where: { id: cardId, deleted_at: null } })
@@ -69,7 +69,7 @@ async function getListOrThrow(listId: string, client: CardAccessClient = prisma)
   return list
 }
 
-/** Write access: inbox card owner, or MEMBER+ in the card's workspace. */
+/** 쓰기는 인박스 카드 소유자 또는 카드가 속한 워크스페이스의 MEMBER 이상에게 허용한다. */
 type CardAccess = Pick<Card, 'list_id' | 'user_id' | 'is_completed' | 'start_at' | 'deadline'>
 
 interface WorkspaceCardLocation {
@@ -78,6 +78,7 @@ interface WorkspaceCardLocation {
 }
 
 async function lockCardOrThrow(tx: Prisma.TransactionClient, cardId: string): Promise<CardAccess> {
+  // 수정/이동 전 행을 잠가 동시 요청이 같은 이전 위치와 상태를 기준으로 쓰지 않게 한다.
   const cards = await tx.$queryRaw<CardAccess[]>`
     SELECT "list_id", "user_id", "is_completed", "start_at", "deadline"
     FROM "Cards"
@@ -104,6 +105,8 @@ async function requireCardRole(
   minRole?: Role,
   client: CardAccessClient = prisma,
 ): Promise<Role | null> {
+  // 개인 인박스와 워크스페이스 카드의 권한 모델을 이 경계에서 분기해
+  // 나머지 카드 기능이 동일한 검사 함수를 재사용하게 한다.
   if (card.list_id === null) {
     if (card.user_id !== userId) throw new ForbiddenError()
     return null
@@ -136,6 +139,7 @@ function publishCardChange(input: {
   action: 'created' | 'updated' | 'deleted' | 'moved'
   listIds?: string[]
 }): void {
+  // 인박스 카드는 개인 화면만 갱신하면 되므로 워크스페이스 채널 이벤트를 발행하지 않는다.
   if (!input.location) return
   publishWorkspaceChange({
     workspace_id: input.location.workspaceId,
@@ -147,7 +151,7 @@ function publishCardChange(input: {
   })
 }
 
-// ─── Cards ────────────────────────────────────────────────────
+// ─── 카드
 
 export async function listInboxCards(input: { userId: string }) {
   const cards = await prisma.card.findMany({
@@ -172,6 +176,7 @@ export async function createCard(input: {
   const list = await getListOrThrow(input.listId)
   await requireWorkspaceRole(list.workspace_id, input.userId, 'MEMBER')
 
+  // 리스트 잠금 아래에서 마지막 순번 조회와 생성을 묶어 동시 생성의 sequence 충돌을 막는다.
   const created = await prisma.$transaction(async (tx) => {
     const lockedList = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT "id"
@@ -283,6 +288,7 @@ export async function reorderCard(input: {
   beforeCardId?: string | null
   afterCardId?: string | null
 }) {
+  // 이웃 카드 ID로 중간 sequence를 계산해 전체 카드의 순번을 다시 쓰지 않는다.
   const result = await prisma.$transaction(async (tx) => {
     const card = await lockCardOrThrow(tx, input.cardId)
     await requireCardWrite(card, input.userId, tx)
@@ -327,6 +333,7 @@ export async function moveCard(input: {
   afterCardId?: string | null
 }) {
   const result = await prisma.$transaction(async (tx) => {
+    // 목표 리스트와 카드를 잠근 상태에서 권한, 워크스페이스 경계, 새 순번을 검증한다.
     const lockedTarget = await tx.$queryRaw<Array<{ id: string; workspace_id: string }>>`
       SELECT "id", "workspace_id"
       FROM "Lists"
@@ -343,6 +350,7 @@ export async function moveCard(input: {
     let sourceListId: string | null = null
     if (card.list_id !== null) {
       const sourceList = await getListOrThrow(card.list_id, tx)
+      // 카드 레이블과 권한 범위가 워크스페이스 기준이므로 공간 간 직접 이동은 금지한다.
       if (sourceList.workspace_id !== targetList.workspace_id) {
         throw new BadRequestError('Cards cannot be moved between workspaces')
       }
@@ -351,6 +359,7 @@ export async function moveCard(input: {
     await requireWorkspaceRole(targetList.workspace_id, input.userId, 'MEMBER', tx)
 
     if (card.list_id === null) {
+      // 인박스에서 복원할 때 과거 워크스페이스 레이블 관계가 남지 않게 방어적으로 정리한다.
       const detachedRelation = softDeletedBy(input.userId)
       await tx.cardLabel.updateMany({
         where: { card_id: input.cardId, deleted_at: null },
@@ -412,6 +421,7 @@ export async function updateCardDates(input: {
     await requireCardWrite(card, input.userId, tx)
     const location = await workspaceLocationForCard(card, tx)
 
+    // 부분 수정에서도 최종 시작/종료 값을 조합한 뒤 기간 순서를 검증한다.
     const newStart = 'startAt' in input ? input.startAt : (card.start_at?.toISOString() ?? null)
     const newEnd = 'deadline' in input ? input.deadline : (card.deadline?.toISOString() ?? null)
     if (newStart && newEnd && new Date(newStart) > new Date(newEnd)) {
@@ -468,6 +478,7 @@ export async function updateCardCompletion(input: {
     }
   })
 
+  // 실제 상태가 바뀐 경우에만 이벤트를 보내 불필요한 보드 재조회를 줄인다.
   if (result.changed) {
     publishCardChange({
       userId: input.userId,
@@ -486,6 +497,7 @@ export async function moveCardToInbox(input: { userId: string; cardId: string })
     await requireCardWrite(card, input.userId, tx)
     const location = await workspaceLocationForCard(card, tx)
 
+    // 워크스페이스 범위 레이블은 개인 인박스에 적용할 수 없어 이동과 함께 분리한다.
     const detachedRelation = softDeletedBy(input.userId)
     await tx.cardLabel.updateMany({
       where: { card_id: input.cardId, deleted_at: null },
@@ -515,7 +527,7 @@ export async function moveCardToInbox(input: { userId: string; cardId: string })
   return result.card
 }
 
-// ─── Attachments ──────────────────────────────────────────────
+// ─── 첨부 파일
 
 export async function addAttachment(input: {
   userId: string
@@ -555,6 +567,7 @@ export async function getAttachmentFile(input: {
   })
   if (!attachment || !attachment.storage_key) throw new NotFoundError()
   const card = await getCardOrThrow(attachment.card_id)
+  // 실제 파일 경로를 반환하기 전에 카드 접근 권한을 확인해 정적 파일 우회를 막는다.
   await requireCardRole(card, input.userId)
 
   return {
@@ -576,6 +589,7 @@ export async function removeAttachment(input: {
   await requireCardWrite(card, input.userId)
   const location = await workspaceLocationForCard(card)
 
+  // DB에서 먼저 숨긴 뒤 파일을 지워 파일 삭제 실패가 접근 상태를 되돌리지 않게 한다.
   await prisma.attachment.update({
     where: { id: input.attachmentId },
     data: softDeletedBy(input.userId),
@@ -592,7 +606,7 @@ export async function removeAttachment(input: {
   })
 }
 
-// ─── Comments ─────────────────────────────────────────────────
+// ─── 댓글
 
 function commentAlreadyDeletedError(): AppError {
   return new AppError('COMMENT_ALREADY_DELETED', 409, '이 댓글은 삭제되었습니다.')
@@ -635,6 +649,7 @@ export async function updateComment(input: { userId: string; commentId: string; 
   await requireCardRole(card, input.userId)
   const location = await workspaceLocationForCard(card)
 
+  // 사전 조회 뒤 삭제될 수 있어 updateMany의 deleted_at 조건과 count로 경쟁을 다시 확인한다.
   const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.comment.updateMany({
       where: {
@@ -672,6 +687,7 @@ export async function deleteComment(input: { userId: string; commentId: string }
   if (!comment) throw new NotFoundError()
   const card = await getCardOrThrow(comment.card_id)
 
+  // 작성자는 자기 댓글을, 워크스페이스 ADMIN은 다른 사용자의 댓글까지 관리할 수 있다.
   if (comment.user_id === input.userId) {
     await requireCardRole(card, input.userId)
   } else {

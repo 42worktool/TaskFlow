@@ -12,6 +12,9 @@ type CardWithList = Card & {
   list: { id: string; workspace_id: string } | null
 }
 
+// 레이블은 워크스페이스 범위의 자원이므로 생성/수정과 카드 연결 모두
+// 카드와 레이블이 같은 워크스페이스에 있는지 확인한다.
+
 async function getLabelOrThrow(labelId: string, client: LabelClient = prisma): Promise<Label> {
   const label = await client.label.findFirst({
     where: { id: labelId, deleted_at: null },
@@ -108,6 +111,7 @@ export async function updateLabel(input: {
 export async function deleteLabel(input: { userId: string; labelId: string }): Promise<void> {
   const label = await getLabelOrThrow(input.labelId)
   await requireWorkspaceRole(label.workspace_id, input.userId, 'MEMBER')
+  // 레이블과 연결 관계를 함께 soft delete해 카드 응답에 끊어진 관계가 노출되지 않게 한다.
   await prisma.$transaction(async (tx) => {
     await tx.label.update({
       where: { id: label.id },
@@ -148,6 +152,7 @@ export async function addCardLabel(input: { userId: string; cardId: string; labe
   const workspaceId = await assertSameWorkspace(card, label)
   await requireWorkspaceRole(workspaceId, input.userId, 'MEMBER')
 
+  // 복합 PK 관계는 과거 삭제 행이 있으면 새로 만들지 않고 복구한다.
   await prisma.$transaction(async (tx) => {
     const existing = await tx.cardLabel.findUnique({
       where: { label_id_card_id: { label_id: label.id, card_id: card.id } },

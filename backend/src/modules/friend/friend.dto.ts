@@ -1,3 +1,4 @@
+// 방향 없는 친구 관계의 상대 사용자를 골라 공개 친구·요청 응답으로 변환한다.
 import type { FriendRequest, Friendship } from '@prisma/client'
 import { z } from 'zod'
 import { userSummarySelect, type SelectedUserSummary } from '../../lib/user-summary'

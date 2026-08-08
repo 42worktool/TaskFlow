@@ -9,6 +9,8 @@ import { updateAccountSchema } from './auth.validation'
 const OAUTH_STATE_COOKIE = 'ft_oauth_state'
 const REFRESH_TOKEN_COOKIE = 'ft_refresh_token'
 
+// refresh token은 JavaScript에서 읽지 못하는 쿠키에만 두고,
+// 짧게 유지되는 access token만 응답 본문으로 전달한다.
 const oauthCookieBaseOptions: CookieOptions = {
   httpOnly: true,
   secure: config.cookieSecure,
@@ -50,6 +52,7 @@ async function sendAuthenticatedUser(
 ): Promise<void> {
   const session = await authService.createSession(user.id)
   res.cookie(REFRESH_TOKEN_COOKIE, session.refreshToken, refreshCookieOptions)
+  // 토큰이 포함된 인증 응답을 브라우저나 중간 프록시가 캐시하지 않게 한다.
   res.set('Cache-Control', 'no-store')
   res.status(statusCode).json({
     user,
@@ -85,6 +88,7 @@ export const beginGoogle: RequestHandler = async (req, res) => {
 }
 
 export const googleCallback: RequestHandler = async (req, res) => {
+  // OAuth 콜백은 브라우저 리디렉션 흐름이므로 JSON 오류 대신 안전한 로그인 URL로 돌려보낸다.
   const providerError = queryString(req.query.error)
   if (providerError) {
     res.clearCookie(OAUTH_STATE_COOKIE, oauthCookieBaseOptions)
@@ -139,6 +143,7 @@ export const refresh: RequestHandler = async (req, res, next) => {
       expires_in: config.accessTokenTtlSeconds,
     })
   } catch (error) {
+    // 회전에 실패한 쿠키를 남겨 무한 재시도하지 않도록 브라우저에서도 즉시 제거한다.
     res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieBaseOptions)
     next(error)
   }
@@ -150,6 +155,7 @@ export const logout: RequestHandler = async (req, res) => {
     try {
       await authService.revokeSession(token)
     } catch (error) {
+      // Redis 장애가 있더라도 클라이언트 쿠키 삭제는 완료해 사용자가 로그아웃할 수 있게 한다.
       console.error(
         '[auth] refresh session revoke failed',
         error instanceof Error ? error.message : error,

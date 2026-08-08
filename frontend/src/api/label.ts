@@ -1,3 +1,4 @@
+// 워크스페이스 레이블의 생명주기와 카드 연결·해제를 표현하는 API 모듈이다.
 import type { Label } from '../types'
 import { apiRequest } from '../services/auth'
 

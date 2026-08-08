@@ -1,3 +1,4 @@
+// 리스트 이름과 이웃 ID 기반 재정렬 입력을 서비스 진입 전에 검증한다.
 import { z } from 'zod'
 import { uuidSchema } from '../../lib/validation'
 

@@ -3,6 +3,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, useId } from 'vue'
 import type { Workspace, WorkspaceMember } from '../types'
 import ProfileLink from './ProfileLink.vue'
 
+// 상단바에서 팀원과 실시간 온라인 수를 빠르게 확인하고, 권한이 있으면 관리 모달로 연결한다.
+// 미리보기는 온라인 사용자를 먼저 배치해 제한된 공간에서도 현재 접속자를 우선 보여준다.
 const props = defineProps<{
   members: Workspace['members']
   onlineUserIds: ReadonlySet<string>
@@ -46,6 +48,7 @@ function memberInitial(member: WorkspaceMember): string {
 }
 
 function memberColor(userId: string): string {
+  // 사진이 없는 사용자는 ID 기반의 안정적인 색을 사용해 렌더링마다 아바타 색이 바뀌지 않게 한다.
   const colors = ['#0c66e4', '#6554c0', '#0b875b', '#b65c02', '#ae2e24', '#227d9b']
   let hash = 0
 

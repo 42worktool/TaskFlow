@@ -22,6 +22,8 @@ interface CardOption extends Card {
   listName: string
 }
 
+// 워크스페이스 메시지를 실시간으로 합치고, 보드에서 놓은 카드를 메시지와 카드 댓글에 함께 연결한다.
+// 브라우저별 drag 이벤트 차이를 보완해 채팅 패널 어느 부분에 놓아도 같은 첨부 흐름으로 수렴시킨다.
 const props = withDefaults(
   defineProps<{
     workspaceId: string
@@ -62,6 +64,7 @@ const cardTitles = computed(() => new Map(cards.value.map((card) => [card.id, ca
 const acceptsCardDrop = computed(() => getBoardCardDropId(messengerState.cardDrag) !== null)
 
 function mergeMessages(incoming: readonly WorkspaceMessage[]): void {
+  // API 응답과 WebSocket 이벤트가 겹쳐도 ID로 중복을 제거하고 최근 100개만 유지한다.
   const byId = new Map(messages.value.map((message) => [message.id, message]))
   incoming.forEach((message) => byId.set(message.id, message))
   messages.value = [...byId.values()]
@@ -81,6 +84,7 @@ async function loadMessages(
   if (retryTimer) clearTimeout(retryTimer)
   retryTimer = null
   const workspaceId = props.workspaceId
+  // 대화방을 전환한 뒤 늦게 도착한 이전 응답은 세대 번호로 무시한다.
   const generation = ++loadGeneration
   if (!workspaceId) return
 
@@ -135,9 +139,8 @@ async function loadCards(): Promise<CardOption[] | null> {
 async function sendMessage(): Promise<void> {
   const workspaceId = props.workspaceId
   const nextContent = content.value.trim()
-  // Keep the validated drop/picker selection even if a background card
-  // refresh is racing with the submit. The server verifies workspace
-  // ownership and writes the message + card comment atomically.
+  // 배경 카드 갱신과 전송이 겹쳐도 이미 검증한 선택을 보존한다.
+  // 서버가 워크스페이스 소속을 재검증하고 메시지와 카드 댓글을 원자적으로 기록한다.
   const cardId = selectedCardId.value
   if (!workspaceId || !nextContent || sending.value) return
 
@@ -164,6 +167,7 @@ async function sendMessage(): Promise<void> {
   }
 }
 
+// 한글 조합 중 Enter와 실제 전송 Enter를 구분하고, 조합 완료 값은 다음 틱에서 읽는다.
 const composerSubmitter = createComposerEnterSubmitter(
   () => {
     void sendMessage()
@@ -224,6 +228,7 @@ function handleCardDrop(event: DragEvent): void {
 async function attachCard(cardId: string): Promise<void> {
   const workspaceId = props.workspaceId
   cardLinkError.value = ''
+  // 캐시에 없으면 최신 목록을 다시 읽어 삭제되었거나 다른 워크스페이스인 카드를 연결하지 않는다.
   const cachedCard = findDroppedCard(cards.value, cardId)
   if (cachedCard) {
     selectedCardId.value = cachedCard.id
@@ -272,6 +277,7 @@ function isPointInsidePanel(clientX: number, clientY: number): boolean {
 }
 
 function handleFallbackCardPointerMove(event: MouseEvent | PointerEvent): void {
+  // Sortable fallback 모드는 native drop을 내지 않을 수 있어 전역 포인터 좌표로 패널 진입을 보완한다.
   const cardId = getBoardCardDropId(messengerState.cardDrag)
   if (!cardId) return
   const inside = isPointInsidePanel(event.clientX, event.clientY)
@@ -316,6 +322,7 @@ const removeMessageListener = realtime.on('workspace.message_created', (value) =
   mergeMessages([message])
 })
 
+// 카드 제목과 선택 가능 여부는 변경 이벤트의 식별자만으로 알 수 없으므로 카드 목록을 다시 조회한다.
 const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) => {
   const event = parseWorkspaceChangedEvent(value)
   if (
@@ -398,6 +405,7 @@ onMounted(() => {
   window.addEventListener('mouseup', handleFallbackCardPointerUp, true)
 })
 
+// 패널이 없어질 때 재시도와 실시간/포인터 리스너를 해제해 숨은 대화방이 상태를 갱신하지 않게 한다.
 onUnmounted(() => {
   loadGeneration += 1
   cardLoadGeneration += 1

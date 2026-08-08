@@ -1,3 +1,4 @@
+// 레이블과 카드 연결 요청을 검증된 서비스 입력으로 바꾸는 HTTP 어댑터다.
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
 import * as svc from './label.service'

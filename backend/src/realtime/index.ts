@@ -11,6 +11,7 @@ export type {
 } from './server'
 
 export const realtime = new RealtimeServer({
+  // HTTP 인증과 같은 access token 검증기를 주입해 두 경로의 사용자 판정 기준을 통일한다.
   ...config.websocket,
   allowedOrigin: config.appOrigin,
   authenticateAccessToken: verifyAccessToken,

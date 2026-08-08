@@ -1,5 +1,5 @@
 // ============================================================
-// card.router.ts — mount card, member, and attachment routes
+// card.router.ts — 카드, 레이블, 첨부 파일 라우트 연결
 // ============================================================
 import { Router } from 'express'
 import * as ctrl from './card.controller'
@@ -16,7 +16,7 @@ cardRouter.param('attachment_id', uuidParam)
 cardRouter.param('card_id', uuidParam)
 cardRouter.param('label_id', uuidParam)
 
-// More specific routes before the wildcard /:card_id
+// /:card_id 와일드카드가 구체적인 /inbox 경로를 가로채지 않도록 먼저 등록한다.
 cardRouter.delete('/attachments/:attachment_id', ctrl.removeAttachment)
 cardRouter.get('/attachments/:attachment_id/download', ctrl.downloadAttachment)
 

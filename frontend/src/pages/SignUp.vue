@@ -6,6 +6,7 @@ import AppLogo from '../components/AppLogo.vue'
 import AuthInput from '../components/AuthInput.vue'
 import { signupWithPassword } from '../services/auth'
 
+// 가입 입력을 클라이언트에서 먼저 확인한 뒤 계정을 만들고 원래 요청한 내부 화면으로 이동한다.
 const route = useRoute()
 const router = useRouter()
 const name = ref('')
@@ -16,6 +17,8 @@ const passwordError = ref('')
 const formError = ref('')
 const submitting = ref(false)
 const redirectTarget = computed(() =>
+  // Vue Router에 넘길 상대 경로 후보만 유지하고 나머지는 기본 화면으로 대체한다.
+  // 이 검사는 사용자 흐름 정리용이며 서버 측 입력 검증을 대신하지 않는다.
   typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
     ? route.query.redirect
     : '/workspaces',

@@ -1,3 +1,4 @@
+// 카드의 시작일·마감일을 월간 달력의 주별 막대와 겹침 lane으로 변환한다.
 import type { Card } from '../types'
 
 function localDay(value: string | Date): number | null {
@@ -44,8 +45,8 @@ function cardDateRange(card: Card): CardDateRange | null {
 }
 
 /**
- * Calendar dates follow the browser's local day, matching the date shown on cards.
- * A single start/deadline is a one-day event; two dates form an inclusive range.
+ * 카드 화면과 같은 날짜가 보이도록 브라우저의 로컬 날짜를 기준으로 판단한다.
+ * 시작일이나 마감일 하나만 있으면 하루 일정, 둘 다 있으면 양 끝을 포함한 기간이다.
  */
 export function cardOccursOnDate(card: Card, date: Date): boolean {
   const day = localDay(date)
@@ -55,8 +56,8 @@ export function cardOccursOnDate(card: Card, date: Date): boolean {
 }
 
 /**
- * Builds month rows and lays overlapping card ranges into separate weekly lanes.
- * Columns are zero-based and inclusive so the view can map them directly to CSS grid.
+ * 월을 주 행으로 나누고 겹치는 카드 기간은 서로 다른 lane에 배치한다.
+ * 열 번호는 0부터 시작하며 양 끝을 포함해 CSS grid 위치로 바로 바꿀 수 있다.
  */
 export function buildCalendarWeeks(
   year: number,
@@ -110,6 +111,8 @@ export function buildCalendarWeeks(
           left.card.id.localeCompare(right.card.id),
       )
 
+    // 배열 앞쪽에서 처음 사용 가능한 lane을 재사용하는 greedy 배치로,
+    // 기존 lane 순서를 안정적으로 유지하면서 막대가 겹치지 않게 한다.
     const laneEnds: number[] = []
     for (const segment of candidates) {
       let lane = laneEnds.findIndex((endColumn) => endColumn < segment.startColumn)

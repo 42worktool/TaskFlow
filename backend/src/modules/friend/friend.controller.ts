@@ -1,3 +1,4 @@
+// 친구 요청·수락·삭제 HTTP 요청을 인증 사용자 기준의 서비스 호출로 연결한다.
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
 import * as friendService from './friend.service'

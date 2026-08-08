@@ -1,3 +1,4 @@
+// 공개 화면과 인증 화면, 워크스페이스 하위 화면의 URL 구조와 접근 가드를 정의한다.
 import { createRouter, createWebHistory } from 'vue-router'
 
 import SignIn from '../pages/SignIn.vue'
@@ -43,6 +44,7 @@ const router = createRouter({
         { path: 'dashboard', component: Dashboard },
         {
           path: 'chat',
+          // 채팅은 독립 콘텐츠가 아니라 보드 위 메신저이므로 기존 URL은 보드+패널 상태로 보정한다.
           redirect: (to) => ({
             path: `/workspaces/${String(to.params.workspaceId)}/board`,
             query: { messenger: 'chat' },
@@ -54,9 +56,11 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  // refresh cookie 확인이 끝나기 전에 리다이렉트하면 로그인 사용자가 잠깐 튕기므로 먼저 초기화한다.
   await initializeAuth()
 
   if (to.meta.requiresAuth && !authState.user) {
+    // 로그인 뒤 원래 작업으로 돌아갈 수 있도록 전체 경로를 redirect query에 보존한다.
     return {
       path: '/signin',
       query: { redirect: to.fullPath },

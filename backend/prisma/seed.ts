@@ -1,15 +1,15 @@
-// ============================================================
-// seed.ts — development fixtures
-//   Run: npm run db:seed (after migrations)
-//   Fixed IDs and upserts keep repeated runs deterministic.
-// ============================================================
+// 개발 화면을 재현하는 고정 fixture를 migration 이후 구성한다.
+// 고정 ID와 upsert를 사용해 반복 실행해도 같은 관계와 대시보드 상태를 만든다.
 import { Prisma, PrismaClient } from '@prisma/client'
 import { hashPassword } from '../src/modules/auth/auth.utils'
 
+// 운영 DB에 예제 계정이 섞이는 사고를 막기 위해 환경과 명시적 허용값을 모두 확인한다.
 if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DB_SEED !== 'true') {
   throw new Error('Database seed is allowed only in development')
 }
 
+// seed 실행에 꼭 필요한 환경 변수를 한곳에서 검증해 중간 단계에서 일부 데이터만
+// 작성된 뒤 실패하는 상황을 피한다.
 function required(name: string): string {
   const value = process.env[name]?.trim()
   if (!value) throw new Error(`${name} is required`)
@@ -20,6 +20,8 @@ const DEV_SEED_EMAIL = required('DEV_SEED_EMAIL')
 const DEV_SEED_PASSWORD = required('DEV_SEED_PASSWORD')
 const prisma = new PrismaClient()
 
+// 관계형 fixture는 여러 테이블에서 같은 대상을 참조하므로 UUID를 고정한다.
+// 고정 ID 덕분에 upsert가 기존 행을 정확히 찾아 반복 실행 결과가 달라지지 않는다.
 const ids = {
   users: {
     owner: '00000000-0000-4000-8000-000000000001',
@@ -85,6 +87,8 @@ export const DEV_WORKSPACE_ID = ids.workspaces.product
 
 const fixtureWorkspaceIds = Object.values(ids.workspaces)
 
+// 대시보드와 캘린더가 실행 날짜를 기준으로 항상 의미 있는 기간을 보여주도록
+// 절대 날짜 대신 오늘로부터의 UTC 오프셋을 만든다.
 function dateFromNow(days: number, hour = 9): Date {
   const date = new Date()
   date.setUTCHours(hour, 0, 0, 0)
@@ -92,6 +96,8 @@ function dateFromNow(days: number, hour = 9): Date {
   return date
 }
 
+// 업무 테이블이 공유하는 감사 컬럼을 동일하게 채워 fixture도 실제 서비스 데이터와
+// 같은 soft-delete 및 활동 로그 제약조건을 통과하게 한다.
 function audit(userId: string) {
   return {
     created_by: userId,
@@ -101,11 +107,14 @@ function audit(userId: string) {
   }
 }
 
+// 사용자 → 워크스페이스 → 멤버십 → 보드 데이터 순서로 부모 행을 먼저 만든다.
+// 전체 과정을 한 트랜잭션으로 묶어 어느 단계든 실패하면 부분 fixture를 남기지 않는다.
 async function main() {
   const passwordHash = await hashPassword(DEV_SEED_PASSWORD)
 
   await prisma.$transaction(
     async (tx) => {
+      // 로그인과 역할별 화면을 바로 확인할 수 있도록 역할별 고정 계정을 구성한다.
       const users = [
         { id: ids.users.owner, email: DEV_SEED_EMAIL, name: 'Dev Owner' },
         { id: ids.users.admin, email: 'alex.admin@local.test', name: 'Alex 관리자' },
@@ -135,6 +144,7 @@ async function main() {
         })
       }
 
+      // 비공개 팀 공간과 공개 참여 공간을 함께 만들어 접근 정책 두 가지를 재현한다.
       const workspaces = [
         {
           id: ids.workspaces.product,
@@ -169,6 +179,7 @@ async function main() {
         })
       }
 
+      // OWNER부터 VIEWER까지 같은 데이터에서 권한별 동작을 비교할 수 있게 연결한다.
       const memberships = [
         [ids.workspaces.product, ids.users.owner, 'OWNER'],
         [ids.workspaces.product, ids.users.admin, 'ADMIN'],
@@ -197,6 +208,7 @@ async function main() {
         })
       }
 
+      // 정렬 간격을 넉넉히 둬 실제 fractional ordering 동작을 시험할 수 있게 한다.
       const lists = [
         [ids.lists.backlog, ids.workspaces.product, 'Backlog / 아이디어', 1024],
         [ids.lists.todo, ids.workspaces.product, 'To Do', 2048],
@@ -229,6 +241,7 @@ async function main() {
         })
       }
 
+      // 일정, 완료 여부, 인박스 여부가 다른 카드를 구성해 보드·캘린더·대시보드를 채운다.
       const cards = [
         {
           id: ids.cards.research,
@@ -577,6 +590,7 @@ async function main() {
         })
       }
 
+      // 워크스페이스마다 독립된 라벨 집합을 만들어 라벨 범위 제한을 재현한다.
       const labels = [
         [ids.labels.urgent, ids.workspaces.product, '긴급 / Urgent', '#ef4444'],
         [ids.labels.bug, ids.workspaces.product, 'Bug', '#f97316'],
@@ -610,6 +624,7 @@ async function main() {
         })
       }
 
+      // 카드와 같은 워크스페이스의 라벨만 연결해 실제 서비스의 범위 제약을 지킨다.
       const cardLabels = [
         [ids.cards.onboarding, ids.labels.urgent],
         [ids.cards.onboarding, ids.labels.design],
@@ -644,6 +659,7 @@ async function main() {
         })
       }
 
+      // 실제 파일을 만들지 않고 메타데이터만 넣어 첨부 UI의 표시 상태를 재현한다.
       const attachments = [
         [
           '88888888-8888-4888-8888-000000000001',
@@ -683,6 +699,7 @@ async function main() {
         })
       }
 
+      // 서로 다른 작성자의 댓글을 넣어 카드 상세와 프로필 연결을 확인한다.
       const comments = [
         [
           'aaaaaaaa-aaaa-4aaa-8aaa-000000000001',
@@ -780,6 +797,7 @@ async function main() {
         })
       }
 
+      // 일반 메시지와 카드 연결 메시지를 함께 구성해 메신저-카드 댓글 흐름을 보여준다.
       const workspaceMessages = [
         [
           'bbbbbbbb-bbbb-4bbb-8bbb-000000000001',
@@ -904,6 +922,7 @@ async function main() {
         })
       }
 
+      // 수락된 친구와 대기 요청을 분리해 친구 목록과 요청함 양쪽 상태를 만든다.
       const friendships = [
         [ids.users.owner, ids.users.admin, -40],
         [ids.users.owner, ids.users.member, -18],
@@ -921,6 +940,7 @@ async function main() {
         })
       }
 
+      // 아직 수락되지 않은 요청은 Friendship이 아니라 FriendRequest에만 남긴다.
       const friendRequests = [
         [ids.users.owner, ids.users.viewer, ids.users.viewer, -2],
         [ids.users.owner, ids.users.guest, ids.users.owner, -1],
@@ -939,6 +959,7 @@ async function main() {
         })
       }
 
+      // 친구 관계가 있는 사용자 사이에만 DM 예시를 넣어 서비스 제약과 맞춘다.
       const directMessages = [
         [
           'cccccccc-cccc-4ccc-8ccc-000000000001',
@@ -1010,6 +1031,7 @@ async function main() {
         })
       }
 
+      // 헬퍼로 각 객체가 Prisma의 ActivityLog 입력 계약을 만족하는지 컴파일 시점에 확인한다.
       const activity = (data: Prisma.ActivityLogCreateManyInput) => data
       const activityLogs = [
         activity({
@@ -1234,6 +1256,8 @@ async function main() {
         }),
       ]
 
+      // 위 upsert 과정에서 DB 트리거가 만든 실행 시점 로그를 제거한 뒤 고정 로그로 교체한다.
+      // 그래야 seed를 반복해도 대시보드 활동량과 날짜가 누적되지 않고 항상 같은 결과를 낸다.
       await tx.activityLog.deleteMany({
         where: { workspace_id: { in: fixtureWorkspaceIds } },
       })

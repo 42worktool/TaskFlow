@@ -1,3 +1,4 @@
+// 메일 본문 생성과 HTML 이스케이프를 발송 계층에서 분리해 템플릿 출력을 안전하게 만든다.
 import type { MailOptions } from './mailer'
 
 type TemplateMailOptions = Omit<MailOptions, 'to'>

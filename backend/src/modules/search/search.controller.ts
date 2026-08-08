@@ -1,3 +1,4 @@
+// 검색 쿼리 문자열을 정규화한 서비스 입력으로 변환하고 페이지 응답을 전달한다.
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
 import { searchQuerySchema } from './search.validation'

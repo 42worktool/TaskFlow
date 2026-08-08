@@ -1,3 +1,4 @@
+// 계정 수정 입력을 HTTP 경계에서 검증하고 외부 프로필 URL을 일관된 형태로 정규화한다.
 import { z } from 'zod'
 
 const linkedInUrlSchema = z

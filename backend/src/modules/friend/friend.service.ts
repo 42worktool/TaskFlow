@@ -37,6 +37,9 @@ class FriendRequestNotFoundError extends AppError {
     super('FRIEND_REQUEST_NOT_FOUND', 404, 'friend request not found')
   }
 }
+
+// DB가 친구/요청의 최종 상태를 보관하고, 실시간 이벤트는 커밋된 결과를
+// 상대 사용자의 모든 연결에 알려 화면을 빠르게 동기화하는 보조 수단이다.
 function publishFriendRequestCreated(
   recipientUserId: string,
   request: FriendRequestWithUsers,
@@ -131,6 +134,8 @@ export async function listFriendRequests(input: { userId: string }) {
 
 async function createFriendRequest(userId: string, targetUserId: string) {
   const pair = canonicalFriendPair(userId, targetUserId)
+  // 요청 확인과 생성을 한 트랜잭션에서 처리한다. 반대 방향 요청이 이미 있으면
+  // 덮어쓰지 않고 수락 흐름을 사용하도록 별도 충돌로 알려준다.
   const outcome = await prisma.$transaction(async (tx) => {
     const friendship = await tx.friendship.findUnique({
       where: { user_low_id_user_high_id: pair },
@@ -148,6 +153,8 @@ async function createFriendRequest(userId: string, targetUserId: string) {
       include: friendRequestInclude,
     })
 
+    // 요청 upsert와 친구 수락이 경쟁했을 수 있어 친구 관계를 다시 확인하고
+    // 이미 수락됐다면 남은 요청 행을 정리한다.
     const acceptedDuringRequest = await tx.friendship.findUnique({
       where: { user_low_id_user_high_id: pair },
       select: { user_low_id: true },
@@ -193,6 +200,8 @@ export async function sendFriendRequestToUser(input: { userId: string; targetUse
 
 export async function acceptFriendRequest(input: { userId: string; requesterUserId: string }) {
   const pair = canonicalFriendPair(input.userId, input.requesterUserId)
+  // 자신에게 온 요청 삭제와 친구 관계 생성을 원자적으로 묶어
+  // 존재하지 않는 요청을 임의로 수락하거나 반쪽 상태가 남지 않게 한다.
   const friendship = await prisma.$transaction(async (tx) => {
     const deleted = await tx.friendRequest.deleteMany({
       where: {

@@ -1,5 +1,5 @@
 // ============================================================
-// comment.router.ts — mount top-level comment routes
+// comment.router.ts — 최상위 댓글 라우트 연결
 // ============================================================
 import { Router } from 'express'
 import * as ctrl from './card.controller'

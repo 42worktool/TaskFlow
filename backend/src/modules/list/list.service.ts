@@ -1,9 +1,8 @@
 // ============================================================
-// list.service.ts — List CRUD business logic
+// list.service.ts — 보드 리스트 CRUD와 순서 관리
 //
-// Lists belong directly to a Workspace (Workspace *is* the board).
-// Mirrors workspace.service.ts conventions: Prisma singleton,
-// soft delete via deleted_at, role checks via the shared workspace helper.
+// 리스트는 워크스페이스 보드에 직접 속한다. 공용 Prisma와 deleted_at 기반 soft delete,
+// 공통 워크스페이스 역할 검사를 사용해 다른 도메인과 권한 규칙을 맞춘다.
 // ============================================================
 import { prisma } from '../../db'
 import { NotFoundError } from '../../errors'
@@ -28,8 +27,8 @@ async function assertReadAccess(userId: string, workspaceId: string): Promise<vo
 }
 
 /**
- * List all lists in a workspace, with their cards, for the board's initial render.
- * Member of the workspace OR a public workspace.
+ * 보드 첫 렌더링에 필요한 리스트, 카드, 레이블을 한 번에 조회한다.
+ * 활성 멤버이거나 공개 워크스페이스일 때 읽을 수 있다.
  */
 export async function listLists(input: { userId: string; workspaceId: string }) {
   await assertReadAccess(input.userId, input.workspaceId)
@@ -93,7 +92,7 @@ export async function getList(input: { userId: string; listId: string }) {
 }
 
 /**
- * Create a list at the end of the workspace's board. Requires MEMBER+.
+ * 보드의 마지막 순번에 리스트를 만든다. MEMBER 이상이 필요하다.
  */
 export async function createList(input: { userId: string; workspaceId: string; name: string }) {
   await requireWorkspaceRole(input.workspaceId, input.userId, 'MEMBER')
@@ -124,7 +123,7 @@ export async function createList(input: { userId: string; workspaceId: string; n
 }
 
 /**
- * Update a list's name. Requires MEMBER+.
+ * 리스트 이름을 수정한다. MEMBER 이상이 필요하다.
  */
 export async function updateList(input: { userId: string; listId: string; name: string }) {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
@@ -151,9 +150,9 @@ export async function updateList(input: { userId: string; listId: string; name: 
 }
 
 /**
- * Soft-delete a list. Cards keep existing (list_id is set null via the
- * onDelete: SetNull relation semantics we replicate manually since this is
- * a soft delete, not a hard delete). Requires MEMBER+.
+ * 리스트를 soft delete하고 카드 자체는 개인 인박스로 이동해 보존한다.
+ * 실제 DELETE가 아니어서 DB의 onDelete: SetNull이 실행되지 않으므로 관계 정리를
+ * 트랜잭션에서 직접 구현한다. MEMBER 이상이 필요하다.
  */
 export async function deleteList(input: { userId: string; listId: string }): Promise<void> {
   const list = await prisma.list.findFirst({ where: { id: input.listId, deleted_at: null } })
@@ -162,8 +161,8 @@ export async function deleteList(input: { userId: string; listId: string }): Pro
 
   const detachedRelation = softDeletedBy(input.userId)
   await prisma.$transaction(async (tx) => {
-    // Mark the list first so a concurrent inbox restore cannot attach a card
-    // after the card transfer has already scanned this list.
+    // 리스트를 먼저 비활성화해 카드 스캔이 끝난 뒤 동시 인박스 복구가
+    // 이 리스트에 새 카드를 붙이는 경쟁을 막는다.
     await tx.list.update({
       where: { id: input.listId },
       data: softDeletedBy(input.userId),
@@ -203,8 +202,7 @@ export async function deleteList(input: { userId: string; listId: string }): Pro
 }
 
 /**
- * Reorder a list among its workspace siblings using neighbor ids.
- * Requires MEMBER+.
+ * 앞뒤 이웃 ID로 워크스페이스 안의 리스트 순서를 바꾼다. MEMBER 이상이 필요하다.
  */
 export async function reorderList(input: {
   userId: string

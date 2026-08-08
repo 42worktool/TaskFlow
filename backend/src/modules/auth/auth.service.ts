@@ -24,6 +24,9 @@ const LOGIN_ATTEMPT_PREFIX = 'auth:login-attempts:'
 const LOGIN_ATTEMPT_LIMIT = 10
 const LOGIN_ATTEMPT_WINDOW_SECONDS = 15 * 60
 
+// 인증 서비스는 비밀번호/Google 계정을 사용자 한 명으로 연결하고,
+// 짧은 access token과 서버에서 폐기 가능한 refresh session을 함께 관리한다.
+
 export interface UserPublic {
   id: string
   email: string
@@ -61,6 +64,7 @@ function registrationPassword(value: unknown): string {
 }
 
 function loginAttemptKey(email: string, clientKey: string): string {
+  // 이메일과 접속자 식별자를 해시해 개인정보가 Redis 키에 그대로 남지 않게 한다.
   const fingerprint = createHash('sha256').update(`${clientKey}\0${email}`).digest('hex')
   return `${LOGIN_ATTEMPT_PREFIX}${fingerprint}`
 }
@@ -89,6 +93,8 @@ export async function registerWithPassword(input: {
   password: unknown
   clientIp: string
 }): Promise<UserPublic> {
+  // 빠른 중복 확인으로 일반 충돌을 친절하게 처리하되, 동시 가입 경쟁은
+  // DB unique 제약(P2002)을 마지막 방어선으로 사용한다.
   await checkSignupRateLimit(input.clientIp)
 
   const name = accountName(input.name)
@@ -138,6 +144,8 @@ export async function authenticateWithPassword(input: {
         where: { email: { equals: email, mode: 'insensitive' } },
       })
     : null
+  // 사용자가 없거나 입력 형식이 틀려도 동일한 scrypt 검증을 수행해
+  // 응답 시간과 오류 메시지로 계정 존재 여부가 드러나지 않게 한다.
   const passwordMatches = await verifyPassword(password, user?.password_hash ?? null)
 
   if (!user || !passwordMatches) {
@@ -164,6 +172,7 @@ function publicUser(user: User): UserPublic {
 }
 
 function stateKey(state: string): string {
+  // 원본 bearer 값을 Redis 키로 노출하지 않고 해시만 저장한다.
   return `${OAUTH_STATE_PREFIX}${createHash('sha256').update(state).digest('hex')}`
 }
 
@@ -179,6 +188,8 @@ export async function beginGoogleOAuth(returnToValue: unknown): Promise<{
   authorizationUrl: string
   state: string
 }> {
+  // state는 요청 위조를, nonce는 다른 인증 응답의 재사용을 막는다.
+  // 둘 모두 Redis에서 짧게 보관해 서버가 발급한 요청인지 확인한다.
   const state = randomBytes(32).toString('base64url')
   const nonce = randomBytes(32).toString('base64url')
   const record: OAuthStateRecord = { nonce, returnTo: safeReturnTo(returnToValue) }
@@ -210,6 +221,7 @@ async function consumeOAuthState(
   }
 
   const redis = await getRedisClient()
+  // getDel로 검증과 소비를 원자적으로 처리해 같은 콜백을 두 번 사용할 수 없게 한다.
   const raw = await redis.getDel(stateKey(queryState))
   if (!raw) {
     throw new AppError('EXPIRED_OAUTH_STATE', 401, 'OAuth state expired or was already used')
@@ -230,6 +242,8 @@ async function findOrCreateGoogleUser(payload: {
 }): Promise<User> {
   const email = normalizeEmail(payload.email)
 
+  // OAuth 계정 조회, 기존 이메일 연결, 신규 사용자 생성을 한 트랜잭션으로 묶어
+  // 동시 콜백이 중복 계정이나 절반만 연결된 계정을 만들지 않게 한다.
   return prisma.$transaction(async (tx) => {
     const account = await tx.oAuthAccount.findUnique({
       where: {
@@ -247,6 +261,8 @@ async function findOrCreateGoogleUser(payload: {
     })
 
     if (existingUser) {
+      // 이메일이 같다는 이유만으로 계정을 자동 병합하면 계정 탈취 위험이 있으므로
+      // 운영자가 명시적으로 허용한 경우에만 검증된 이메일을 연결한다.
       if (!config.autoLinkVerifiedEmail) {
         throw new AppError(
           'ACCOUNT_LINK_REQUIRED',
@@ -333,6 +349,8 @@ export async function createSession(userId: string): Promise<{
   const redis = await getRedisClient()
   const sessionKey = refreshKey(refreshToken)
   const indexKey = userSessionsKey(userId)
+  // 실제 refresh token 대신 해시 키를 저장하고 사용자별 인덱스도 함께 관리한다.
+  // 이 인덱스는 계정 삭제 시 해당 사용자의 모든 세션을 한 번에 폐기하는 데 쓴다.
   await redis
     .multi()
     .set(sessionKey, JSON.stringify(session), { EX: config.refreshTokenTtlSeconds })
@@ -350,6 +368,7 @@ export async function rotateSession(refreshToken: string): Promise<{
 }> {
   const redis = await getRedisClient()
   const oldSessionKey = refreshKey(refreshToken)
+  // refresh token은 한 번 사용하면 즉시 없애는 회전 방식으로 재사용 공격을 제한한다.
   const raw = await redis.getDel(oldSessionKey)
   if (!raw) {
     throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh token is invalid or expired')
@@ -408,6 +427,8 @@ export async function updateCurrentUser(
 }
 
 export async function deleteCurrentUser(userId: string): Promise<void> {
+  // OWNER가 사라져 관리 불가능한 워크스페이스가 남지 않도록 계정 삭제 전에
+  // 소유권 위임 또는 워크스페이스 삭제를 강제한다.
   await prisma.$transaction(async (tx) => {
     const ownedWorkspace = await tx.workspaceMember.findFirst({
       where: {
@@ -448,6 +469,7 @@ async function replaceAvatarUrl(userId: string, url: string | null): Promise<Use
     data: { profile_image_url: url },
   })
 
+  // DB 갱신이 성공한 뒤에만 이전 로컬 파일을 지운다. Google 등 외부 URL은 삭제 대상이 아니다.
   if (previous?.profile_image_url?.startsWith(AVATAR_URL_PREFIX)) {
     await deleteUploadedFile('avatars', previous.profile_image_url.slice(AVATAR_URL_PREFIX.length))
   }

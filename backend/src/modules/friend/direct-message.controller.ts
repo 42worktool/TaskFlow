@@ -1,3 +1,4 @@
+// 친구 ID와 메시지 입력을 파싱해 DM 서비스로 전달하고 HTTP 응답으로 변환한다.
 import type { RequestHandler } from 'express'
 import { authenticatedUserId } from '../../middleware/auth'
 import { createDirectMessage, listDirectMessages } from './direct-message.service'

@@ -1,3 +1,4 @@
+// 이메일과 UUID처럼 여러 API 경계에서 반복되는 정규화·검증 규칙을 공유한다.
 import { z } from 'zod'
 
 export const normalizedEmailSchema = z

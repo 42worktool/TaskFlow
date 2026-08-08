@@ -48,6 +48,9 @@ import {
 } from '../services/realtime/protocol'
 import type { Friend, Workspace } from '../types'
 
+// 메신저의 대화 목록, 친구 관리, 워크스페이스 채팅과 DM을 한 창의 화면 상태로 전환한다.
+// 배지 집계용 실시간 이벤트는 여기서 한 번만 받아 현재 보이는 대화는 읽음 처리하고
+// 나머지만 누적한다. 실제 메시지 표시는 각 대화 패널의 별도 구독이 담당한다.
 const route = useRoute()
 const router = useRouter()
 const closeButton = ref<HTMLButtonElement | null>(null)
@@ -131,6 +134,7 @@ function handleResize(): void {
 }
 
 async function loadDirectory(): Promise<void> {
+  // 친구/워크스페이스 목록을 함께 갱신해 사라진 방의 읽지 않은 수와 현재 DM 선택도 정리한다.
   const generation = ++directoryLoadGeneration
   directoryLoading.value = true
   directoryError.value = ''
@@ -202,6 +206,7 @@ function receiveFriendRemoved(value: unknown): void {
 }
 
 function visibleMessengerRoom(): VisibleMessengerRoom | null {
+  // 창이 열려 있어도 브라우저 탭이 숨겨졌다면 실제로 읽은 것이 아니므로 읽음 대상으로 보지 않는다.
   if (!messengerState.open || document.visibilityState !== 'visible') {
     return null
   }
@@ -270,6 +275,7 @@ async function selectWorkspaceRoom(workspace: Workspace): Promise<void> {
     name: workspace.name,
     syncVersion: routeWorkspace?.id === workspace.id ? routeWorkspace.syncVersion : 0,
   })
+  // 대화방 선택과 동시에 해당 보드를 열어 카드 링크와 워크스페이스 문맥이 항상 일치하게 한다.
   const targetPath = `/workspaces/${workspace.id}/board`
   if (route.path === targetPath) return
   try {
@@ -303,6 +309,7 @@ let removeDirectMessageListener: (() => void) | null = null
 let removeWorkspaceActivityListener: (() => void) | null = null
 
 watch([() => messengerState.open, () => messengerState.pane], async ([open], [previousOpen]) => {
+  // 창을 연 버튼으로 초점을 복원해 키보드 사용자가 닫힌 뒤 원래 흐름을 이어가게 한다.
   if (open && !previousOpen) {
     const focused = document.activeElement
     returnFocus = focused instanceof HTMLElement && focused !== document.body ? focused : null
@@ -324,6 +331,7 @@ watch(
     () => authState.user?.id,
   ],
   ([messengerQuery, legacyDrawer]) => {
+    // URL 진입 요청은 한 번 소비한 뒤 제거한다. 이전 drawer 링크도 호환하되 내부 상태는 pane으로 통일한다.
     if (!authState.user) return
     const requested = paneFromQuery(messengerQuery) ?? paneFromQuery(legacyDrawer)
     if (!requested) {
@@ -353,6 +361,7 @@ watch(
 )
 
 onMounted(() => {
+  // 메신저가 닫혀 있어도 알림 배지는 계속 쌓여야 하므로 실시간 리스너는 Host 생명주기에 묶는다.
   compactViewport.value = window.matchMedia('(max-width: 760px)').matches
   removeFriendPresenceListener = realtime.on('friend.presence_changed', receiveFriendPresence)
   removeFriendRequestCreatedListener = realtime.on(

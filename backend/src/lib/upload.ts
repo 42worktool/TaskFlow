@@ -1,10 +1,8 @@
 // ============================================================
-// upload.ts — multer configuration for local-disk file storage
+// upload.ts — 로컬 디스크 파일 저장을 위한 multer 설정
 //
-// Files persist under UPLOAD_DIR/<subdir>/<uuid>.<ext>. /app/uploads is
-// backed by the named Docker volume `uploads_data` (see docker-compose.yml),
-// so uploaded files survive container recreation instead of living only in
-// the ./backend:/app dev bind mount.
+// 파일은 UPLOAD_DIR/<하위 디렉터리>/<uuid>.<확장자>로 저장한다. /app/uploads는
+// Docker의 uploads_data 이름 볼륨에 연결되어 컨테이너를 다시 만들어도 유지된다.
 // ============================================================
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
@@ -28,11 +26,9 @@ export const ATTACHMENT_MIME_ALLOWLIST = new Set([
 export const AVATAR_MIME_ALLOWLIST = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 
 /**
- * multer's underlying parser (busboy) decodes multipart header fields —
- * including the filename — as latin1 by default, even though browsers send
- * the filename as UTF-8. A Korean filename like "보고서.pdf" therefore
- * arrives as mojibake (e.g. "ë³´ê³ ì„œ.pdf"). Re-interpreting those bytes as
- * UTF-8 undoes the mis-decoding; ASCII filenames pass through unchanged.
+ * multer의 파서(busboy)는 브라우저가 UTF-8로 보낸 multipart 파일명도 기본적으로
+ * latin1로 해석한다. 이 때문에 한글 파일명이 깨지므로 latin1 바이트를 UTF-8로
+ * 다시 해석한다. ASCII 파일명은 그대로 유지된다.
  */
 export function fixOriginalnameEncoding(name: string): string {
   return Buffer.from(name, 'latin1').toString('utf8')
@@ -41,20 +37,14 @@ export function fixOriginalnameEncoding(name: string): string {
 export const MAX_ORIGINAL_FILENAME_LENGTH = 255
 
 /**
- * `file.originalname` is as client-controlled as `file.mimetype` — it's the
- * multipart part's declared filename, and multer does nothing to validate
- * it. Before this endpoint took multipart uploads, `addAttachmentSchema`
- * enforced `z.string().min(1).max(255)` on the equivalent JSON `file_name`
- * field; this restores that bound. Splitting on both slash styles drops any
- * directory components a client could smuggle in (this server never
- * derives an on-disk path from it — storage uses a random UUID — but the
- * value is echoed back verbatim in API responses and the download's
- * `Content-Disposition` header, so it shouldn't masquerade as a path).
- * Control characters are stripped for the same reason.
+ * file.originalname도 클라이언트가 지정하는 값이므로 신뢰하지 않는다. 양쪽 슬래시를
+ * 기준으로 경로 부분을 제거하고, API와 Content-Disposition에 다시 노출될 때 헤더를
+ * 교란하지 못하게 제어 문자도 제거한다. 1~255자 길이 검사는 실제 저장명을 만드는
+ * storageFor에서 적용해 정규화 후의 값만 검증한다.
  */
 export function normalizeOriginalname(name: string): string {
   const base = name.split(/[/\\]/).pop() ?? name
-  // eslint-disable-next-line no-control-regex -- Uploaded filenames must not contain ASCII controls.
+  // eslint-disable-next-line no-control-regex -- 업로드 파일명에는 ASCII 제어 문자를 허용하지 않는다.
   return base.replace(/[\x00-\x1f\x7f]/g, '').trim()
 }
 
@@ -91,14 +81,11 @@ function fileFilterFor(allowlist: Set<string>) {
 }
 
 /**
- * `file.mimetype` is not detected by multer — it's the Content-Type header the
- * client put on the multipart part, so a malicious client can label anything
- * as "image/png". Sniff the actual file signature (magic bytes) so the
- * declared type can't be trusted blindly.
+ * file.mimetype은 multer가 탐지한 값이 아니라 클라이언트가 보낸 Content-Type이다.
+ * 따라서 앞부분의 간이 signature를 비교해 명백한 선언값 불일치를 한 번 더 거른다.
  *
- * Each entry is one or more byte ranges that must all match (WEBP's "RIFF"
- * header and "WEBP" tag sit at different offsets); GIF has two acceptable
- * signatures, so it appears as two entries.
+ * 각 항목은 모두 일치해야 하는 바이트 범위다. WEBP처럼 서로 다른 offset의 표식을
+ * 확인할 수 있으며, GIF는 허용 signature가 두 개라 항목도 두 개다.
  */
 const IMAGE_SIGNATURES: { mime: string; checks: { offset: number; bytes: number[] }[] }[] = [
   {
@@ -131,17 +118,14 @@ function detectImageMimeType(header: Buffer): string | null {
   )
 }
 
-// MP4 (ISO base media) files are a sequence of boxes; the first box is
-// almost always "ftyp" starting at offset 4, preceded by a 4-byte box size.
+// MP4(ISO base media)는 box의 연속이며 첫 box는 보통 4바이트 크기 뒤의 ftyp이다.
 function isMp4(header: Buffer): boolean {
   return header.length >= 8 && header.toString('ascii', 4, 8) === 'ftyp'
 }
 
-// No magic bytes identify plain text, so fall back to a binary/text
-// heuristic: reject a NUL byte or non-whitespace control character anywhere
-// in the sample (the same signal git and `file` use to call content
-// binary). Bytes >= 0x80 are allowed since valid UTF-8 text — Korean
-// filenames' contents included — legitimately contains them.
+// 일반 텍스트에는 고유 magic bytes가 없어 binary/text 간이 휴리스틱을 사용한다.
+// 샘플에 NUL 또는 공백이 아닌 제어 문자가 있으면 거부하고, 정상 UTF-8 한글 등에
+// 필요한 0x80 이상 바이트는 허용한다. 이는 UTF-8 유효성이나 파일 전체를 보장하지 않는다.
 function looksLikePlainText(header: Buffer): boolean {
   for (const byte of header) {
     if (byte === 0x00 || byte === 0x7f) return false
@@ -172,10 +156,9 @@ async function readHeaderBytes(filePath: string, length: number): Promise<Buffer
 }
 
 /**
- * Verifies an uploaded file's actual content matches its declared MIME type
- * and that the detected type is on the allowlist. Deletes the file and
- * rejects the request on mismatch, since a spoofed Content-Type is exactly
- * what a malicious upload would use to slip past `fileFilter`.
+ * 업로드 앞 512바이트의 signature/휴리스틱 결과가 선언 MIME 및 허용 목록과 일치하는지
+ * 확인한다. 불일치하면 저장된 파일을 지우고 요청을 거부하지만, 완전한 형식 파싱이나
+ * 악성 콘텐츠 검사는 아니므로 이 검사만으로 파일의 유효성·안전성을 보장하지 않는다.
  */
 export function requireMagicBytesMatch(
   subdir: string,
@@ -226,9 +209,8 @@ export async function deleteUploadedFile(subdir: string, filename: string): Prom
 }
 
 /**
- * multer's diskStorage already wrote `file` before the wrapped handler runs,
- * so any failure past that point (permission denied, not found, DB error)
- * must not leave it orphaned on disk.
+ * diskStorage는 실제 핸들러보다 먼저 파일을 쓴다. 이후 권한/DB 처리에서 실패하면
+ * 참조되지 않는 파일이 남지 않도록 래퍼가 업로드 파일을 정리한다.
  */
 export async function withUploadCleanup<T>(
   subdir: string,

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 로그인과 회원가입 입력의 브라우저 속성·비활성 상태를 한 계약으로 통일하고,
+// defineModel로 부모의 폼 상태를 별도 emit 코드 없이 양방향 연결한다.
 withDefaults(
   defineProps<{
     type?: string

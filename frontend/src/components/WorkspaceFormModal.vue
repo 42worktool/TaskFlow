@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { WorkspaceAPI } from '../api/workspace'
 import type { Workspace } from '../types'
 
+// workspace prop 유무로 생성과 편집을 같은 폼에 통합하고, 저장 결과를 상위 목록에 즉시 전달한다.
 const props = defineProps<{ workspace?: Workspace }>()
 const emit = defineEmits<{ close: []; saved: [Workspace] }>()
 
@@ -22,6 +23,7 @@ async function submit() {
   loading.value = true
   error.value = ''
   try {
+    // 폼의 모양은 같지만 기존 ID가 있으면 수정, 없으면 생성 API로 분기한다.
     const workspace = props.workspace
       ? await WorkspaceAPI.update(props.workspace.id, {
           name: trimmed,

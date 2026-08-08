@@ -1,3 +1,4 @@
+// 인증 미들웨어 뒤에 모든 비공개 도메인 라우터를 조합해 보호 경계를 한곳에 둔다.
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth'
 import { cardRouter, commentRouter, inboxRouter } from '../modules/card'

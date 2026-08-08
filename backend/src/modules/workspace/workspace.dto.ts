@@ -26,6 +26,8 @@ export function toWorkspaceDto(
   workspace: WorkspaceWithMembers,
   options: { includeMemberEmail: boolean },
 ) {
+  // 공개 워크스페이스를 둘러보는 비회원에게는 멤버 이메일을 숨기고,
+  // 활성 멤버가 조회할 때만 협업에 필요한 이메일을 포함한다.
   return {
     id: workspace.id,
     name: workspace.name,

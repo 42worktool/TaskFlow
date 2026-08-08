@@ -1,3 +1,4 @@
+// 워크스페이스, 역할, 초대 토큰 입력을 API와 Redis 저장 경계에서 함께 검증한다.
 import { z } from 'zod'
 import { normalizedEmailSchema, uuidSchema } from '../../lib/validation'
 

@@ -17,6 +17,8 @@ import {
 } from '../services/messenger'
 import { formatMessengerUnreadCount, totalMessengerUnreadCount } from '../services/messengerUnread'
 
+// 워크스페이스 이동, 보드 기능, 인박스와 채팅 토글을 데스크톱/모바일의 공통 하단 내비게이션으로 묶는다.
+// 닫힌 인박스·채팅 아이콘도 카드 드롭 대상으로 만들어 먼저 패널을 열지 않아도 작업을 이어가게 한다.
 const props = withDefaults(
   defineProps<{
     workspaceId?: string
@@ -115,6 +117,7 @@ function consumeSuppressedClick(target: 'inbox' | 'chat'): boolean {
 }
 
 function suppressDropClick(target: 'inbox' | 'chat'): void {
+  // drop 직후 브라우저가 발생시키는 click이 방금 연 패널을 다시 닫지 않도록 한 번만 소비한다.
   suppressedClick = target
   if (suppressedClickTimer) clearTimeout(suppressedClickTimer)
   suppressedClickTimer = setTimeout(() => {
@@ -139,6 +142,7 @@ function selectChat(): void {
     return
   }
   if (compactViewport.value) emit('close-inbox')
+  // 마지막 대화 문맥이 있으면 그대로 복원하고, 없으면 현재 워크스페이스 방 또는 목록을 연다.
   if (messengerState.pane !== 'directory') {
     openMessenger()
     return
@@ -169,6 +173,7 @@ function clearToolboxDropHover(cardId: string): void {
 function updateToolboxDropHover(
   event: Pick<MouseEvent, 'clientX' | 'clientY'>,
 ): 'inbox' | 'chat' | null {
+  // native drag와 Sortable fallback이 모두 같은 좌표 판정을 쓰도록 버튼 경계를 직접 비교한다.
   const cardId = draggedBoardCardId.value
   if (!cardId) return null
 
@@ -225,6 +230,7 @@ function commitToolboxDrop(event: MouseEvent | DragEvent): void {
   if (event.type === 'drop') event.preventDefault()
   suppressDropClick(target)
 
+  // 외부 드롭 소유권을 먼저 확정해 뒤에 겹친 보드 리스트가 같은 카드를 이동시키지 못하게 한다.
   if (target === 'chat') {
     requestChatCardAttachment(cardId, 'toolbox-chat')
     return
@@ -235,6 +241,7 @@ function commitToolboxDrop(event: MouseEvent | DragEvent): void {
 }
 
 onMounted(() => {
+  // Sortable fallback은 drop 대신 pointerup만 낼 수 있어 세 입력 계열을 전역 capture 단계에서 함께 받는다.
   syncCompactViewport()
   window.addEventListener('resize', syncCompactViewport)
   window.addEventListener('dragover', handleToolboxDragMove, true)

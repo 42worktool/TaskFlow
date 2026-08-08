@@ -8,6 +8,7 @@ export function computeSequence<T extends Sequenced>(
   beforeId?: string | null,
   afterId?: string | null,
 ): number {
+  // 인접 항목의 중간값을 사용하면 드래그 한 번마다 전체 목록의 순번을 다시 쓰지 않아도 된다.
   const before = beforeId ? siblings.find((item) => item.id === beforeId) : null
   const after = afterId ? siblings.find((item) => item.id === afterId) : null
 

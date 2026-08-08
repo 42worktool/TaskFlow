@@ -7,6 +7,8 @@ import { AccountAPI } from '../api/account'
 import { AVATAR_MAX_BYTES, AVATAR_MIME_ALLOWLIST } from '../utils/uploadLimits'
 import ProfileLink from '../components/ProfileLink.vue'
 
+// 현재 사용자의 공개 프로필 문구와 사진을 편집하고, 계정 삭제까지 수행하는 모달 본문이다.
+// 업로드 전 크기와 MIME을 검사해 서버 요청 전에 명확한 피드백을 제공한다.
 const emit = defineEmits<{
   close: []
 }>()
@@ -28,6 +30,7 @@ function closeAccount(): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+  // 프로필 모달 위에 계정 편집이 열린 경우에만 Escape를 소비해 겹친 표면이 함께 닫히지 않게 한다.
   if (event.key !== 'Escape') return
   if (profileModalState.surface && profileModalState.surface !== 'account') return
   event.preventDefault()
@@ -99,6 +102,7 @@ async function removeAvatarPhoto() {
 }
 
 async function removeAccount() {
+  // 계정 삭제는 복구하기 어려우므로 명시적 확인 후 성공 시 인증 진입 화면으로 이동한다.
   const confirmed = window.confirm('계정과 연결된 로그인 정보가 모두 삭제됩니다. 계속하시겠습니까?')
   if (!confirmed) return
 

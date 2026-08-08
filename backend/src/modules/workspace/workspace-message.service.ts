@@ -14,6 +14,8 @@ import { publishWorkspaceChange } from './workspace.realtime'
 
 async function deliverWorkspaceMessageCreated(message: WorkspaceMessageDto): Promise<void> {
   try {
+    // 채널 구독 여부와 무관하게 활성 멤버의 사용자 연결로 전송해
+    // 다른 워크스페이스를 보고 있는 메신저도 새 메시지를 받을 수 있게 한다.
     const event = workspaceMessageDtoSchema.parse(message)
     const members = await prisma.workspaceMember.findMany({
       where: {
@@ -45,6 +47,7 @@ export async function listWorkspaceMessages(input: { userId: string; workspaceId
     take: MESSAGE_HISTORY_LIMIT,
   })
 
+  // DB에서는 최신 N개만 효율적으로 자르고, 클라이언트에는 오래된 순으로 제공한다.
   return messages.reverse().map(toWorkspaceMessageDto)
 }
 
@@ -57,6 +60,8 @@ export async function createWorkspaceMessage(input: {
   await requireWorkspaceRole(input.workspaceId, input.userId, 'VIEWER')
 
   const cardId = input.cardId ?? null
+  // 카드가 첨부된 메시지는 동일 워크스페이스 카드인지 확인한 뒤
+  // 채팅 메시지와 카드 댓글을 한 트랜잭션으로 생성해 두 기록이 어긋나지 않게 한다.
   const dto = await prisma.$transaction(async (tx) => {
     if (cardId) {
       const card = await tx.card.findFirst({
@@ -98,6 +103,7 @@ export async function createWorkspaceMessage(input: {
     return toWorkspaceMessageDto(message)
   })
 
+  // DB 커밋 뒤 메시지를 전달하고, 카드 댓글이 생겼다면 보드에 부분 재조회 신호도 보낸다.
   await deliverWorkspaceMessageCreated(dto)
   if (cardId) {
     publishWorkspaceChange({

@@ -9,6 +9,8 @@ export const REALTIME_CLOSE_CODE = {
   RATE_LIMITED: 4429,
 } as const
 
+// auth/system 이벤트는 전송 계층이 소유하며 도메인 모듈이 같은 이름을 등록하지 못한다.
+
 const REALTIME_CLIENT_CONTROL_EVENTS = ['auth.authenticate', 'auth.refresh'] as const
 
 const REALTIME_SERVER_CONTROL_EVENTS = ['system.ready', 'system.ack', 'system.error'] as const
@@ -39,6 +41,8 @@ export const inboundMessageSchema = z
     data: z.unknown().optional(),
   })
   .strict()
+
+// strict 스키마로 프로토콜에 정의되지 않은 필드를 거부해 버전 간 모호한 해석을 피한다.
 
 export const authenticationDataSchema = z
   .object({

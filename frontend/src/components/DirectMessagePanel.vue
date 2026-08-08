@@ -8,6 +8,8 @@ import { parseDirectMessage } from '../services/realtime/protocol'
 import type { DirectMessage } from '../types'
 import { createComposerEnterSubmitter } from '../utils/composerKeyboard'
 
+// 선택한 친구와의 DM 기록을 API 스냅샷과 실시간 이벤트에서 합쳐 하나의 시간순 대화로 유지한다.
+// 대화 상대가 바뀌면 이전 요청을 무효화해 메시지가 다른 방에 나타나지 않게 한다.
 const props = withDefaults(
   defineProps<{
     friendId: string
@@ -39,6 +41,7 @@ function belongsToCurrentConversation(message: DirectMessage): boolean {
 }
 
 function mergeMessages(incoming: readonly DirectMessage[]): void {
+  // 전송 응답과 WebSocket 수신이 같은 메시지를 포함할 수 있어 ID로 합친 뒤 최근 100개만 유지한다.
   const byId = new Map(messages.value.map((message) => [message.id, message]))
   incoming.forEach((message) => byId.set(message.id, message))
   messages.value = [...byId.values()]
@@ -101,6 +104,7 @@ async function sendMessage(): Promise<void> {
   }
 }
 
+// 한글 조합 중 Enter를 전송으로 오인하지 않고 조합이 끝난 다음 틱의 완성 문자열을 보낸다.
 const composerSubmitter = createComposerEnterSubmitter(
   () => {
     void sendMessage()
@@ -124,6 +128,7 @@ const removeMessageListener = realtime.on('dm.message_created', (value) => {
 })
 
 const removeRealtimeStateListener = realtime.onStateChange((state) => {
+  // 연결이 끊긴 동안 놓친 메시지는 재연결 시 최신 100개 snapshot을 다시 읽어 보완한다.
   if (state === 'connected' && props.friendId) void loadMessages(true)
 })
 

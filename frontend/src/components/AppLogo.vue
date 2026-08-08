@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 인증 페이지마다 문구만 바꾸고 동일한 브랜드 블록을 유지한다.
 defineProps<{ tagline: string }>()
 </script>
 

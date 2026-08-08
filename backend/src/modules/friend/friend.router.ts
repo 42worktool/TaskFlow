@@ -1,3 +1,4 @@
+// 친구 요청, 친구 목록, 친구 간 DM 경로를 하나의 인증 하위 라우터로 조합한다.
 import { Router } from 'express'
 import { uuidParam } from '../../middleware/validation'
 import * as friendController from './friend.controller'

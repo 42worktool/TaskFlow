@@ -10,6 +10,8 @@ import {
   parseSearchExpression,
 } from '../utils/searchQuery'
 
+// 일반 검색어와 /명령어를 같은 입력에서 해석하고, 사람 검색은 Slack처럼 즉시 프로필 후보를 보여준다.
+// 실제 검색 조건은 URL 형식으로 변환해 검색 결과 페이지와 동일한 파서를 공유한다.
 const props = defineProps<{
   initialQuery?: string
 }>()
@@ -97,6 +99,7 @@ const workspaceIdForLookup = computed(() => {
 })
 
 function searchCriteria() {
+  // 입력하지 않은 범위/정렬은 현재 URL 값을 이어받되 명시한 명령과 충돌하는 레이블은 제거한다.
   const parsed = parseSearchExpression(query.value, currentWorkspace.value)
   const hasCategoryCommand =
     /(^|\s)\/(all|card|cards|workspace|workspaces|user|users)(?=\s|$)/i.test(query.value)
@@ -186,6 +189,7 @@ watch(
 watch(
   [peopleLookupText, workspaceIdForLookup, focused],
   ([text, workspaceId, isFocused]) => {
+    // 사람 자동완성은 입력을 지연하고 마지막 요청만 반영해 빠른 타이핑 중 결과 깜빡임을 줄인다.
     const requestVersion = ++peopleRequestVersion
     if (peopleSearchTimer) clearTimeout(peopleSearchTimer)
     peopleSuggestions.value = []
@@ -234,6 +238,7 @@ function selectCommand(index: number) {
   const token = activeSlashToken.value
   if (!suggestion || !token) return
 
+  // 전체 입력을 바꾸지 않고 커서 앞의 마지막 slash 토큰만 완성해 이어서 값을 입력할 수 있게 한다.
   const tokenStart = query.value.length - token.length
   query.value = `${query.value.slice(0, tokenStart)}${suggestion.insert}`
   activeSuggestion.value = 0
@@ -257,6 +262,7 @@ function selectActiveSuggestion() {
 }
 
 function handleKeydown(event: KeyboardEvent) {
+  // 자동완성 목록은 combobox 규칙에 맞춰 화살표로 순환하고 Enter/Tab으로 현재 항목을 확정한다.
   if (!suggestionsOpen.value || optionCount.value === 0) return
 
   if (event.key === 'ArrowDown') {

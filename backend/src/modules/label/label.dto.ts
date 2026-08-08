@@ -1,3 +1,4 @@
+// Prisma 레이블 행을 API가 사용하는 공개 필드와 날짜 문자열로 변환한다.
 import type { Label } from '@prisma/client'
 
 export function toLabelDto(label: Label) {

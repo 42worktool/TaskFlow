@@ -37,9 +37,9 @@ export type WorkspacePresenceEvent = z.infer<typeof workspacePresenceEventSchema
 
 type WorkspaceChangeInput = Omit<WorkspaceChangeEvent, 'event_id' | 'occurred_at'>
 
-// This prototype runs one API process, so small in-memory revisions are enough
-// to close the authorization-query -> channel-join race without adding a
-// distributed lock. Mutations advance these only after their DB write commits.
+// 이 프로토타입은 API 프로세스가 하나이므로 작은 메모리 revision만으로
+// 권한 조회와 채널 참여 사이의 경쟁을 막는다. 권한을 바꾸는 DB 쓰기가 커밋된 뒤
+// revision을 올리며, 다중 인스턴스로 확장할 때는 공유 저장소 방식으로 교체해야 한다.
 const workspaceAccessRevisions = new Map<string, number>()
 const memberAccessRevisions = new Map<string, number>()
 
@@ -97,6 +97,9 @@ function reportPublishFailure(event: string, error: unknown): void {
 
 export function publishWorkspaceChange(input: WorkspaceChangeInput): WorkspaceChangeEvent | null {
   let event: WorkspaceChangeEvent
+  // 실시간 전송 실패가 이미 커밋된 비즈니스 작업을 되돌려서는 안 되므로
+  // 검증/전송 오류만 기록한다. 해당 이벤트는 유실될 수 있으며 이후 별도 API 조회나
+  // 다른 동기화 계기가 있어야 현재 상태를 다시 맞출 수 있다.
   try {
     event = workspaceChangeEventSchema.parse({
       ...input,
@@ -148,6 +151,8 @@ export function startWorkspaceRealtime(): () => void {
     'workspace.subscribe',
     workspaceSubscriptionSchema,
     async (context, { workspace_id }) => {
+      // DB 권한 조회 전후 revision이 같을 때만 채널에 들어가게 해,
+      // 조회 직후 멤버가 제거되는 TOCTOU 경쟁을 차단한다.
       const accessSnapshot = captureWorkspaceAccess(workspace_id, context.userId)
       const authorizedWorkspace = await prisma.workspace.findFirst({
         where: {
@@ -178,9 +183,8 @@ export function startWorkspaceRealtime(): () => void {
 
       context.join(workspaceChannel(workspace_id))
 
-      // Build the acknowledgement from a fresh post-join query. If access is
-      // revoked while that query is in flight, the revision check also makes
-      // the handler leave instead of acknowledging a stale subscription.
+      // 채널 참여 후 최신 조회로 ack를 만든다. 이 조회 중 권한이 회수되면 revision을
+      // 다시 확인해 오래된 구독을 승인하지 않고 즉시 채널에서 나간다.
       const finalAccessSnapshot = captureWorkspaceAccess(workspace_id, context.userId)
       const workspace = await prisma.workspace.findFirst({
         where: {

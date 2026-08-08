@@ -3,6 +3,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, useId, watch } from 'v
 import { LabelAPI } from '../api/label'
 import type { Label } from '../types'
 
+// 워크스페이스 라벨의 생성·수정·삭제를 작은 팝오버 안에서 처리하고 변경 사실을 상위 화면에 알린다.
+// 패널을 열 때 목록을 다시 요청해 닫혀 있던 동안의 변경을 화면에 반영한다.
 const props = defineProps<{
   workspaceId: string
   canManage: boolean
@@ -71,6 +73,7 @@ async function createLabel(): Promise<void> {
 }
 
 function getLabelTextColor(hex: string): string {
+  // 라벨 배경의 상대 휘도를 계산해 밝은 배경에는 어두운 글자, 어두운 배경에는 흰 글자를 쓴다.
   const normalized = hex.replace('#', '')
   if (!/^[\da-f]{6}$/i.test(normalized)) return '#111827'
 
@@ -133,6 +136,7 @@ async function deleteLabel(label: Label): Promise<void> {
 }
 
 function close(): void {
+  // 팝오버를 닫은 뒤 트리거로 초점을 돌려 키보드 탐색 위치를 잃지 않게 한다.
   open.value = false
   editingId.value = null
   void nextTick(() => trigger.value?.focus())

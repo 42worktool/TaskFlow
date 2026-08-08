@@ -1,5 +1,6 @@
 services:
   nginx:
+    # 개발용 self-signed 인증서를 재빌드 뒤에도 재사용한다.
     volumes:
       - dev_tls_data:/etc/nginx/ssl
 
@@ -7,6 +8,7 @@ services:
     build:
       target: development
     volumes:
+      # 소스는 즉시 반영하되 컨테이너용 node_modules는 호스트 파일로 덮지 않는다.
       - ./frontend:/app
       - /app/node_modules
     environment:
@@ -16,6 +18,7 @@ services:
     build:
       target: development
     volumes:
+      # 백엔드 소스 hot reload와 Linux 의존성을 분리하고 업로드 파일은 별도 보존한다.
       - ./backend:/app
       - /app/node_modules
       - dev_uploads_data:/app/uploads

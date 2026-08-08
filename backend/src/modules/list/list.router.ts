@@ -1,5 +1,5 @@
 // ============================================================
-// list.router.ts — mount list CRUD + nested card creation routes
+// list.router.ts — 리스트 CRUD와 하위 카드 생성 라우트 연결
 // ============================================================
 import { Router } from 'express'
 import * as listCtrl from './list.controller'

@@ -5,6 +5,8 @@ import { WorkspaceAPI, type WorkspaceInvitationPreview } from '../api/workspace'
 import { authState, logout } from '../services/auth'
 import type { WorkspaceRole } from '../types'
 
+// 초대 토큰을 먼저 미리보기로 검증해 대상과 역할을 보여준 뒤, 사용자의 명시적 수락으로 멤버십을 만든다.
+// 로그인 계정이 초대 대상과 다르면 같은 토큰 URL을 보존한 채 계정을 전환할 수 있게 한다.
 const route = useRoute()
 const router = useRouter()
 const error = ref('')
@@ -49,6 +51,7 @@ async function acceptInvitation() {
 }
 
 async function switchAccount() {
+  // 로그아웃 뒤에도 초대 링크로 돌아오도록 현재 전체 경로를 redirect에 보관한다.
   const redirect = route.fullPath
   await logout().catch(() => undefined)
   await router.replace({ path: '/signin', query: { redirect } })

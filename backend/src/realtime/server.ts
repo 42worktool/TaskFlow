@@ -44,16 +44,16 @@ interface Connection {
 
 export interface RealtimePrincipal {
   readonly userId: string
-  /** Unix timestamp in milliseconds. */
+  /** 밀리초 단위 Unix 시각 */
   readonly expiresAt: number
 }
 
 export interface RealtimeConnectionInfo {
   readonly connectionId: string
   readonly userId: string
-  /** Unix timestamp in milliseconds. */
+  /** 밀리초 단위 Unix 시각 */
   readonly authenticatedAt: number
-  /** Unix timestamp in milliseconds. */
+  /** 밀리초 단위 Unix 시각 */
   readonly accessTokenExpiresAt: number
 }
 
@@ -77,11 +77,11 @@ export interface RealtimeServerOptions {
   heartbeatIntervalMs: number
   maxPayloadBytes: number
   maxMessagesPerMinute: number
-  /** Defaults to maxPayloadBytes. */
+  /** 생략하면 maxPayloadBytes를 사용한다. */
   maxOutboundPayloadBytes?: number
-  /** Defaults to four maximum-sized outbound payloads. */
+  /** 생략하면 최대 송신 payload 네 개 분량을 사용한다. */
   maxBufferedAmountBytes?: number
-  /** Maximum time to wait for accepted handlers and lifecycle observers. */
+  /** 이미 수락한 핸들러와 생명주기 관찰자를 기다릴 최대 시간 */
   shutdownDrainTimeoutMs?: number
   authenticateAccessToken(accessToken: string): RealtimePrincipal
 }
@@ -102,6 +102,8 @@ function closeReason(reason: string): string {
 }
 
 export class RealtimeServer {
+  // 연결, 사용자, 채널을 서로 다른 인덱스로 관리해 채널 broadcast와 사용자별 DM을
+  // 같은 서버에서 지원한다. 모든 인덱스는 removeConnection에서 함께 정리한다.
   private readonly options: RealtimeServerOptions
   private readonly router = new RealtimeRouter()
   private readonly connections = new Map<string, Connection>()
@@ -174,6 +176,7 @@ export class RealtimeServer {
   }
 
   attach(server: HttpServer): void {
+    // Express와 같은 HTTP 서버의 upgrade 이벤트만 가로채 한 포트에서 HTTP와 WS를 제공한다.
     if (this.attachedServer) throw new Error('Realtime server is already attached')
     this.attachedServer = server
     server.on('upgrade', this.handleUpgrade)
@@ -251,6 +254,8 @@ export class RealtimeServer {
   }
 
   private async performClose(): Promise<void> {
+    // 종료가 시작되면 새 upgrade와 메시지를 막고, 이미 수락한 핸들러가 끝난 뒤 연결을 닫는다.
+    // 제한 시간 이후에는 강제 종료해 프로세스가 무기한 멈추지 않게 한다.
     this.closing = true
     const drainDeadline = Date.now() + this.shutdownDrainTimeoutMs
     if (this.heartbeatTimer) {
@@ -315,6 +320,8 @@ export class RealtimeServer {
       return
     }
 
+    // 지정 경로와 정확한 Origin만 upgrade해 일반 HTTP 요청이나 타 사이트의
+    // 브라우저가 인증된 WebSocket을 임의로 열지 못하게 한다.
     if (pathname !== this.options.path) {
       sendHttpUpgradeError(socket, 404, 'Not Found')
       return
@@ -354,6 +361,7 @@ export class RealtimeServer {
       authTimer: null,
       accessTokenExpiryTimer: null,
     }
+    // 미인증 소켓이 리소스를 무기한 점유하지 않도록 제한 시간 안에 인증을 요구한다.
     connection.authTimer = setTimeout(() => {
       if (!this.isActive(connection)) return
       this.sendError(connection, 'AUTH_TIMEOUT', 'Authentication timed out', false)
@@ -387,6 +395,8 @@ export class RealtimeServer {
         return
       }
 
+      // 같은 연결의 메시지는 Promise 체인으로 직렬화해 앞선 이동/수정이 끝나기 전에
+      // 다음 이벤트가 추월하지 않게 한다. 연결끼리는 독립적으로 병렬 처리된다.
       connection.processing = connection.processing
         .then(() => this.handleMessage(connection, raw))
         .catch((error) => {
@@ -433,6 +443,8 @@ export class RealtimeServer {
     }
 
     const message = parsed.data
+    // 인증 전에 허용되는 유일한 유효 프로토콜 이벤트는 auth.authenticate다.
+    // 인증 뒤에는 auth.refresh만 제어 이벤트로 처리하고 나머지는 도메인 라우터로 전달한다.
     if (!connection.userId) {
       if (message.event !== 'auth.authenticate') {
         this.sendError(
@@ -458,6 +470,7 @@ export class RealtimeServer {
       return
     }
 
+    // 처리 중 토큰이 만료돼도 이미 허용한 핸들러는 끝까지 실행하고, finally에서 연결을 닫는다.
     connection.activeHandlerCount += 1
     try {
       try {
@@ -518,6 +531,7 @@ export class RealtimeServer {
     try {
       const principal = this.options.authenticateAccessToken(parsed.data.accessToken)
       this.assertValidPrincipal(principal)
+      // 연결 중 토큰 갱신은 같은 사용자만 허용해 인증된 소켓의 주체가 바뀌지 않게 한다.
       if (refresh && connection.userId !== principal.userId) {
         this.failAuthentication(connection, requestId)
         return
@@ -530,6 +544,7 @@ export class RealtimeServer {
         connection.accessTokenExpiresAt = principal.expiresAt
         connection.authenticationExpiryPending = false
         this.clearAuthTimer(connection)
+        // 한 사용자의 여러 탭/기기 연결을 모두 찾아 DM과 알림을 동시에 보낼 수 있게 색인한다.
         const userConnectionIds = this.userConnections.get(principal.userId) ?? new Set<string>()
         userConnectionIds.add(connection.id)
         this.userConnections.set(principal.userId, userConnectionIds)
@@ -604,6 +619,7 @@ export class RealtimeServer {
   }
 
   private join(connection: Connection, channel: string): void {
+    // 채널 이름은 서버 도메인 핸들러가 결정하고, 여기서는 활성 인증과 크기만 최종 방어한다.
     this.assertCanJoin(connection)
     if (!channel || channel.length > 200) {
       throw new RealtimeError('INVALID_CHANNEL', 'The channel name is invalid')
@@ -624,6 +640,8 @@ export class RealtimeServer {
 
   private sendApplicationEvent(connection: Connection, event: string, data?: unknown): void {
     const result = this.send(connection, event, data)
+    // 일부 이벤트가 누락되면 클라이언트 상태가 서버와 달라질 수 있으므로
+    // 직렬화 불가/크기 초과 시 연결을 닫아 전체 재동기화를 유도한다.
     if (result === 'not_serializable' || result === 'too_large') {
       this.closeConnection(
         connection,
@@ -637,6 +655,7 @@ export class RealtimeServer {
     if (!eventNameSchema.safeParse(event).success) {
       throw new Error(`Invalid outbound realtime event name "${event}"`)
     }
+    // system/auth 네임스페이스의 제어 이벤트는 서버 프로토콜만 만들 수 있다.
     if (isRealtimeControlEvent(event)) {
       throw new Error(`Realtime control event "${event}" is reserved by the protocol`)
     }
@@ -740,6 +759,8 @@ export class RealtimeServer {
       )
       return 'too_large'
     }
+    // 송신 버퍼가 계속 쌓이는 느린 클라이언트를 끊어 서버 메모리 증가와
+    // 이미 오래된 이벤트의 무한 적체를 막는다.
     if (connection.socket.bufferedAmount + payloadBytes > this.maxBufferedAmountBytes) {
       console.warn(`[realtime] closing slow connection ${connection.id}`)
       this.closeConnection(connection, SLOW_CLIENT_CLOSE_CODE, 'Client is too slow')
@@ -778,6 +799,7 @@ export class RealtimeServer {
   }
 
   private consumeMessageAllowance(connection: Connection): boolean {
+    // 프로토타입에 맞는 연결별 고정 1분 창으로 메시지 폭주를 제한한다.
     const now = Date.now()
     if (now - connection.messageWindowStartedAt >= 60_000) {
       connection.messageWindowStartedAt = now
@@ -788,6 +810,7 @@ export class RealtimeServer {
   }
 
   private heartbeat(): void {
+    // 이전 ping에 pong을 보내지 않은 연결은 유령 연결로 보고 정리한다.
     for (const connection of [...this.connections.values()]) {
       if (this.authenticationExpired(connection)) {
         this.expireAuthentication(connection)
@@ -835,6 +858,7 @@ export class RealtimeServer {
       return
     }
 
+    // setTimeout 최대 범위를 넘는 TTL은 잘라 예약하고, 깨어난 시점에 다시 계산한다.
     connection.accessTokenExpiryTimer = setTimeout(
       () => {
         connection.accessTokenExpiryTimer = null
@@ -853,6 +877,7 @@ export class RealtimeServer {
 
   private expireAuthentication(connection: Connection): void {
     if (!this.isActive(connection)) return
+    // 유효한 access token으로 시작한 도메인 작업을 중간에 끊지 않고 완료 직후 만료 처리한다.
     if (connection.activeHandlerCount > 0) {
       connection.authenticationExpiryPending = true
       return
@@ -901,6 +926,8 @@ export class RealtimeServer {
 
   private removeConnection(connection: Connection, code: number, reason: string): void {
     if (!connection.active || this.connections.get(connection.id) !== connection) return
+    // active 플래그를 먼저 내리고 모든 색인/타이머를 한 곳에서 제거해
+    // close/error/heartbeat가 동시에 와도 중복 정리와 중복 알림을 막는다.
     connection.active = false
     this.clearAuthTimer(connection)
     this.clearAccessTokenExpiryTimer(connection)
@@ -965,6 +992,8 @@ export class RealtimeServer {
     value: Readonly<T>,
     lifecycle: string,
   ): void {
+    // 같은 연결의 lifecycle 이벤트 그룹은 발생 순서대로 처리하고, 한 이벤트의 관찰자는
+    // 서로 막지 않도록 병렬 실행한다. 실패는 소켓 핵심 흐름과 분리하되 종료 시에는 기다린다.
     const listenerSnapshot = [...listeners]
     connection.lifecycleTask = connection.lifecycleTask.then(() =>
       this.runLifecycleListeners(listenerSnapshot, value, lifecycle),

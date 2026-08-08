@@ -5,6 +5,7 @@ import { authState, logout } from '../services/auth'
 import AccountLink from './AccountLink.vue'
 import ProfileLink from './ProfileLink.vue'
 
+// 로그인 사용자 메뉴에서 공개 프로필, 계정 편집과 로그아웃 진입점을 제공한다.
 const router = useRouter()
 const open = ref(false)
 const root = ref<HTMLElement | null>(null)
@@ -13,6 +14,7 @@ const user = computed(() => authState.user)
 const initial = computed(() => user.value?.name.trim().charAt(0).toUpperCase() || '?')
 
 function closeAndRestoreFocus(): void {
+  // 메뉴를 키보드로 닫았을 때 트리거로 복귀시켜 탐색 위치를 보존한다.
   open.value = false
   void nextTick(() => trigger.value?.focus())
 }

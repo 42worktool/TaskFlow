@@ -1,3 +1,5 @@
+// 인증된 WebSocket 연결의 수립·재연결·요청 응답·구독 복구를 담당하는 범용 클라이언트다.
+// 업무 이벤트 타입은 제네릭으로 받고, 전송 신뢰성과 세션 생명주기만 이 계층에서 책임진다.
 import {
   parseRealtimeAuthRefreshResult,
   parseRealtimeMessage,
@@ -23,7 +25,7 @@ export interface RealtimeClientOptions {
   rateLimitCooldownMs?: number
   serverUnavailableCooldownMs?: number
   requestTimeoutMs?: number
-  /** Time from socket construction until a valid system.ready message. */
+  /** 소켓 생성 후 유효한 system.ready를 받을 때까지 허용하는 시간이다. */
   handshakeTimeoutMs?: number
   authenticationRefreshLeadMs?: number
   maxOutboundMessageBytes?: number
@@ -126,6 +128,7 @@ function createRequestId(): string {
 }
 
 function browserCloseCode(code: number): number {
+  // WebSocket.close가 송신할 수 없는 code는 브라우저 허용 범위의 애플리케이션 code로 치환한다.
   if (Number.isInteger(code) && (code === 1000 || (code >= 3000 && code <= 4999))) {
     return code
   }
@@ -144,6 +147,7 @@ export class RealtimeClient<
     never
   >,
 > {
+  // generation은 이전 소켓의 늦은 이벤트가 새 연결 상태를 바꾸지 못하게 하는 세대 번호다.
   private readonly options: RealtimeClientOptions
   private readonly maxOutboundMessageBytes: number
   private readonly maxBufferedAmountBytes: number
@@ -196,6 +200,7 @@ export class RealtimeClient<
   }
 
   connect(): Promise<void> {
+    // 동시에 여러 기능이 연결을 요구해도 하나의 waiter와 하나의 소켓 수립 과정만 공유한다.
     if (this.isConnected) return Promise.resolve()
     if (this.connectionWaiter) return this.connectionWaiter.promise
 
@@ -220,6 +225,7 @@ export class RealtimeClient<
   }
 
   disconnect(code = 1000, reason = 'Client disconnected'): void {
+    // 명시적 종료는 자동 재연결·구독 복구·대기 요청까지 함께 끊는 최종 상태 전환이다.
     this.shouldReconnect = false
     this.connectionGeneration += 1
     this.openingGeneration = null
@@ -248,6 +254,7 @@ export class RealtimeClient<
   }
 
   private startAuthenticationRefresh(forceHttpRefresh: boolean): Promise<void> {
+    // 만료 타이머와 외부 호출이 겹쳐도 WebSocket 인증 갱신은 한 번만 진행한다.
     if (this.authenticationRefreshInFlight) {
       return this.authenticationRefreshInFlight
     }
@@ -272,6 +279,7 @@ export class RealtimeClient<
     generation: number,
     socket: WebSocket | null,
   ): Promise<void> {
+    // HTTP에서 새 access token을 얻은 뒤 같은 소켓에 auth.refresh로 교체하고 다음 만료를 예약한다.
     const accessToken = await this.options.tokenProvider(forceHttpRefresh)
     if (!this.isActiveSocket(socket, generation) || !this.isConnected) return
     if (!accessToken) {
@@ -333,10 +341,9 @@ export class RealtimeClient<
   }
 
   /**
-   * Keeps a subscription intent across transient socket reconnects.
-   *
-   * The callback runs once for every authenticated connection and can issue the
-   * feature-specific subscribe request. Removing it stops future replays.
+   * 일시적인 소켓 재연결 뒤에도 구독 의도를 유지한다.
+   * 콜백은 인증이 끝난 각 연결에서 한 번 실행되어 기능별 subscribe를 다시 보내며,
+   * 반환한 해제 함수를 호출하면 이후 연결부터 재생하지 않는다.
    */
   registerSubscriptionRecovery(key: string, recover: RealtimeSubscriptionRecovery): () => void {
     if (!key) throw new Error('Realtime subscription keys must not be empty')
@@ -378,6 +385,7 @@ export class RealtimeClient<
   }
 
   private async openSocket(generation: number): Promise<void> {
+    // 토큰 확보 → 소켓 생성 → 프로토콜 인증의 순서로 열고, 각 비동기 경계에서 세대를 확인한다.
     if (
       !this.isGenerationActive(generation) ||
       this.socket ||
@@ -479,6 +487,7 @@ export class RealtimeClient<
           return
         }
 
+        // 인증 만료는 HTTP token을 한 번 강제 갱신해 즉시 재접속하되 반복 실패는 종료한다.
         if (event.code === REALTIME_CLOSE_CODE.AUTHENTICATION_REQUIRED) {
           if (this.refreshAttempted) {
             this.stopConnectionLifecycle(
@@ -494,6 +503,8 @@ export class RealtimeClient<
           return
         }
 
+        // 정상 종료와 재시도로 해결되지 않는 정책·프로토콜 오류는 terminal로 처리해
+        // 의도치 않은 재연결 루프를 만들지 않는다.
         if (TERMINAL_CLOSE_CODES.has(event.code)) {
           this.stopConnectionLifecycle(
             new Error(`Realtime connection closed with terminal code ${event.code}`),
@@ -536,6 +547,7 @@ export class RealtimeClient<
   }
 
   private handleMessage(message: RealtimeMessage | null, generation: number): void {
+    // 모든 서버 프레임은 protocol 파서를 통과한 뒤 제어 응답과 업무 이벤트로 분기한다.
     if (!message) {
       this.failActiveConnection(
         this.socket,
@@ -563,6 +575,7 @@ export class RealtimeClient<
       this.reconnectAttempt = 0
       this.refreshAttempted = false
       this.readyData = ready
+      // 클라이언트 시계 오차를 보정해 access token 갱신 타이머가 너무 늦게 울리지 않게 한다.
       this.serverClockOffsetMs = Date.parse(ready.serverTime) - Date.now()
       this.setState('connected')
       this.scheduleAuthenticationRefresh(ready.accessTokenExpiresAt, generation, this.socket)
@@ -617,6 +630,7 @@ export class RealtimeClient<
   }
 
   private requestWire(event: string, data: unknown): Promise<unknown> {
+    // requestId로 ACK/ERROR를 원 요청 Promise에 연결하고 응답 유실은 timeout으로 회수한다.
     return new Promise((resolve, reject) => {
       let requestId: string | null = null
       try {
@@ -659,6 +673,7 @@ export class RealtimeClient<
       )
     }
 
+    // 문자 수가 아닌 실제 UTF-8 바이트로 제한해 한글 등 다중 바이트 본문도 정확히 검사한다.
     const messageBytes = new TextEncoder().encode(serialized).byteLength
     if (messageBytes > this.maxOutboundMessageBytes) {
       throw new RealtimeSendError(
@@ -668,6 +683,7 @@ export class RealtimeClient<
       )
     }
 
+    // 네트워크가 느릴 때 브라우저 송신 버퍼가 무한히 쌓이는 대신 재시도 가능한 오류를 낸다.
     if (this.socket.bufferedAmount + messageBytes > this.maxBufferedAmountBytes) {
       throw new RealtimeSendError(
         'BACKPRESSURE',
@@ -708,6 +724,7 @@ export class RealtimeClient<
 
     const base = this.options.reconnectBaseDelayMs ?? 500
     const maximum = this.options.reconnectMaxDelayMs ?? 30_000
+    // 지수 백오프에 jitter를 섞어 서버 복구 순간 모든 브라우저가 동시에 재접속하지 않게 한다.
     const exponentialDelay = Math.min(maximum, base * 2 ** (this.reconnectAttempt - 1))
     const jitteredDelay = exponentialDelay * (0.75 + Math.random() * 0.5)
     this.reconnectTimer = setTimeout(() => {
@@ -740,6 +757,7 @@ export class RealtimeClient<
     const serverNow = Date.now() + this.serverClockOffsetMs
     const remainingMs = Date.parse(accessTokenExpiresAt) - serverNow
     if (remainingMs <= 0) return
+    // 수명이 짧은 token에도 최소 절반은 사용한 뒤 갱신해 즉시 refresh가 반복되지 않게 한다.
     const effectiveLeadMs = Math.min(leadMs, remainingMs / 2)
     const delayMs = Math.min(MAX_TIMER_DELAY_MS, Math.max(1, remainingMs - effectiveLeadMs))
     this.authenticationRefreshTimer = setTimeout(() => {
@@ -822,7 +840,7 @@ export class RealtimeClient<
       try {
         socket.close()
       } catch {
-        // The local lifecycle is already stopped; the browser owns final cleanup.
+        // 로컬 생명주기는 이미 끝났으므로 최종 transport 정리는 브라우저에 맡긴다.
       }
     }
   }

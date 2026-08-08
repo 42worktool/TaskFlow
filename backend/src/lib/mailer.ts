@@ -1,3 +1,4 @@
+// SMTP 전송기 생성과 실제 메일 발송을 캡슐화해 큐가 메일 서버 설정에 의존하지 않게 한다.
 import { createTransport } from 'nodemailer'
 import { config } from '../config'
 

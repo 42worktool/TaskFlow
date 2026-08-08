@@ -1,3 +1,5 @@
+// 워크스페이스와 구성원 역할·소유권 정책을 호출하는 HTTP API를 모은다.
+// OWNER는 일반 역할 변경으로 만들 수 없고 별도 위임 API만 사용하도록 타입에서도 제외한다.
 import type { Workspace, WorkspaceRole } from '../types'
 import { apiRequest } from '../services/auth'
 

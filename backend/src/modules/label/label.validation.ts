@@ -1,3 +1,4 @@
+// 레이블 이름·색상과 카드 연결 ID를 API 경계에서 제한한다.
 import { z } from 'zod'
 import { uuidSchema } from '../../lib/validation'
 

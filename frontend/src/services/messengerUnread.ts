@@ -1,3 +1,5 @@
+// 실시간 메시지·친구 요청·워크스페이스 활동을 메신저 배지 하나로 집계한다.
+// 읽음 상태는 서버 영속 알림이 아니라 현재 브라우저 세션의 UI 관심 상태를 나타낸다.
 import { computed, reactive } from 'vue'
 import type { DirectMessage, FriendRequest, NotificationEvent, WorkspaceMessage } from '../types'
 
@@ -46,6 +48,7 @@ export function markFriendRequestsRead(): void {
 }
 
 export function clearMessengerUnread(): void {
+  // reactive 객체 자체를 교체하지 않고 키를 지워 기존 computed 구독을 유지한다.
   for (const workspaceId of Object.keys(messengerUnreadState.workspaces)) {
     delete messengerUnreadState.workspaces[workspaceId]
   }
@@ -59,6 +62,7 @@ export function pruneMessengerUnreadRooms(
   workspaceIds: readonly string[],
   friendIds: readonly string[],
 ): void {
+  // 탈퇴한 워크스페이스나 해제된 친구의 배지가 총합에 영구히 남지 않도록 정리한다.
   const availableWorkspaces = new Set(workspaceIds)
   const availableFriends = new Set(friendIds)
   for (const workspaceId of Object.keys(messengerUnreadState.workspaces)) {
@@ -85,6 +89,7 @@ function recordWorkspaceUnread(
   workspaceId: string,
   visibleRoom: VisibleMessengerRoom | null,
 ): boolean {
+  // 사용자가 현재 보고 있는 방의 이벤트는 이미 읽은 것으로 간주해 배지를 올리지 않는다.
   if (isVisibleRoom(visibleRoom, 'workspace', workspaceId)) return false
   messengerUnreadState.workspaces[workspaceId] = workspaceUnreadCount(workspaceId) + 1
   return true
@@ -104,6 +109,7 @@ export function receiveDirectMessageUnread(
   currentUserId: string | null,
   visibleRoom: VisibleMessengerRoom | null,
 ): boolean {
+  // 내 송신 메시지와 다른 수신자에게 간 메시지는 현재 사용자의 알림이 아니다.
   if (
     !currentUserId ||
     message.author.user_id === currentUserId ||
@@ -138,6 +144,7 @@ export function receiveFriendRequestUnread(
 }
 
 export function parseNotificationEvent(value: unknown): NotificationEvent | null {
+  // WebSocket 경계의 unknown 값을 화면 타입으로 신뢰하기 전에 필수 필드를 런타임 검증한다.
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<NotificationEvent>
   const actor = candidate.actor

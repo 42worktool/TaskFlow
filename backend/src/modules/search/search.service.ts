@@ -55,11 +55,15 @@ interface UserSearchItem extends SearchSortValue {
 }
 
 type InternalSearchItem = WorkspaceSearchItem | CardSearchItem | UserSearchItem
+
+// 워크스페이스/카드/사용자를 각자 DB에서 필터링한 뒤 공통 정렬 키로 합친다.
+// 서로 다른 모델을 하나의 Slack형 결과 목록으로 보여주기 위한 내부 표현이다.
 function normalized(value: string): string {
   return value.trim().toLocaleLowerCase()
 }
 
 function relevanceScore(item: SearchSortValue, query: string): number {
+  // 완전 일치, 접두 일치, 이름 포함, 보조 필드 포함 순으로 단순 가중치를 부여한다.
   const terms = normalized(query).split(/\s+/).filter(Boolean)
   if (terms.length === 0) return 0
 
@@ -104,6 +108,7 @@ function compareItems(
 }
 
 function publicItem(item: InternalSearchItem) {
+  // 정렬 전용 key/searchable 필드는 응답에서 제거해 내부 검색 구현이 API 계약에 새지 않게 한다.
   if (item.kind === 'workspace') {
     return {
       kind: item.kind,
@@ -148,11 +153,14 @@ export async function search(input: SearchInput) {
   const searchesUsers =
     (input.type === 'all' || input.type === 'user') && Boolean(query) && !input.labelId
 
+  // 워크스페이스와 카드는 공개 범위 또는 활성 멤버십 안에서만 찾는다. 사용자 검색은 공개
+  // 프로필을 대상으로 하되 workspace scope가 있으면 그 공간의 활성 멤버로 다시 제한한다.
   const workspaceVisibility = [
     { is_public: true },
     { members: { some: { user_id: input.userId, deleted_at: null } } },
   ]
 
+  // 선택된 타입과 scope에 필요한 쿼리만 실행하고, 독립적인 모델 조회는 병렬 처리한다.
   const [workspaces, cards, users] = await Promise.all([
     searchesWorkspaces
       ? prisma.workspace.findMany({
@@ -205,6 +213,7 @@ export async function search(input: SearchInput) {
                 workspace: { deleted_at: null, OR: workspaceVisibility },
               },
             },
+            // 레이블 ID는 워크스페이스 안에서만 의미가 있으므로 두 scope가 함께 있을 때만 적용한다.
             ...(input.labelId && input.workspaceId
               ? {
                   card_labels: {
@@ -366,6 +375,7 @@ export async function search(input: SearchInput) {
     })),
   ]
 
+  // 서로 다른 모델의 결과를 합친 뒤 정렬/페이지를 적용해야 전체 결과 기준 순서가 유지된다.
   items.sort((left, right) => compareItems(left, right, input.sort, query))
   const total = items.length
   const totalPages = Math.max(1, Math.ceil(total / input.limit))

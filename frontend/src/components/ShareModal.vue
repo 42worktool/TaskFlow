@@ -4,6 +4,8 @@ import { WorkspaceAPI } from '../api/workspace'
 import type { Workspace, WorkspaceMember, WorkspaceRole } from '../types'
 import { canAssignWorkspaceRole, canChangeWorkspaceMemberRole } from '../utils/workspacePermissions'
 
+// 초대, 역할 변경, 멤버 제거와 소유권 위임을 한 관리 화면에서 수행한다.
+// 현재 관리자의 계급보다 낮은 역할만 제어하도록 공용 권한 규칙을 UI 선택지와 요청 직전에 모두 적용한다.
 const props = defineProps<{
   workspaceName: string
   workspaceId: string
@@ -48,6 +50,7 @@ const assignableRoles = computed(() =>
 )
 
 watch(assignableRoles, (roles) => {
+  // 권한이 실시간으로 낮아지면 더 이상 부여할 수 없는 초대 역할을 첫 유효 값으로 즉시 보정한다.
   if (!roles.some((role) => role.value === inviteRole.value) && roles[0]) {
     inviteRole.value = roles[0].value
   }
@@ -81,6 +84,7 @@ async function handleRoleChange(member: WorkspaceMember, event: Event): Promise<
   const select = event.currentTarget
   if (!(select instanceof HTMLSelectElement)) return
 
+  // 변경된 권한으로 남아 있던 select를 조작할 수 있으므로 요청 직전에도 계층 규칙을 재검사한다.
   const role = select.value
   if (
     updatingRole.value ||
@@ -127,6 +131,7 @@ async function handleRemoveMember(userId: string) {
 }
 
 async function handleOwnershipTransfer(member: WorkspaceMember): Promise<void> {
+  // 소유권 이전은 현재 소유자에게만 허용하고 되돌리기 어려운 역할 교환을 확인창으로 명시한다.
   if (props.managerRole !== 'OWNER' || transferringOwnership.value) return
   if (
     !window.confirm(

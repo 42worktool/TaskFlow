@@ -1,3 +1,4 @@
+// DM과 워크스페이스 채팅이 같은 길이 제한, 응답 형태, 조회 순서를 공유하게 한다.
 import { z } from 'zod'
 import { userSummarySchema } from './user-summary'
 import { uuidSchema } from './validation'

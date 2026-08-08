@@ -26,6 +26,8 @@ import type { Card, DraggableChange, ListWithCards } from '../types'
 import { horizontalEdgeScrollDelta } from '../utils/dragAutoScroll'
 import { neighborIds } from '../utils/ordering'
 
+// 보드의 로컬 정렬 상태와 서버 상태를 연결하고, 실시간 무효화와 외부 드롭을 한 흐름으로 조정한다.
+// 드래그 도중에는 서버 재조회가 Sortable의 임시 배열을 덮지 않도록 변경을 모아 두었다가 반영한다.
 const route = useRoute()
 const router = useRouter()
 const props = withDefaults(
@@ -70,6 +72,7 @@ const showAddList = ref(false)
 const newListName = ref('')
 let isSubmittingList = false
 
+// 세대 번호로 오래된 응답을 무시하고, 배경 갱신은 현재 보드를 비우지 않아 드래그 문맥을 유지한다.
 async function fetchLists(options: { reset?: boolean } = {}): Promise<void> {
   const reset = options.reset ?? true
   const generation = ++listLoadGeneration
@@ -155,6 +158,7 @@ function scheduleInvalidationFlush(): void {
   }, 80)
 }
 
+// 여러 실시간 이벤트를 짧게 합쳐 필요한 리스트만 갱신하고, 일부 조회가 실패하면 전체 조회로 복구한다.
 async function flushInvalidations(): Promise<void> {
   if (dragDepth > 0 || refreshRunning) return
   refreshRunning = true
@@ -219,6 +223,7 @@ function continueBoardAutoScroll(): void {
   autoScrollFrame = window.requestAnimationFrame(continueBoardAutoScroll)
 }
 
+// 인박스 카드가 가로로 긴 보드 끝에 닿을 때 다음 리스트까지 이동할 수 있도록 프레임 단위로 스크롤한다.
 function handleCardDragPointer(event: { clientX: number }): void {
   if (messengerState.cardDrag?.source !== 'inbox') return
   dragPointerX = event.clientX
@@ -411,8 +416,8 @@ function persistCardChange(
       () => queueFullRefresh(),
     )
   } else if (event.removed && isExternalCardDropClaimed(event.removed.element.id)) {
-    // Sortable can remove a fallback-dragged card from its local source model
-    // before the external target settles. Reconcile without persisting a move.
+    // fallback 드래그는 외부 드롭 확정 전에 원본 배열에서 카드를 뺄 수 있으므로,
+    // 이동 API를 호출하지 않고 서버 상태를 다시 읽어 원래 보드를 복원한다.
     queueFullRefresh()
   }
 }
@@ -420,6 +425,8 @@ function persistCardChange(
 function onCardChange(listId: string, event: DraggableChange<Card>) {
   if (!props.canEditBoard) return
   const workspaceId = String(route.params.workspaceId ?? '')
+  // 외부 drop capture가 메신저/인박스의 소유권을 먼저 확정할 한 task를 준 뒤,
+  // 아직 보드가 처리할 변경만 서버 이동·정렬 API에 반영한다.
   const timer = window.setTimeout(() => {
     cardChangeTimers.delete(timer)
     persistCardChange(workspaceId, listId, event)
@@ -539,6 +546,7 @@ function onBoardCardDragStart(card: Card): void {
 }
 
 function onBoardCardDragEnd(): void {
+  // 보드 밖 드롭은 Sortable 리스트 이동과 별개다. 최종 소유자가 확정한 대상에만 한 번 반영한다.
   try {
     const drag = messengerState.cardDrag
     const drop = messengerState.externalCardDrop
@@ -660,6 +668,7 @@ const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) =
   scheduleInvalidationFlush()
 })
 
+// 화면을 떠날 때 예약된 저장과 전역 드래그 대상을 모두 지워 다음 워크스페이스에 상태가 새지 않게 한다.
 onMounted(() => {
   window.addEventListener('dragover', handleCardDragPointer)
   window.addEventListener('mousemove', handleCardDragPointer)

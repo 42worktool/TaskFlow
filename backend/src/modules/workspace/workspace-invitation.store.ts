@@ -10,6 +10,9 @@ const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60
 const INVITE_KEY_PREFIX = 'workspace:invite:'
 const INVITE_INDEX_KEY_PREFIX = 'workspace:invite:index:'
 
+// 초대 본문은 만료 가능한 Redis 값으로 두고, 워크스페이스별 키 인덱스를 별도로 둔다.
+// 워크스페이스 삭제 시 아직 사용되지 않은 초대를 한 번에 폐기하기 위한 구조다.
+
 function invitationIndexKey(workspaceId: string): string {
   return `${INVITE_INDEX_KEY_PREFIX}${workspaceId}`
 }
@@ -17,6 +20,7 @@ function invitationIndexKey(workspaceId: string): string {
 function invitationKey(token: string): string | null {
   const parsed = workspaceInvitationTokenSchema.safeParse(token)
   if (!parsed.success) return null
+  // URL에 전달되는 원본 토큰은 Redis 키에 저장하지 않아 저장소 노출 시 바로 사용할 수 없게 한다.
   const digest = createHash('sha256').update(parsed.data).digest('hex')
   return `${INVITE_KEY_PREFIX}${digest}`
 }
@@ -35,6 +39,7 @@ async function removeFromIndex(
   invitation: WorkspaceInvitation,
   key: string,
 ): Promise<void> {
+  // 인덱스 정리는 보조 작업이므로 실패해도 이미 소비된 초대의 본 처리까지 실패시키지 않는다.
   try {
     await redis.sRem(invitationIndexKey(invitation.workspaceId), key)
   } catch (error) {
@@ -50,6 +55,7 @@ async function create(input: WorkspaceInvitation): Promise<string> {
   const invitation = workspaceInvitationSchema.parse(input)
 
   for (;;) {
+    // NX 저장이 충돌하면 새 난수를 만들어 재시도해 기존 초대를 덮어쓰지 않는다.
     const token = randomBytes(32).toString('base64url')
     const key = invitationKey(token)!
     const created = await redis.set(key, JSON.stringify(invitation), {
@@ -83,6 +89,7 @@ async function take(token: string): Promise<WorkspaceInvitation | null> {
   if (!key) return null
 
   const redis = await getRedisClient()
+  // 조회와 삭제를 원자적으로 묶어 동시에 수락해도 한 요청만 초대를 소비한다.
   const raw = await redis.getDel(key)
   if (!raw) return null
 

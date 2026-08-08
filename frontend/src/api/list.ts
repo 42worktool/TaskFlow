@@ -1,3 +1,4 @@
+// 보드 리스트의 조회·이름 변경·정렬 계약을 화면 컴포넌트에서 분리한다.
 import type { List, ListWithCards } from '../types'
 import { apiRequest } from '../services/auth'
 

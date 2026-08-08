@@ -16,5 +16,5 @@
     "types": ["node", "express"]
   },
   "include": ["index.ts", "src/**/*.ts", "prisma/seed.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["test/**/*.ts"]
 }

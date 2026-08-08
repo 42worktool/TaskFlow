@@ -9,6 +9,8 @@ import { parseWorkspaceChangedEvent } from '../services/realtime/protocol'
 import type { Card, ListWithCards } from '../types'
 import { buildCalendarWeeks, type CalendarRangeSegment } from '../utils/calendar'
 
+// 보드 카드의 시작일~마감일을 월간 주차와 레인으로 배치해 기간 막대로 보여준다.
+// 실시간 변경은 영향받은 리스트만 다시 읽고, 상세 모달을 연 카드는 별도 토큰으로 갱신한다.
 const route = useRoute()
 const props = withDefaults(
   defineProps<{
@@ -86,6 +88,7 @@ const hasCardsThisMonth = computed(() =>
 const rangeColors = ['#2563eb', '#7c3aed', '#0f766e', '#c2410c', '#be123c']
 
 function rangeColor(cardId: string): string {
+  // 카드 ID 기반의 고정 색을 사용해 다시 그려져도 같은 일정이 같은 색으로 보이게 한다.
   let hash = 0
   for (let index = 0; index < cardId.length; index++) {
     hash = (hash * 31 + cardId.charCodeAt(index)) | 0
@@ -122,6 +125,7 @@ function cardRangeLabel(card: Card): string {
 }
 
 async function loadLists(reset: boolean): Promise<void> {
+  // 월을 이동해도 데이터 원본은 동일하므로 워크스페이스 전환 때만 화면을 비우고 다시 읽는다.
   const generation = ++loadGeneration
   const workspaceId = String(route.params.workspaceId ?? '')
   const showLoading = reset || loading.value
@@ -201,6 +205,7 @@ function queueFullRefresh(): void {
 }
 
 async function flushInvalidations(): Promise<void> {
+  // 짧은 시간에 연속 도착한 이벤트를 묶어 삭제는 즉시 반영하고 나머지는 리스트 단위로 재조회한다.
   if (refreshRunning) return
   refreshRunning = true
 
@@ -294,6 +299,7 @@ const removeWorkspaceChangeListener = realtime.on('workspace.changed', (value) =
   scheduleInvalidationFlush()
 })
 
+// 화면 해제 뒤 응답과 예약 갱신이 달력 상태를 만지지 못하도록 세대와 리스너를 함께 종료한다.
 onUnmounted(() => {
   loadGeneration += 1
   removeWorkspaceChangeListener()

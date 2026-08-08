@@ -82,6 +82,9 @@ Prototype channels and presence are intentionally held in one backend process.
 - A browser that supports WebSockets.
 - Google OAuth client credentials to test Google login.
 - SMTP credentials to send workspace invitations.
+- For a public Let's Encrypt certificate, a domain whose DNS points to a
+  publicly reachable host and an OpenSSH client when using the optional reverse
+  tunnel.
 
 The containers pin the main runtime families used by the project:
 Node.js 20, PostgreSQL 15, Redis 7, and Nginx stable Alpine. A host Node.js
@@ -101,6 +104,10 @@ deployment-specific placeholder:
 | `NODE_ENV`                                          | Runtime mode; use `development` locally and `production` in deployment                                |
 | `HTTPS_PORT`                                        | Host port exposed by the Nginx HTTPS entrypoint                                                       |
 | `TLS_CERT_DIR`                                      | Production host directory containing `fullchain.pem` and `privkey.pem`; defaults to `./.taskflow/tls` |
+| `DOMAIN`                                            | Public domain used for optional automatic Let's Encrypt HTTP-01 issuance                              |
+| `CERTBOT_EMAIL`                                     | Email registered with Let's Encrypt; defaults to `admin@DOMAIN` when omitted                          |
+| `SSH_TUNNEL_HOST`                                   | Optional `~/.ssh/config` host alias used for certificate and application reverse tunnels              |
+| `LOCAL_HTTP_PORT`                                   | Local host port used by standalone Certbot; defaults to `8080`                                        |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Credentials for the environment-specific PostgreSQL container                                         |
 | `DATABASE_URL`                                      | Backend connection URL using the same PostgreSQL credentials                                          |
 | `GOOGLE_CLIENT_ID`                                  | Google OAuth web client ID                                                                            |
@@ -196,22 +203,100 @@ Create a separate production environment file and replace every placeholder:
 
 ```bash
 cp .env.prod.example .env.prod
+```
+
+At minimum, replace the production database, JWT, OAuth, and SMTP credentials.
+For a public domain, also set `DOMAIN`, `CERTBOT_EMAIL`, `APP_ORIGIN`, and
+`GOOGLE_REDIRECT_URI` to the exact deployed HTTPS origin. The domain's A or
+AAAA record must resolve to the public host that receives the certificate and
+application tunnels.
+
+If the application runs behind a separate public VPS, configure key-based SSH
+access under a host alias instead of putting a password or private-key contents
+in `.env.prod`:
+
+```sshconfig
+Host taskflow-tunnel
+  HostName vps.example.com
+  User root
+  IdentityFile ~/.ssh/id_ed25519_taskflow
+```
+
+Then enable the tunnel in `.env.prod`:
+
+```dotenv
+DOMAIN=taskflow.example.com
+CERTBOT_EMAIL=admin@example.com
+SSH_TUNNEL_HOST=taskflow-tunnel
+LOCAL_HTTP_PORT=8080
+APP_ORIGIN=https://taskflow.example.com
+GOOGLE_REDIRECT_URI=https://taskflow.example.com/oauth/google
+```
+
+The SSH server must allow remote forwarding and public reverse-tunnel binds,
+and its firewall must accept ports 80 and 443. Those remote ports must also be
+free. Standard OpenSSH permits remote forwarding of privileged ports below
+1024 only for a root login, so the tunnel alias normally needs a carefully
+controlled root account and a dedicated key. If root SSH access is prohibited,
+the scripts as written require an equivalent VPS-side proxy or port-redirection
+arrangement. The server may also require `AllowTcpForwarding yes` and
+`GatewayPorts yes`, or equivalent provider settings. The scripts use
+non-interactive SSH, so verify the host fingerprint and key-based connection
+before the first run. If no SSH tunnel is used, public port 80 must instead be
+forwarded to `LOCAL_HTTP_PORT`; setting `LOCAL_HTTP_PORT=80` is also possible
+when the host can bind that port directly.
+
+Start the production stack with:
+
+```bash
 make prod-up
 ```
+
+Before Compose starts, `certbot-issue.sh` runs Certbot in standalone mode on
+`LOCAL_HTTP_PORT`. When `SSH_TUNNEL_HOST` is configured, a temporary reverse
+tunnel exposes that listener as the VPS's port 80 for the Let's Encrypt HTTP-01
+challenge and closes immediately afterward. A newly issued or previously
+stored certificate is copied to `TLS_CERT_DIR`, then the production services
+start. Finally, `app-tunnel.sh` keeps the VPS's port 443 forwarded to the local
+`HTTPS_PORT` until `make prod-down` stops the tunnel.
 
 Production uses compiled backend and frontend images without source mounts.
 Its PostgreSQL and Redis volumes belong to the separate `taskflow-prod`
 Compose project, so development resets cannot delete production data. Use
 `make prod-logs` and `make prod-down` for its lifecycle.
 
-With the default `TLS_CERT_DIR=./.taskflow/tls`, Nginx creates a self-signed
-localhost certificate when the directory does not contain one. To use a domain
-certificate later, place its files at `fullchain.pem` and `privkey.pem` in a
-dedicated host directory, set `TLS_CERT_DIR` to that directory, and restart the
-production services. Also update `APP_ORIGIN` and `GOOGLE_REDIRECT_URI` to the
-exact public HTTPS domain. Never enable `ALLOW_DB_SEED` in production.
+Certbot keeps its ACME account and original certificate files under
+`.taskflow/letsencrypt/`. Nginx reads the installed copies from
+`${TLS_CERT_DIR:-./.taskflow/tls}/fullchain.pem` and `privkey.pem`. The
+persistent tunnel records its PID and diagnostics in
+`.taskflow/app-tunnel.pid` and `.taskflow/app-tunnel.log`. Both `.env.prod` and
+the entire `.taskflow/` directory are ignored by Git; keep them that way, use
+restrictive permissions, and never commit or share the TLS private key, ACME
+account data, or SSH private key.
+
+When `DOMAIN` is unset or certificate issuance fails, startup continues and
+the Nginx entrypoint generates or keeps a self-signed certificate. A manually
+managed certificate remains supported by placing `fullchain.pem` and
+`privkey.pem` in `TLS_CERT_DIR` before startup. Renew a Let's Encrypt
+certificate with:
+
+```bash
+make prod-renew
+```
+
+The renewal target stops Nginx, briefly opens the HTTP-01 tunnel when
+configured, copies the renewed files into `TLS_CERT_DIR`, and starts the
+services again. If renewal fails, the installed certificate is kept. Renewal
+is not scheduled by the project, so run this command before expiration or
+invoke it from an external scheduler. Never enable `ALLOW_DB_SEED` in
+production.
 
 ### 5. Run checks
+
+Backend test files are centralized under `backend/test`, and frontend test
+files are centralized under `frontend/test`. Run their package scripts from
+the respective package roots so each suite uses its own TypeScript and test
+runner configuration:
 
 ```bash
 cd backend
@@ -403,20 +488,28 @@ Minor module is worth 1 point. This table claims only modules whose complete
 requirements can be demonstrated from the current source; final acceptance
 remains the evaluator's decision.
 
-| Module                                                | Level | Points | Justification and implementation                                                                                                                                              | Contributors                                      |
-| ----------------------------------------------------- | ----- | -----: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Use a frontend and backend framework                  | Major |      2 | Vue 3 frontend and Express 5 backend, both in TypeScript                                                                                                                      | `wchoe`, `yeonjuki`, `injo`, `chakim`, `seungjuk` |
-| Implement real-time features using WebSockets         | Major |      2 | Authenticated WSS protocol with cross-client updates, channel broadcasting, reconnect, token refresh, heartbeat, graceful disconnect, and server drain                        | `seungjuk`                                        |
-| Allow users to interact with other users              | Major |      2 | Persistent direct and workspace chat, public profile views, friend request/removal flows, friend lists, and online presence                                                   | `seungjuk`, `yeonjuki`, `injo`, `wchoe`           |
-| Use an ORM                                            | Minor |      1 | Prisma schema, relations, transactions, and migrations over PostgreSQL                                                                                                        | `yeonjuki`, `injo`, `chakim`, `wchoe`             |
-| Real-time collaborative features                      | Minor |      1 | Shared workspaces synchronize list, card, label, membership, chat-link, and presence changes across connected clients                                                         | `seungjuk`                                        |
-| Advanced search with filters, sorting, and pagination | Minor |      1 | Workspace-scoped card and label filters, people discovery, slash commands, relevance/newest/name sorting, and URL-backed pagination                                           | `seungjuk`, `wchoe`                               |
-| File upload and management system                     | Minor |      1 | Card attachments support multiple media types, client/server validation, content-signature checks, access-controlled storage, image preview, progress, download, and deletion | `injo`                                            |
-| Standard user management and authentication           | Major |      2 | Profile editing, validated avatar upload/removal with fallback avatars, public profile views, friends, and realtime online status                                             | `seungjuk`, `injo`, `yeonjuki`, `wchoe`           |
-| Remote authentication with OAuth 2.0                  | Minor |      1 | Google Authorization Code flow with state, nonce, ID-token verification, and account linking policy                                                                           | `seungjuk`                                        |
-| Organization system                                   | Major |      2 | Workspace create/edit/delete, invitations, member add/remove, role-aware views/actions, and list/card resources within each workspace                                         | `chakim`, `injo`, `wchoe`, `seungjuk`             |
-| User activity analytics and insights dashboard        | Minor |      1 | Trigger-backed contribution heatmap, dated activity feed, issue flow, completion metrics, list/activity charts, and selectable periods                                        | `seungjuk`                                        |
-| **Currently defensible total**                        |       | **16** | Exceeds the 14-point subject requirement by 2 points                                                                                                                          |                                                   |
+| Module                                                          | Level | Points | Justification and implementation                                                                                                                                                             | Contributors                                      |
+| --------------------------------------------------------------- | ----- | -----: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Use a frontend and backend framework                            | Major |      2 | Vue 3 frontend and Express 5 backend, both in TypeScript                                                                                                                                     | `wchoe`, `yeonjuki`, `injo`, `chakim`, `seungjuk` |
+| Implement real-time features using WebSockets                   | Major |      2 | Authenticated WSS protocol with cross-client updates, channel broadcasting, reconnect, token refresh, heartbeat, graceful disconnect, and server drain                                       | `seungjuk`                                        |
+| Allow users to interact with other users                        | Major |      2 | Persistent direct and workspace chat, public profile views, friend request/removal flows, friend lists, and online presence                                                                  | `seungjuk`, `yeonjuki`, `injo`, `wchoe`           |
+| Use an ORM                                                      | Minor |      1 | Prisma schema, relations, transactions, and migrations over PostgreSQL                                                                                                                       | `yeonjuki`, `injo`, `chakim`, `wchoe`             |
+| Real-time collaborative features                                | Minor |      1 | Shared workspaces synchronize list, card, label, membership, chat-link, and presence changes across connected clients                                                                        | `seungjuk`                                        |
+| Advanced search with filters, sorting, and pagination           | Minor |      1 | Workspace-scoped card and label filters, people discovery, slash commands, relevance/newest/name sorting, and URL-backed pagination                                                          | `seungjuk`, `wchoe`                               |
+| File upload and management system                               | Minor |      1 | Card attachments support multiple media types, client/server validation, content-signature checks, access-controlled storage, image preview, progress, download, and deletion                | `injo`                                            |
+| Standard user management and authentication                     | Major |      2 | Profile editing, validated avatar upload/removal with fallback avatars, public profile views, friends, and realtime online status                                                            | `seungjuk`, `injo`, `yeonjuki`, `wchoe`           |
+| Remote authentication with OAuth 2.0                            | Minor |      1 | Google Authorization Code flow with state, nonce, ID-token verification, and account linking policy                                                                                          | `seungjuk`                                        |
+| Organization system                                             | Major |      2 | Workspace create/edit/delete, invitations, member add/remove, role-aware views/actions, and list/card resources within each workspace                                                        | `chakim`, `injo`, `wchoe`, `seungjuk`             |
+| User activity analytics and insights dashboard                  | Minor |      1 | Trigger-backed contribution heatmap, dated activity feed, issue flow, completion metrics, list/activity charts, and selectable periods                                                       | `seungjuk`                                        |
+| Custom module: separate development and production environments | Minor |      1 | Dedicated Compose overlays and environment files, independent project and volume namespaces, HMR development targets, compiled production images, and separate lifecycle commands            | `wchoe`                                           |
+| Custom module: public custom-domain deployment                  | Major |      2 | DNS-based public HTTPS deployment with scripted Let's Encrypt HTTP-01 issuance and renewal, persistent certificates, self-signed fallback, and optional SSH reverse tunnels for ports 80/443 | `yeonjuki`                                        |
+| **Currently defensible total**                                  |       | **19** | Exceeds the 14-point subject requirement by 5 points                                                                                                                                         |                                                   |
+
+The two custom modules cover separate responsibilities. The environment module
+provides reproducible development and production execution. The domain module
+adds the public deployment lifecycle on top: ACME certificate issuance and
+renewal, certificate persistence, DNS-bound HTTPS configuration, and optional
+SSH tunnelling when the application is hosted behind a separate public VPS.
 
 The advanced analytics dashboard is not claimed: although its charts, live
 updates, and date filters are implemented, the Major module also requires PDF

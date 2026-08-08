@@ -1,3 +1,4 @@
+// 검색어, 카테고리, 워크스페이스·레이블 범위, 정렬, 페이지 조건의 입력 경계를 정의한다.
 import { z } from 'zod'
 import { uuidSchema } from '../../lib/validation'
 

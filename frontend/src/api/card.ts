@@ -1,3 +1,5 @@
+// 카드 상세, 정렬·이동, 댓글, 첨부파일에 관한 HTTP 계약을 한곳에 모은다.
+// 화면은 엔드포인트 형식을 알지 않고 카드 ID와 변경 내용만 전달하도록 분리했다.
 import type { Card, CardAttachment, CardComment, CardDetail } from '../types'
 import { apiRequest } from '../services/auth'
 import { downloadFile, fetchBlob, uploadFile } from '../services/fileTransfer'

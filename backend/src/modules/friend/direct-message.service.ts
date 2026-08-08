@@ -21,6 +21,7 @@ class FriendshipRequiredError extends AppError {
 }
 
 async function requireAcceptedFriendship(userId: string, friendUserId: string): Promise<void> {
+  // DM은 수락된 친구 관계가 있을 때만 허용하며 자신에게 보내는 대화방은 만들지 않는다.
   if (userId === friendUserId) throw new FriendshipRequiredError()
 
   const pair = canonicalFriendPair(userId, friendUserId)
@@ -68,6 +69,7 @@ export async function listDirectMessages(input: { userId: string; friendUserId: 
     take: MESSAGE_HISTORY_LIMIT,
   })
 
+  // 인덱스를 활용해 최신 N개를 역순 조회한 뒤 화면 표시용 시간순으로 뒤집는다.
   return messages.reverse().map(toDirectMessageDto)
 }
 
@@ -88,6 +90,7 @@ export async function createDirectMessage(input: {
   })
   const dto = toDirectMessageDto(message)
 
+  // 메시지를 DB에 먼저 저장하고 발신자/수신자의 모든 탭에 같은 DTO를 전송한다.
   publishDirectMessageCreated(dto)
   return dto
 }

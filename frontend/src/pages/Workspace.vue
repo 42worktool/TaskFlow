@@ -15,6 +15,8 @@ import {
   workspaceRoleFor,
 } from '../utils/workspacePermissions'
 
+// 로그인 사용자의 워크스페이스를 소유 프로젝트와 참여 프로젝트로 나눠 진입·편집·탈퇴 행동을 제공한다.
+// 소유자 정책은 UI에서도 미리 안내하지만 최종 권한 검증은 각 API가 다시 수행한다.
 const showCreate = ref(false)
 const inboxOpen = ref(false)
 const memberWorkspaces = ref<Workspace[]>([])
@@ -60,6 +62,7 @@ async function refreshList() {
 }
 
 function onSaved(ws: Workspace) {
+  // 생성 결과는 앞에 추가하고 편집 결과는 같은 ID의 항목만 바꿔 전체 목록 재조회 없이 반영한다.
   if (!editing.value) {
     memberWorkspaces.value.unshift(ws)
     return
@@ -134,6 +137,7 @@ async function leaveWorkspace(ws: Workspace) {
   if (!role) return
   menuOpen.value = null
 
+  // 다른 구성원이 남은 소유자는 먼저 소유권을 넘겨야 하며, 혼자라면 나가기가 삭제 의미를 갖는다.
   if (role === 'OWNER' && ws.members.length > 1) {
     alert('팀원 관리에서 다른 구성원에게 소유권을 위임한 뒤 나갈 수 있습니다.')
     return

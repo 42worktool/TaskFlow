@@ -9,6 +9,8 @@ import type { Friend, FriendRequest } from '../types'
 import { resolveFriendRelationship } from '../utils/friendRelationship'
 import AccountLink from './AccountLink.vue'
 
+// 공개 프로필을 독립 모달로 보여주고 로그인 사용자의 친구 관계에 맞는 요청 행동을 함께 제공한다.
+// 프로필과 친구 관계 목록 조회는 세대 번호로 보호해 빠른 사용자 전환 뒤의 조회 응답을 차단한다.
 const route = useRoute()
 const props = defineProps<{
   userId: string
@@ -59,6 +61,7 @@ function closeProfile(): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+  // 프로필 위에 계정 편집 화면이 겹친 경우에는 Escape를 상위 표면이 먼저 처리하게 둔다.
   if (event.key !== 'Escape') return
   if (profileModalState.surface && profileModalState.surface !== 'profile') return
   event.preventDefault()
@@ -77,6 +80,7 @@ function resetRelationship(): void {
 }
 
 async function loadRelationship(generation: number): Promise<void> {
+  // 본인 프로필에는 친구 API가 필요 없고, 타인일 때만 목록과 요청 양쪽을 조합해 관계를 판정한다.
   if (!profile.value || !authState.user || isOwnProfile.value) return
 
   relationshipLoading.value = true

@@ -1,3 +1,5 @@
+// 공개 프로필과 내 계정 편집이 동시에 열리지 않도록 하나의 전역 표면 상태로 관리한다.
+// 메시지·검색 등 어느 화면에서도 동일한 모달을 열 수 있게 호출 지점을 분리했다.
 import { reactive } from 'vue'
 
 type ProfileSurface = 'profile' | 'account' | null

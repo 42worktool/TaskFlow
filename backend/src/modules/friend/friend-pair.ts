@@ -12,6 +12,8 @@ class CannotFriendSelfError extends AppError {
 }
 
 export function canonicalFriendPair(userId: string, friendUserId: string): FriendPair {
+  // 친구 관계는 방향이 없으므로 두 ID를 항상 같은 순서로 저장해
+  // A-B와 B-A가 별도 행으로 생기지 않게 한다.
   if (userId === friendUserId) throw new CannotFriendSelfError()
   return userId < friendUserId
     ? { user_low_id: userId, user_high_id: friendUserId }

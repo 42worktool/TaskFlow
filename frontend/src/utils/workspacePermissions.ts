@@ -1,3 +1,5 @@
+// 워크스페이스 역할 위계를 화면 노출 판단에 재사용하는 순수 함수 모음이다.
+// 보안을 보장하는 최종 권한 검사는 서버가 수행하며, 여기서는 불가능한 조작을 미리 숨긴다.
 import type { Workspace, WorkspaceRole } from '../types'
 
 const ROLE_RANK: Record<WorkspaceRole, number> = {
@@ -23,6 +25,7 @@ export function canChangeWorkspaceMemberRole(
   callerRole: WorkspaceRole | null,
   targetRole: WorkspaceRole,
 ): boolean {
+  // 관리자도 동급 이상과 OWNER는 제어하지 못하고 자신보다 낮은 역할만 바꿀 수 있다.
   return (
     callerRole !== null &&
     ROLE_RANK[callerRole] >= ROLE_RANK.ADMIN &&
@@ -46,6 +49,7 @@ export function partitionWorkspacesByOwnership(
   workspaces: readonly Workspace[],
   userId: string | undefined,
 ): { owned: Workspace[]; participating: Workspace[] } {
+  // 첫 화면에서 내가 만든 프로젝트와 참여 중인 프로젝트를 역할 기준으로 분리한다.
   const owned: Workspace[] = []
   const participating: Workspace[] = []
 

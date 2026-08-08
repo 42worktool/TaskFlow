@@ -1,3 +1,6 @@
+// 브라우저 인증 상태와 access token의 발급·갱신·폐기를 단일 생명주기로 관리한다.
+// 브라우저는 HttpOnly refresh cookie를 보관하고 서버는 대응 세션 해시를 Redis에 두며,
+// 화면 JavaScript는 메모리의 짧은 access token만 사용한다.
 import { reactive } from 'vue'
 
 export interface AuthUser {
@@ -60,6 +63,8 @@ export const authState = reactive<{
   initialized: false,
 })
 
+// generation은 로그아웃 등으로 폐기된 비동기 응답이 새 세션을 덮지 못하게 하고,
+// attempt는 같은 generation 안에서 더 늦게 시작한 로그인 시도만 채택하게 한다.
 let initialization: Promise<void> | null = null
 let authGeneration = 0
 let authAttempt = 0
@@ -83,7 +88,7 @@ function setExplicitLogout(value: boolean): void {
     if (value) window.localStorage.setItem(EXPLICIT_LOGOUT_KEY, '1')
     else window.localStorage.removeItem(EXPLICIT_LOGOUT_KEY)
   } catch {
-    // Authentication still works when browser storage is unavailable.
+    // 브라우저 저장소를 쓸 수 없어도 현재 탭의 인증 흐름 자체는 계속 동작한다.
   }
 }
 
@@ -98,9 +103,8 @@ function abortRefresh(): void {
   currentRefresh?.controller.abort()
 }
 
-// Exported for account.ts's delete-account flow: clearing the session after
-// the account itself is gone is a session-management concern, not something
-// that belongs duplicated outside auth.ts.
+// 계정 삭제 뒤의 세션 폐기도 인증 생명주기이므로 account.ts에서 중복 구현하지 않고
+// 이 함수를 공유한다. generation을 올려 이미 진행 중인 refresh 응답까지 무효화한다.
 export function invalidateAuthenticatedSession(): void {
   authGeneration += 1
   authAttempt += 1
@@ -117,9 +121,8 @@ function rejectCurrentSession(expectedGeneration: number): void {
   authState.initialized = true
 }
 
-// Also used by fileTransfer.ts, whose XHR-based uploadFile has no Response
-// object to pass through authRequestError and must map a manually parsed
-// error body instead.
+// XHR 기반 업로드는 Response 객체가 없으므로 파싱한 오류 본문에도 같은 사용자 문구
+// 매핑을 적용할 수 있게 메시지 해석만 별도 함수로 공개한다.
 export function resolveErrorMessage(
   body: { error?: string; message?: string } | null,
   fallback: string,
@@ -140,6 +143,7 @@ function applyAuthenticatedSession(
   expectedGeneration: number,
   expectedAttempt: number,
 ): AuthUser {
+  // 요청 중 로그아웃이나 다른 로그인이 시작됐다면 오래된 성공 응답을 세션으로 채택하지 않는다.
   if (expectedGeneration !== authGeneration || expectedAttempt !== authAttempt) {
     throw new Error('Authentication request was superseded by a newer session')
   }
@@ -159,6 +163,7 @@ async function requestPasswordSession(
   payload: Record<string, string>,
   fallback: string,
 ): Promise<AuthUser> {
+  // 명시적 로그인은 기존 자동 refresh보다 우선하므로 먼저 진행 중인 refresh를 취소한다.
   abortRefresh()
   const generation = authGeneration
   const attempt = ++authAttempt
@@ -181,6 +186,7 @@ async function requestRefresh(expectedGeneration = authGeneration): Promise<bool
     return false
   }
   const generation = expectedGeneration
+  // 여러 API가 동시에 401을 받아도 refresh 요청은 한 번만 보내고 같은 결과를 기다린다.
   if (refreshInFlight?.generation === generation) return refreshInFlight.promise
 
   const controller = new AbortController()
@@ -221,6 +227,7 @@ async function requestRefresh(expectedGeneration = authGeneration): Promise<bool
 
 export async function initializeAuth(): Promise<void> {
   if (authState.initialized) return
+  // 앱 시작 시 여러 가드가 호출해도 초기 세션 확인은 하나의 Promise를 공유한다.
   if (initialization) return initialization
 
   initialization = (async () => {
@@ -282,13 +289,14 @@ export async function authFetch(
   }
 
   let response = await makeRequest()
+  // 이 요청이 속한 세션이 여전히 유효할 때만 token을 갱신하고 원 요청을 한 번 재시도한다.
   if (response.status === 401 && requestGeneration === authGeneration) {
     try {
       if ((await requestRefresh(requestGeneration)) && requestGeneration === authGeneration) {
         response = await makeRequest()
       }
     } catch {
-      // A transient refresh failure must not erase a still-valid local session.
+      // 일시적인 refresh 장애만으로 아직 유효할 수 있는 로컬 세션을 지우지는 않는다.
     }
   }
   return response
@@ -298,6 +306,7 @@ export async function apiRequest<T>(
   input: RequestInfo | URL,
   init: ApiRequestInit = {},
 ): Promise<T> {
+  // 도메인 API가 JSON 직렬화와 공통 오류 처리를 반복하지 않도록 얇은 계약으로 감싼다.
   const { json, ...requestInit } = init
   if (json !== undefined) {
     const headers = new Headers(requestInit.headers)
@@ -319,8 +328,8 @@ export async function apiRequest<T>(
 export async function logout(): Promise<void> {
   setExplicitLogout(true)
   invalidateAuthenticatedSession()
-  // Local invalidation happens before the request so late refresh responses
-  // cannot restore the session while logout is in progress.
+  // 서버 요청보다 로컬 세션을 먼저 폐기해 늦게 도착한 refresh 응답이 로그아웃 중
+  // 사용자를 다시 로그인 상태로 되돌리는 경쟁 조건을 막는다.
   await fetch('/api/auth/logout', {
     method: 'POST',
     credentials: 'same-origin',

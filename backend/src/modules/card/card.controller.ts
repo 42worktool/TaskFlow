@@ -112,6 +112,7 @@ export const moveToInbox: RequestHandler = async (req, res) => {
 
 export const addAttachment: RequestHandler = async (req, res) => {
   if (!req.file) throw new BadRequestError('file is required')
+  // multer가 이미 저장한 파일은 이후 서비스 실패 시 래퍼가 제거해 고아 파일을 막는다.
   const attachment = await withUploadCleanup('attachments', req.file, () =>
     svc.addAttachment({
       userId: authenticatedUserId(req),
@@ -123,6 +124,7 @@ export const addAttachment: RequestHandler = async (req, res) => {
 }
 
 export const downloadAttachment: RequestHandler = async (req, res) => {
+  // 서비스에서 권한을 확인한 뒤에만 절대 경로를 받아 Express 다운로드로 전달한다.
   const file = await svc.getAttachmentFile({
     userId: authenticatedUserId(req),
     attachmentId: req.params.attachment_id as string,

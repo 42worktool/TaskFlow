@@ -35,6 +35,8 @@ export class RealtimeRouter {
   private readonly handlers = new Map<string, RegisteredHandler>()
 
   register<T>(event: string, schema: ZodType<T>, handler: RealtimeHandler<T>): () => void {
+    // 이벤트 이름과 payload 검증을 중앙 라우터가 담당해 각 실시간 도메인 핸들러가
+    // 검증되지 않은 데이터를 직접 다루지 않게 한다.
     if (!eventNameSchema.safeParse(event).success) {
       throw new Error(`Invalid realtime event name "${event}"`)
     }
@@ -48,6 +50,7 @@ export class RealtimeRouter {
     const registeredHandler = { schema, handle: handler } as RegisteredHandler
     this.handlers.set(event, registeredHandler)
     return () => {
+      // 재시작/테스트 중 같은 이름으로 새 등록이 생겼다면 이전 해제 함수가 지우지 못하게 한다.
       if (this.handlers.get(event) === registeredHandler) {
         this.handlers.delete(event)
       }

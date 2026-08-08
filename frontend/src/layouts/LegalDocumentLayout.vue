@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageHeader from '../components/PageHeader.vue'
 
+// 법적 문서가 같은 헤더·시행일·본문 폭을 사용하도록 내용만 slot으로 분리한다.
 withDefaults(defineProps<{ title: string; effectiveDate?: string }>(), {
   effectiveDate: '2026년 7월 22일',
 })

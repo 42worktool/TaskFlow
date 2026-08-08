@@ -9,6 +9,8 @@ import {
   parseDateValue,
 } from '../utils/datePicker'
 
+// 브라우저 기본 date input 대신 동일한 달력 UI와 min/max 규칙을 모든 브라우저에서 제공한다.
+// modelValue는 날짜 문자열로만 주고받아 시간대 변환으로 날짜가 달라지는 문제를 피한다.
 const props = withDefaults(
   defineProps<{
     modelValue: string
@@ -53,6 +55,7 @@ function setVisibleMonth(value: string): void {
 }
 
 function openPicker(): void {
+  // 현재 값이 범위 밖이거나 비어 있어도 선택 가능한 가장 가까운 월에서 달력을 연다.
   if (props.disabled) return
   const initial = clampDateValue(props.modelValue || today, props.min, props.max)
   setVisibleMonth(initial)
@@ -70,6 +73,7 @@ function togglePicker(): void {
 }
 
 function changeMonth(amount: number): void {
+  // 선택 가능한 날짜가 하나도 없는 월로는 이동하지 않아 빈 탐색 상태를 만들지 않는다.
   const target = new Date(viewYear.value, viewMonth.value - 1 + amount, 1, 12)
   if (!monthHasSelectableDate(target.getFullYear(), target.getMonth() + 1, props.min, props.max)) {
     return

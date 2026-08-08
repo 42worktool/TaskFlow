@@ -1,3 +1,4 @@
+// 카드 생성·이동·기간·완료·댓글 입력을 서비스 호출 전에 검증하는 요청 경계다.
 import { z } from 'zod'
 import { uuidSchema } from '../../lib/validation'
 
