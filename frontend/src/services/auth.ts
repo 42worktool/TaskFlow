@@ -185,6 +185,7 @@ async function requestRefresh(expectedGeneration = authGeneration): Promise<bool
 
   const controller = new AbortController()
   const promise = (async () => {
+    if (authState.user === null && authState.accessToken === null) return false
     const response = await fetch('/api/auth/refresh', {
       method: 'POST',
       credentials: 'same-origin',
