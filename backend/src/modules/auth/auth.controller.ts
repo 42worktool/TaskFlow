@@ -130,7 +130,8 @@ export const googleCallback: RequestHandler = async (req, res) => {
 export const refresh: RequestHandler = async (req, res, next) => {
   const currentToken = req.cookies?.[REFRESH_TOKEN_COOKIE]
   if (typeof currentToken !== 'string') {
-    throw new AppError('MISSING_REFRESH_TOKEN', 401, 'Refresh cookie is missing')
+    res.status(204).send()
+    return
   }
 
   try {
