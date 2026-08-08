@@ -32,7 +32,7 @@ start() {
     -o ServerAliveCountMax=3 \
     -o BatchMode=yes \
     -o StrictHostKeyChecking=accept-new \
-    -R "$PORT:localhost:$PORT" "$SSH_TUNNEL_HOST" \
+    -R "443:localhost:$PORT" "$SSH_TUNNEL_HOST" \
     >"$LOG_FILE" 2>&1 </dev/null &
   echo $! > "$PID_FILE"
 
