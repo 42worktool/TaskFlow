@@ -153,6 +153,14 @@ async function loadWorkspace(id: string, reset: boolean): Promise<void> {
       if (generation !== workspaceLoadGeneration || id !== workspaceId.value) {
         return
       }
+      // 잘못된 ID, 접근 불가, 삭제된 워크스페이스는 루트로 복귀한다.
+      if (
+        caught instanceof Error &&
+        ['VALIDATION_ERROR', 'FORBIDDEN', 'NOT_FOUND'].includes(String(caught.cause))
+      ) {
+        void router.replace('/')
+        return
+      }
       if (attempt + 1 < attempts) {
         await new Promise((resolve) => {
           setTimeout(resolve, SUBSCRIPTION_RETRY_DELAY_MS)
