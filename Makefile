@@ -5,7 +5,7 @@ NAME = TaskFlow
 COMPOSE_DEV = docker compose -p taskflow-dev --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml
 COMPOSE_PROD = docker compose -p taskflow-prod --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml
 
-.PHONY: all up down logs dev-up dev-down dev-logs dev-seed dev-reset prod-up prod-down prod-logs clean fclean re init check_init
+.PHONY: all up down logs dev-up dev-down dev-logs dev-seed dev-reset prod-up prod-down prod-logs prod-renew clean fclean re init check_init
 
 # Default target
 all: up
@@ -80,6 +80,7 @@ dev-reset:
 
 prod-up: check_init
 	@mkdir -p .taskflow/tls
+	@set -a; . ./.env.prod; set +a; ./scripts/certbot-issue.sh
 	@echo "Building and starting the production environment..."
 	$(COMPOSE_PROD) up -d --build
 
@@ -88,6 +89,15 @@ prod-down:
 
 prod-logs:
 	$(COMPOSE_PROD) logs -f
+
+# Stop nginx, renew the Let's Encrypt certificate, then bring every
+# production service back up.
+prod-renew:
+	@echo "Stopping nginx for certificate renewal..."
+	$(COMPOSE_PROD) stop nginx
+	@set -a; . ./.env.prod; set +a; ./scripts/certbot-renew.sh
+	@echo "Starting all production services..."
+	$(COMPOSE_PROD) up -d
 
 # Remove development containers, networks, volumes, and unused Docker resources
 clean:
