@@ -1,7 +1,8 @@
 #!/bin/sh
 # Attempt to obtain a Let's Encrypt certificate for $DOMAIN before nginx starts.
-# Runs certbot in standalone mode, so it needs host port 80 free (nginx must
-# not be running yet when this script is called).
+# Runs certbot in standalone mode, listening on LOCAL_HTTP_PORT (default 8080)
+# so it doesn't need root to bind a privileged port locally; the SSH tunnel
+# (see lib-ssh-tunnel.sh) forwards the VPS's port 80 to that local port.
 #
 # On any failure (DOMAIN unset, tunnel/port 80 unreachable, rate limited, ...)
 # this exits 0 without writing any files, so nginx/docker-entrypoint.sh falls
@@ -32,7 +33,7 @@ fi
 open_tunnel
 
 echo "[certbot] Requesting a Let's Encrypt certificate for $DOMAIN..."
-if docker run --rm -p 80:80 \
+if docker run --rm -p "${LOCAL_HTTP_PORT:-8080}:80" \
     -v "$(pwd)/$LETSENCRYPT_DIR:/etc/letsencrypt" \
     certbot/certbot certonly --standalone --non-interactive --agree-tos --no-eff-email \
     -m "${CERTBOT_EMAIL:-admin@$DOMAIN}" \

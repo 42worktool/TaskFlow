@@ -83,8 +83,10 @@ prod-up: check_init
 	@set -a; . ./.env.prod; set +a; ./scripts/certbot-issue.sh
 	@echo "Building and starting the production environment..."
 	$(COMPOSE_PROD) up -d --build
+	@set -a; . ./.env.prod; set +a; ./scripts/app-tunnel.sh start
 
 prod-down:
+	@set -a; . ./.env.prod; set +a; ./scripts/app-tunnel.sh stop
 	$(COMPOSE_PROD) down
 
 prod-logs:

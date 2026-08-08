@@ -1,7 +1,7 @@
 #!/bin/sh
 # Renew the Let's Encrypt certificate for $DOMAIN.
-# Runs certbot in standalone mode, so it needs host port 80 free
-# (the caller is expected to have stopped nginx first).
+# Runs certbot in standalone mode, listening on LOCAL_HTTP_PORT (default
+# 8080); the SSH tunnel forwards the VPS's port 80 to that local port.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -24,7 +24,7 @@ fi
 open_tunnel
 
 echo "[certbot] Renewing certificate for $DOMAIN..."
-if docker run --rm -p 80:80 \
+if docker run --rm -p "${LOCAL_HTTP_PORT:-8080}:80" \
     -v "$(pwd)/$LETSENCRYPT_DIR:/etc/letsencrypt" \
     certbot/certbot renew --standalone --non-interactive; then
   cp "$LETSENCRYPT_DIR/live/$DOMAIN/fullchain.pem" "$TLS_DIR/fullchain.pem"
