@@ -4,6 +4,10 @@
 # (the caller is expected to have stopped nginx first).
 set -eu
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib-ssh-tunnel.sh"
+trap close_tunnel EXIT
+
 TLS_DIR="${TLS_CERT_DIR:-./.taskflow/tls}"
 LETSENCRYPT_DIR="./.taskflow/letsencrypt"
 
@@ -16,6 +20,8 @@ if [ ! -d "$LETSENCRYPT_DIR/live/$DOMAIN" ]; then
   echo "[certbot] No existing certificate for $DOMAIN in $LETSENCRYPT_DIR - run 'make prod-up' first to issue one."
   exit 0
 fi
+
+open_tunnel
 
 echo "[certbot] Renewing certificate for $DOMAIN..."
 if docker run --rm -p 80:80 \

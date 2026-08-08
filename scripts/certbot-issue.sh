@@ -8,6 +8,10 @@
 # back to generating its self-signed certificate as it already does today.
 set -eu
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/lib-ssh-tunnel.sh"
+trap close_tunnel EXIT
+
 TLS_DIR="${TLS_CERT_DIR:-./.taskflow/tls}"
 LETSENCRYPT_DIR="./.taskflow/letsencrypt"
 
@@ -16,12 +20,16 @@ if [ -z "${DOMAIN:-}" ]; then
   exit 0
 fi
 
-if [ -f "$TLS_DIR/fullchain.pem" ] && [ -f "$TLS_DIR/privkey.pem" ]; then
-  echo "[certbot] $TLS_DIR already has a certificate - skipping issuance."
+mkdir -p "$TLS_DIR" "$LETSENCRYPT_DIR"
+
+if [ -f "$LETSENCRYPT_DIR/live/$DOMAIN/fullchain.pem" ]; then
+  echo "[certbot] A Let's Encrypt certificate for $DOMAIN already exists - reusing it (run 'make prod-renew' to renew)."
+  cp "$LETSENCRYPT_DIR/live/$DOMAIN/fullchain.pem" "$TLS_DIR/fullchain.pem"
+  cp "$LETSENCRYPT_DIR/live/$DOMAIN/privkey.pem" "$TLS_DIR/privkey.pem"
   exit 0
 fi
 
-mkdir -p "$TLS_DIR" "$LETSENCRYPT_DIR"
+open_tunnel
 
 echo "[certbot] Requesting a Let's Encrypt certificate for $DOMAIN..."
 if docker run --rm -p 80:80 \
