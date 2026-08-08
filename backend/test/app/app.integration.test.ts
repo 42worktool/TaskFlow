@@ -123,6 +123,12 @@ test('protected routes reject requests without a bearer token', async () => {
   })
 })
 
+test('refresh without a cookie reports an empty anonymous session', async () => {
+  const result = await send('/api/auth/refresh', { method: 'POST' })
+
+  assert.deepEqual(result, { status: 204, body: null })
+})
+
 test('public profile route is reachable without a bearer token', async () => {
   const result = await send('/api/users/not-a-uuid/profile')
 

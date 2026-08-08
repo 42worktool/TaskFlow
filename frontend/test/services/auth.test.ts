@@ -54,6 +54,20 @@ describe('auth session generation', () => {
     vi.resetModules()
   })
 
+  it('treats a missing refresh cookie as an anonymous session', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))),
+    )
+
+    const { authState, initializeAuth } = await import('../../src/services/auth')
+    await initializeAuth()
+
+    expect(authState.user).toBeNull()
+    expect(authState.accessToken).toBeNull()
+    expect(authState.initialized).toBe(true)
+  })
+
   it('does not restore an explicitly logged-out session after a reload', async () => {
     const storage = memoryStorage()
     const fetchMock = vi.fn((input: RequestInfo | URL) => {

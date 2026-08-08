@@ -199,7 +199,7 @@ async function requestRefresh(expectedGeneration = authGeneration): Promise<bool
     })
 
     if (generation !== authGeneration || controller.signal.aborted) return false
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 204 || response.status === 401 || response.status === 403) {
       rejectCurrentSession(generation)
       return false
     }
