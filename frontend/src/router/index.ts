@@ -38,7 +38,7 @@ const router = createRouter({
       component: WorkspaceLayout,
       meta: { requiresAuth: true },
       children: [
-        { path: '', redirect: 'board' },
+        { path: '', redirect: '/' },
         { path: 'board', component: Board },
         { path: 'calendar', component: Calendar },
         { path: 'dashboard', component: Dashboard },
